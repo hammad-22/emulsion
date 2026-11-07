@@ -123,18 +123,17 @@ enum ColorMath {
         case 7:  // ACEScct
             return v <= 0.155251141552511 ? (v - 0.0729055341958355) / 10.5402377416545 : min(pow(2, v * 17.52 - 9.72), 65504)
         case 8:  // BT.2100 HLG inverse OETF, scaled so 38% signal = 18% gray (ITU-R BT.2408)
-            let a = 0.17883277
-            let b = 0.28466892
-            let c = 0.55991073
+            let (a, b, c) = (HLG.a, HLG.b, HLG.c)
             let e = v <= 0.5 ? v * v / 3 : (exp((v - c) / a) + b) / 12
-            return e * hlgSceneScale
+            return e * HLG.sceneScale
         case 9: return pow(max(v, 0), 2.4)
         case 10: return v <= 0.04045 ? v / 12.92 : pow((v + 0.055) / 1.055, 2.4)
         default:
             return v
         }
     }
-    static let hlgSceneScale = 0.18 / (0.38 * 0.38 / 3)
+    /// ITU-R BT.2100 HLG constants; `sceneScale` maps 38% signal to 18% gray (BT.2408).
+    enum HLG { static let a = 0.17883277, b = 0.28466892, c = 0.55991073, sceneScale = 0.18 / (0.38 * 0.38 / 3) }
     /// ARRI LogC4 specification constants.
     enum LogC4 { static let a = (262144.0 - 16) / 117.45, b = (1023.0 - 95) / 1023, c = 95.0 / 1023 }
 }

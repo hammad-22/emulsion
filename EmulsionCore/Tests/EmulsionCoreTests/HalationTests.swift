@@ -1,8 +1,5 @@
-import CoreImage
 import EmulsionFixtures
-import ImageIO
 import XCTest
-import simd
 
 @testable import EmulsionCore
 
@@ -34,7 +31,7 @@ final class HalationTests: EmulsionTestCase {
             let point = SceneFixtures.highlightPoint(size: size)
             let w = codes(try render(point, on))
             let wo = codes(try render(point))
-            let i = (size / 2) * size + size / 2 + Int(0.04 * Double(size))
+            let i = pixel(x: size / 2 + Int(0.04 * Double(size)), y: size / 2, width: size)
             return w[i].x - wo[i].x
         }
         XCTAssertEqual(try glow(400), try glow(800), accuracy: 1.5)

@@ -16,7 +16,7 @@ final class AppSettings {
 
     var autoSave: Bool { didSet { defaults.set(autoSave, forKey: Key.autoSave) } }
     var format: Renderer.ExportFormat { didSet { defaults.set(format.rawValue, forKey: Key.format) } }
-    /// Capture resolution; read by the camera once it exists (HAM-96).
+    /// Capture resolution; read by the camera once it exists (MOV-96).
     var resolution: Resolution { didSet { defaults.set(resolution.rawValue, forKey: Key.resolution) } }
 
     private let defaults = UserDefaults.standard

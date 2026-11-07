@@ -1,6 +1,6 @@
 # Market desk research (3 Nov 2026)
 
-Stand-in for interviews (HAM-20) and the on-device teardown (HAM-86); Linear HAM-104 and HAM-105. Built from public sources only: no interviews, and no apps were installed. Treat everything here as hypotheses to confirm with real people and real devices.
+Stand-in for interviews (MOV-20) and the on-device teardown (MOV-86); Linear MOV-104 and MOV-105. Built from public sources only: no interviews, and no apps were installed. Treat everything here as hypotheses to confirm with real people and real devices.
 
 ## Headline
 1. **Chromagraph proves the demand, and it's our closest rival.** Announced 28 Oct 2026 (possibly in the App Store from about 20–22 Oct), it went to No. 1 paid in US Photo & Video. It costs $12.99 once, starts from RAW, bypasses Apple's processing and renders Steve Yedlin's signature color, with grading controls (color, exposure, grain, halation). It's stills only.
@@ -44,10 +44,10 @@ Stand-in for interviews (HAM-20) and the on-device teardown (HAM-86); Linear HAM
 - **Pricing pain** across photo apps: features locked behind paywalls, surprise charges. Free is a real advantage.
 
 ## Ranked needs, and what Emulsion does about them
-1. **Natural RAW starting point, no Apple look.** Our RAW path does this; HAM-79 must confirm highlights survive.
-2. **One beautiful default that needs no fixing.** It's Chromagraph's lesson, so our default look has to win blind A/B tests (HAM-89, M3).
-3. **Believable texture: edge-following halation, density-aware grain, no banding.** Grain and halation v2, plus HAM-99 and HAM-102.
-4. **Fast and fluid.** HAM-95 is done; still needs device numbers.
+1. **Natural RAW starting point, no Apple look.** Our RAW path does this; MOV-79 must confirm highlights survive.
+2. **One beautiful default that needs no fixing.** It's Chromagraph's lesson, so our default look has to win blind A/B tests (MOV-89, M3).
+3. **Believable texture: edge-following halation, density-aware grain, no banding.** Grain and halation v2, plus MOV-99 and MOV-102.
+4. **Fast and fluid.** MOV-95 is done; still needs device numbers.
 5. **Free, no subscription.** Decided.
 6. **Video and log (Apple Log 2).** M4.
 7. **Colorist interop: LUT export, timing in printer points.** M4/M5.
@@ -56,8 +56,8 @@ Stand-in for interviews (HAM-20) and the on-device teardown (HAM-86); Linear HAM
 "Chromagraph gives you one cinematographer's film look for $12.99. Emulsion is a free, open-source film lab: RAW in, real negative-and-print simulation out, many looks you can time like a colorist, and the same engine on Mac."
 
 ## Gaps and next steps
-- Unverified: Chromagraph's import/editing of existing photos; the exact Chromagraph App Store date; how good Film(ish), Film Lab 35 and Acetate really are (add them to HAM-86); Dehancer's RAW quality; current RNI and VSCO prices; Filmbox's 2026 price.
-- Real interviews (HAM-20) and the on-device teardown (HAM-86) are still needed, starting with Chromagraph and Dehancer side by side on the same RAW files.
+- Unverified: Chromagraph's import/editing of existing photos; the exact Chromagraph App Store date; how good Film(ish), Film Lab 35 and Acetate really are (add them to MOV-86); Dehancer's RAW quality; current RNI and VSCO prices; Filmbox's 2026 price.
+- Real interviews (MOV-20) and the on-device teardown (MOV-86) are still needed, starting with Chromagraph and Dehancer side by side on the same RAW files.
 
 ## Sources
 - Chromagraph: https://www.newsshooter.com/2026/10/28/chromagraph-camera-ios-app-by-steve-yedlin-asc/ · https://macrumors.com/2026/10/30/rian-johnson-iphone-camera-app/ · https://www.macobserver.com/?p=494827 · https://nofilmschool.com/rian-johnson-steve-yedlin-app

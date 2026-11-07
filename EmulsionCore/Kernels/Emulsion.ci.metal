@@ -155,9 +155,9 @@ float decodeCurve(float v, int curve) {
     case 7: // ACEScct
         return v<=0.155251141552511 ? (v-0.0729055341958355)/10.5402377416545 : min(exp2(v*17.52-9.72),65504.0);
     case 8: { // BT.2100 HLG inverse OETF, scaled so 38% signal = 18% gray (BT.2408)
-        float a=0.17883277, b=0.28466892, c=0.55991073, hlgSceneScale=0.18/(0.38*0.38/3.0);
+        float a=0.17883277, b=0.28466892, c=0.55991073, sceneScale=0.18/(0.38*0.38/3.0);
         float e=v<=0.5 ? v*v/3.0 : (exp((v-c)/a)+b)/12.0;
-        return e*hlgSceneScale; }
+        return e*sceneScale; }
     case 9: return pow(max(v,0.0),2.4);
     case 10: return v<=0.04045 ? v/12.92 : pow((v+0.055)/1.055,2.4);
     default: return v;

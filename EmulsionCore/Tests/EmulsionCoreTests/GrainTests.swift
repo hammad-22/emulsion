@@ -1,8 +1,5 @@
-import CoreImage
 import EmulsionFixtures
-import ImageIO
 import XCTest
-import simd
 
 @testable import EmulsionCore
 
@@ -67,7 +64,7 @@ final class GrainTests: EmulsionTestCase {
         let preview = renderer.resized(negative, longestEdge: 1600)
         let previewSD = sd(codes(try renderer.render(preview, a)).map(luma))
         let full = try renderer.render(negative, a)
-        let down = full.applyingFilter("CILanczosScaleTransform", parameters: [kCIInputScaleKey: 0.4, kCIInputAspectRatioKey: 1])
+        let down = full.lanczosScaled(by: 0.4)
             .cropped(to: CGRect(x: 0, y: 0, width: 1600, height: 1200))
         let exportSD = sd(codes(down).map(luma))
         XCTAssertEqual(previewSD / exportSD, 1, accuracy: 0.35, "preview σ \(previewSD) vs downsampled export σ \(exportSD)")
