@@ -1,6 +1,4 @@
-import CoreImage
 import EmulsionFixtures
-import ImageIO
 import XCTest
 import simd
 
@@ -15,7 +13,7 @@ final class LocalToneTests: EmulsionTestCase {
             var a = Adjustments.neutral
             a.shadows = sh
             a.highlights = hi
-            let row = Array(codes(try render(step, a))[(80 * 1200)..<(81 * 1200)]).map(luma)
+            let row = Array(codes(try render(step, a))[pixel(x: 0, y: 80, width: 1200)..<pixel(x: 0, y: 81, width: 1200)]).map(luma)
             let dev = (0..<1200).filter { abs($0 - 600) > 4 }.map { abs(row[$0] - ($0 < 600 ? row[20] : row[1180])) }.max()!
             XCTAssertLessThanOrEqual(dev, 3)
         }

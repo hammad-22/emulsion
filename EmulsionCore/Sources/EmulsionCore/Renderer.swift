@@ -33,12 +33,10 @@ public final class Renderer: @unchecked Sendable {
         let longEdge = max(extent.width, extent.height)
 
         // Halation is an exposure effect, computed in scene light. Exposure is applied later
-        // (in the film kernel), so the threshold is scaled by 2^-exposure instead (HAM-102).
+        // (in the film kernel), so the threshold is scaled by 2^-exposure instead (MOV-102).
         if a.halation > 0 {
             let threshold = FilmLook.halationThreshold / pow(2, a.exposure)
             let source = try kernels.run(kernels.halationSource, extent, [image, threshold])
-            // The glow is low-frequency: blur at reduced scale (exact 2×2 box halvings keep the
-            // energy of small highlights) as long as the blur stays ≥ 2 px there.
             let core = Self.lowResBlur(source, sigma: FilmLook.halationRadius * longEdge)
             let skirt = Self.lowResBlur(source, sigma: FilmLook.halationSkirt * longEdge)
             let coreShare = FilmLook.halationCoreShare
@@ -67,8 +65,7 @@ public final class Renderer: @unchecked Sendable {
         return image.cropped(to: extent)
     }
 
-    /// Gaussian blur computed at reduced resolution: exact 2×2 halvings (energy-preserving),
-    /// as long as the blur stays at least `minBlurPixels` wide at the reduced scale.
+    /// Blurs at reduced scale: exact 2×2 halvings keep the energy of small highlights.
     static func lowResBlur(_ image: CIImage, sigma: Double) -> CIImage {
         let maxHalvings = 3
         let minBlurPixels = 2.0

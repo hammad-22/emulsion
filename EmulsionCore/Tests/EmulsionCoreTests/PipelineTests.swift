@@ -1,8 +1,6 @@
-import CoreImage
 import EmulsionFixtures
 import ImageIO
 import XCTest
-import simd
 
 @testable import EmulsionCore
 

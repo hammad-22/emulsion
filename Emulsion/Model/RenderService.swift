@@ -21,7 +21,11 @@ actor RenderService {
 
     private func negative(_ url: URL, maxDimension: CGFloat) throws -> Negative {
         let key = "\(url.lastPathComponent)@\(Int(maxDimension))"
-        if let cached = previews[key] { return cached }
+        if let cached = previews[key] {
+            lruKeys.removeAll { $0 == key }
+            lruKeys.append(key)
+            return cached
+        }
         let renderer = try engine()
         let developed = try renderer.developer.develop(Data(contentsOf: url), maxDimension: maxDimension)
         // Draft RAW decode may come back larger than asked; fit it exactly. Then render it
@@ -44,12 +48,5 @@ actor RenderService {
         let renderer = try engine()
         let full = try renderer.developer.develop(Data(contentsOf: url))
         return try renderer.export(renderer.render(full, adjustments), format: format)
-    }
-
-    /// Drops cached previews of a photo (for the delete flow, not wired yet).
-    func forget(_ url: URL) {
-        let prefix = url.lastPathComponent + "@"
-        for key in previews.keys where key.hasPrefix(prefix) { previews[key] = nil }
-        lruKeys.removeAll { $0.hasPrefix(prefix) }
     }
 }

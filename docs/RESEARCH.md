@@ -270,7 +270,7 @@ Each finding is laid out as: **What we learned** → **Evidence** → **What we'
 | 0 | Input correctness: RAW headroom, signal range, Apple Log 2, JPEG inversion, grain seeds | Wrong inputs make every look wrong | M | See the review's acceptance criteria (HAM issues) |
 | 1 | End-to-end tone refit: printing-density negative + 2383 + flare (F3) + printer points (F8) | Visible quality gain without harshness | M | Mid-gray gamma band agreed; highlight/black anchors; colorist A/B ≥ 3/5 prefer it |
 | 2 | Digitize Vision3 250D/500T + 2383 data (F1) | Unlocks everything below | M | Traced curves overlay the charts within 1 px; method documented |
-| 3 | Real-material validation (moved up, Codex review) | Synthetic tests can't judge beauty; must come before more stocks | M | 30-image / 10-clip set + real film test (HAM-89); 5 colorists rate vs Filmbox/Dehancer |
+| 3 | Real-material validation (moved up, Codex review) | Synthetic tests can't judge beauty; must come before more stocks | M | 30-image / 10-clip set + real film test (MOV-89); 5 colorists rate vs Filmbox/Dehancer |
 | 4 | Display outputs incl. HDR (F10), rendered from film state before the SDR clip | Required by colorists and for video | M | Standard reference values per output |
 | 5 | Spectral negative→print model baked to 3D LUT (F2, F9), only if it beats a fitted RGB baseline on real data | Candidate realism jump | M-L | Beats RGB baseline on paired film/digital data; GPU vs reference within 0.5 step |
 | 6 | iPhone performance (live preview, 4K video) | "Fast and fluid" promise | M | 120 Hz preview, 4K30 playback, < 1 GB memory |

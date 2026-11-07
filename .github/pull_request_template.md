@@ -1,5 +1,5 @@
 ## What and why
-<!-- One or two sentences. Link the Linear issue (e.g. HAM-95). -->
+<!-- One or two sentences. Link the Linear issue (e.g. MOV-95). -->
 
 ## Proof
 <!-- Required.

@@ -49,7 +49,7 @@ public struct FilmModel: Sendable, Equatable {
     /// above +1.5 stops on the brightest channel the result blends toward a ratio-preserving
     /// rendering through the same neutral response. Below +1.5 stops the result is unchanged.
     /// Artistic, not physical: bright neutrals lose part of their printer-light timing, and very
-    /// bright saturated colors keep a tint instead of reaching white (HAM-99).
+    /// bright saturated colors keep a tint instead of reaching white (MOV-99).
     public var highlightChromaRetention = 0.6
 
     /// Scene mid-gray (18%) is timed to this display-linear value on every channel.

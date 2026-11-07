@@ -1,6 +1,4 @@
-import CoreImage
 import EmulsionFixtures
-import ImageIO
 import XCTest
 import simd
 
@@ -33,7 +31,7 @@ final class FilmModelTests: EmulsionTestCase {
             let base = 0.5 + 0.5 * SIMD3(r, g, b)
             colors.append(base * Float(0.18 * pow(2, Double(r + g) * 6 - 6)))
         }
-        let image = Fixtures.row(colors, space: CGColorSpace(name: CGColorSpace.extendedLinearDisplayP3)!)
+        let image = Fixtures.row(colors, space: SceneFixtures.linearP3)
         let gpu = codes(try render(image))
         for (i, c) in colors.enumerated() {
             let ref = FilmLook.stock.render(SIMD3(Double(c.x), Double(c.y), Double(c.z)))

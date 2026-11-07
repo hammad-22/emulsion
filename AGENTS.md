@@ -14,7 +14,7 @@ iOS 26 / macOS 26 only, iPhone 17 Pro and iPhone Duo as targets. Swift 6.4 toolc
   - `Sources/EmulsionCore/`: film math (`FilmModel`), input transforms (`ColorSpaces`), develop (`Developer`), render graph and export (`Renderer`), stock and texture constants (`FilmLook`), kernel argument packing (`FilmModel+Kernel`).
   - `Kernels/Emulsion.ci.metal`: GPU kernels; must match the Swift mirror. Compiled `.metallib`s are checked in under `Resources/Kernels/`.
   - `Sources/EmulsionFixtures/`: synthetic test images. `Tests/`: the test suite.
-- `Emulsion/`: the SwiftUI app. Only the data layer exists; the camera and screens aren't written, so it doesn't compile yet (HAM-96).
+- `Emulsion/`: the SwiftUI app. Only the data layer exists; the camera and screens aren't written, so it doesn't compile yet (MOV-96).
 - `scripts/`: `build-kernels.sh` rebuilds the metallibs.
 
 ## Commands
@@ -57,7 +57,7 @@ swift format lint --recursive EmulsionCore Emulsion          # style (config: .s
 ## Hard rules
 - Film/input math changes go into the Metal kernel *and* its Swift mirror, with metallibs rebuilt in the same commit.
 - Don't call anything "physical", "accurate" or "like stock X" without a measurement or a primary source. Label artistic choices as artistic.
-- No GPL code or data in the engine or apps (Apache-2.0 plan, HAM-94). No film brand names in the product (HAM-92).
+- No GPL code or data in the engine or apps (Apache-2.0 plan, MOV-94). No film brand names in the product (MOV-92).
 - Don't add per-pixel iterative solves to the live preview path without profiling on device.
 
 ## Keep this file current

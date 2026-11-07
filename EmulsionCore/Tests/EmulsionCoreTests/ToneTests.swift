@@ -1,16 +1,14 @@
-import CoreImage
 import EmulsionFixtures
-import ImageIO
 import XCTest
-import simd
 
 @testable import EmulsionCore
 
 final class ToneTests: EmulsionTestCase {
     func testNeutralWedgeIsMonotoneNearNeutralAndRollsOffHighlights() throws {
         let (wedge, stops) = SceneFixtures.wedge()
-        let out = codes(try render(wedge))
-        let labs = Fixtures.oklab(try render(wedge))
+        let rendered = try render(wedge)
+        let out = codes(rendered)
+        let labs = Fixtures.oklab(rendered)
         let mid = stops.firstIndex { $0 >= 0 }!
         // 18% gray → 0.17 display-linear ≈ 114 code (encoded).
         XCTAssertEqual(out[mid].y, Double(Fixtures.encode(Float(FilmLook.stock.middleGrayOut))) * 255, accuracy: 1.0)

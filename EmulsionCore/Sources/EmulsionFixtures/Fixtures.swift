@@ -13,13 +13,12 @@ public enum Fixtures {
         width: Int, height: Int, space: CGColorSpace,
         _ color: (Int, Int) -> SIMD3<Float>
     ) -> CIImage {
-        var values = [Float]()
-        values.reserveCapacity(width * height * 4)
+        var values = [SIMD4<Float>](repeating: .zero, count: width * height)
         // CIImage bitmap rows are top-down; generate so that y=0 is the bottom row.
         for row in 0..<height {
             for x in 0..<width {
                 let c = color(x, height - 1 - row)
-                values += [c.x, c.y, c.z, 1]
+                values[row * width + x] = SIMD4(c, 1)
             }
         }
         let data = values.withUnsafeBytes { Data($0) }
@@ -59,12 +58,13 @@ public enum Fixtures {
     public static func encodedFloats(_ image: CIImage, space: CGColorSpace) -> [SIMD3<Double>] {
         floats(image, space: space)
     }
+    private static let readbackContext = CIContext(options: [.workingColorSpace: linearSRGB, .workingFormat: CIFormat.RGBAf])
+
     static func floats(_ image: CIImage, space: CGColorSpace) -> [SIMD3<Double>] {
         let w = Int(image.extent.width)
         let h = Int(image.extent.height)
         var f = [Float](repeating: 0, count: w * h * 4)
-        CIContext(options: [.workingColorSpace: linearSRGB, .workingFormat: CIFormat.RGBAf])
-            .render(image, toBitmap: &f, rowBytes: w * 16, bounds: image.extent, format: .RGBAf, colorSpace: space)
+        readbackContext.render(image, toBitmap: &f, rowBytes: w * 16, bounds: image.extent, format: .RGBAf, colorSpace: space)
         var out = [SIMD3<Double>](repeating: .zero, count: w * h)
         for row in 0..<h {
             for x in 0..<w {
@@ -103,6 +103,7 @@ public enum Fixtures {
 
 public enum SceneFixtures {
     public static let linear = Fixtures.linearSRGB
+    public static let linearP3 = CGColorSpace(name: CGColorSpace.extendedLinearDisplayP3)!
 
     /// Neutral exposure wedge from −8 to +6 stops around mid-gray.
     public static func wedge(steps: Int = 141) -> (image: CIImage, stops: [Double]) {
@@ -128,7 +129,7 @@ public enum SceneFixtures {
         [0.55, 0.04, 0.03], [0.02, 0.35, 0.60], [0.60, 0.05, 0.50], [0.18, 0.18, 0.18],
     ]
     public static func patches(cell: Int = 64) -> CIImage {
-        Fixtures.image(width: cell * patchesP3.count, height: cell, space: CGColorSpace(name: CGColorSpace.extendedLinearDisplayP3)!) {
+        Fixtures.image(width: cell * patchesP3.count, height: cell, space: linearP3) {
             x, _ in
             patchesP3[x / cell]
         }

@@ -68,7 +68,7 @@ public struct Developer {
     /// pixel buffer) from a camera or display encoding into scene light.
     public func scene(fromEncoded image: CIImage, as space: InputColorSpace) throws -> Negative {
         let m = space.toWorking
-        let rows = (0..<3).map { CIVector(row: $0, of: m) }
+        let rows = CIVector.rows(of: m)
         let linear = try kernels.run(kernels.inputTransform, image.extent, [image, Double(space.curve)] + rows)
         return space.isDisplayReferred ? try sceneFromDisplay(linear) : Negative(image: linear, source: .raw)
     }
@@ -76,12 +76,5 @@ public struct Developer {
     private func normalized(_ image: CIImage) -> CIImage {
         let e = image.extent.integral
         return image.cropped(to: e).transformed(by: CGAffineTransform(translationX: -e.minX, y: -e.minY))
-    }
-}
-
-extension CIImage {
-    /// High-quality downscale, used for previews and RAW drafts.
-    func lanczosScaled(by scale: CGFloat) -> CIImage {
-        applyingFilter("CILanczosScaleTransform", parameters: [kCIInputScaleKey: scale, kCIInputAspectRatioKey: 1])
     }
 }
