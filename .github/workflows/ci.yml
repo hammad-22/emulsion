@@ -1,0 +1,40 @@
+name: CI
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  engine:
+    name: Engine tests, lint, kernels
+    runs-on: macos-26
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Select newest Xcode
+        run: |
+          XCODE=$(ls -d /Applications/Xcode*.app | sort -V | tail -1)
+          echo "DEVELOPER_DIR=$XCODE/Contents/Developer" >> "$GITHUB_ENV"
+          echo "Using $XCODE"
+
+      - name: Toolchain versions
+        run: |
+          xcodebuild -version
+          swift --version
+
+      - name: Lint (swift format)
+        run: swift format lint --strict --recursive EmulsionCore Emulsion
+
+      # Compile-only for now: byte-for-byte comparison needs path-independent builds (MOV-123).
+      - name: Kernels compile
+        run: sh scripts/build-kernels.sh
+
+      - name: Engine tests
+        working-directory: EmulsionCore
+        run: swift test
