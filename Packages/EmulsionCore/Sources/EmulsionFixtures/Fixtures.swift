@@ -9,8 +9,9 @@ public enum Fixtures {
     public static let linearSRGB = CGColorSpace(name: CGColorSpace.extendedLinearSRGB)!
 
     /// Float RGBA image in an encoded color space, bottom row first (Core Image convention).
+    /// A nil `space` keeps raw code values (no color matching), as for camera log input.
     public static func image(
-        width: Int, height: Int, space: CGColorSpace,
+        width: Int, height: Int, space: CGColorSpace?,
         _ color: (Int, Int) -> SIMD3<Float>
     ) -> CIImage {
         var values = [SIMD4<Float>](repeating: .zero, count: width * height)
@@ -27,7 +28,7 @@ public enum Fixtures {
             size: CGSize(width: width, height: height), format: .RGBAf, colorSpace: space)
     }
 
-    public static func row(_ colors: [SIMD3<Float>], space: CGColorSpace) -> CIImage {
+    public static func row(_ colors: [SIMD3<Float>], space: CGColorSpace?) -> CIImage {
         image(width: colors.count, height: 1, space: space) { x, _ in colors[x] }
     }
 

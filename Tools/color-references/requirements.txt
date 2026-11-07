@@ -1,0 +1,3 @@
+# Offline test-reference tooling only; never shipped. colour-science is BSD-3-Clause, NumPy BSD-3-Clause.
+colour-science==0.4.7
+numpy==2.5.4
