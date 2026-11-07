@@ -58,7 +58,7 @@ swift format lint --recursive EmulsionCore Emulsion          # style (config: .s
   2. Run the Swift review skill (`.agents/skills/swift-review/SKILL.md`; `/swift-review` in Claude Code).
   3. Run a bug review: `/code-review high` on the branch diff (or Codex's code review). For risky engine or color-pipeline changes, note in the PR that `/code-review ultra` is recommended; only the owner can launch it.
   4. Investigate every finding and mark it ACCEPT or REFUTE, with proof (a reproduction, file:line or a test). Fix what's accepted, adding a regression test for each real bug.
-  5. Open the PR as a **draft** (`gh pr create --draft`, or `gh stack submit --draft`) with the verdicts in a PR comment.
+  5. Open the PR as a **draft** (`gh pr create --draft`; for stacks, `gh stack submit --auto` then `gh pr ready --undo <n>`) with the verdicts in a PR comment.
   6. Mark it ready (`gh pr ready`) once CI is green.
 - **Merging:** the parent session merges ready PRs once CI is green and the review verdicts are recorded. Stacks merge bottom-up.
 
