@@ -38,3 +38,7 @@ jobs:
       - name: Engine tests
         working-directory: Packages/EmulsionCore
         run: swift test
+
+      - name: App logic tests (EmulsionKit)
+        working-directory: Packages/EmulsionKit
+        run: swift test
