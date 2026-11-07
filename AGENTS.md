@@ -3,7 +3,7 @@
 A free, open-source film lab for iPhone (Mac later): RAW and log footage in, a simulated negative → print film process out. **The engine is the product**: fast, honest about what it models, and verified.
 
 - Background: `docs/ENGINE.md` (how it works), `docs/DECISIONS.md` (owner decisions), `docs/RESEARCH.md`, `docs/MARKET-RESEARCH.md`.
-- Work: Linear project **Emulsion** (personal workspace "Hammad Shahid", not ResortPass). GitHub: `hammad-22/emulsion` (private).
+- Work: Linear team **Emulsion** (key `MOV`, personal workspace "Hammad Shahid", not ResortPass). GitHub: `hammad-22/emulsion` (private).
 - This file is the single source of rules for every coding agent (Codex reads it directly; `CLAUDE.md` imports it). Folder-specific rules live in nested `AGENTS.md` files: `EmulsionCore/Kernels/`, `EmulsionCore/Tests/`, `Emulsion/`. Read the nested file before editing in that folder.
 
 ## Stack
@@ -53,6 +53,19 @@ swift format lint --recursive EmulsionCore Emulsion          # style (config: .s
   1. Run a simplify pass for reuse, simplification and efficiency, and apply the fixes. In Claude Code that's `/simplify`.
   2. Run a bug review on every PR: `/code-review high <PR#>` in Claude Code (included in the plan), or Codex's code review. For big or risky PRs (engine math, color pipeline), also ask the owner to launch `/code-review ultra <PR#>`. It runs in the cloud and costs about $5–25 per run after 3 free runs, so agents can't start it.
   3. Investigate every finding and mark it ACCEPT or REFUTE, with proof (a reproduction, file:line or a test). Fix what's accepted, add a regression test for each real bug, and record the verdicts in a PR comment.
+
+## Linear
+- **Projects:**
+  - *Emulsion Engine*: milestones E1 inputs, E2 film realism, E3 video/HDR/interop, E4 Windows (later).
+  - *Emulsion iOS App*: I1 builds and runs, I2 stills on TestFlight, I3 video.
+  - *Emulsion Mac App*: X1 MVP, X2 colorist tools, X3 plugins.
+  - *Emulsion Product & Launch*: P1 demand, P2 open source and legal, P3 App Store.
+- **Labels:** one *Platform* label (iOS, macOS, Engine, Windows) plus one *Area* label (Color I/O, Texture, and so on).
+- **Issues are living documents.** Each has a "For agents" section: where to start, how to verify, what needs the owner.
+  - When you learn something or find a better approach, rewrite the plan in the description and say why in a comment.
+  - Link PRs, and move the status as work progresses.
+  - New issues follow the same shape: what/why, acceptance, For agents.
+- **Branch names** use Linear's suggestion (e.g. `hammadshahid22/mov-96-...`) so PRs link to their issue automatically.
 
 ## Hard rules
 - Film/input math changes go into the Metal kernel *and* its Swift mirror, with metallibs rebuilt in the same commit.
