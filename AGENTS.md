@@ -39,6 +39,10 @@ swift format lint --recursive EmulsionCore Emulsion          # style (config: .s
 
 ## Workflow
 - **Branch per topic, PR into `main`.** Never commit to `main`. Ask before pushing to a new remote or making anything public.
+- **Stack dependent PRs with GitHub stacked PRs** (`gh stack`, needs gh ≥ 2.90 and `gh extension install github/gh-stack`):
+  - `gh stack init <branch>` to start; `gh stack add <branch>` for each dependent change; `gh stack submit` to push and open the PRs; `gh stack sync` after merges.
+  - GitHub rebases the rest of the stack when a lower PR merges, so don't rebase by hand.
+  - Edit each PR description after `submit` to use the template.
 - **Reproduce bugs with a failing test first, then fix.**
 - **Review agents always.** Have an independent agent check any non-trivial engine change, research claim or verdict. Back claims with proof (file:line, a reproduced number, a source URL) and say what's unverified.
 - **Reuse before writing.** Search for an existing helper before adding one. Duplicates between Swift and Metal are deliberate mirrors; any other duplicate is a bug.
@@ -51,8 +55,9 @@ swift format lint --recursive EmulsionCore Emulsion          # style (config: .s
 - **PR descriptions** cover what, why, proof, testing and the Linear issue. No tool-attribution footers.
 - **After opening every PR, review it before asking for a merge:**
   1. Run a simplify pass for reuse, simplification and efficiency, and apply the fixes. In Claude Code that's `/simplify`.
-  2. Run a bug review on every PR: `/code-review high <PR#>` in Claude Code (included in the plan), or Codex's code review. For big or risky PRs (engine math, color pipeline), also ask the owner to launch `/code-review ultra <PR#>`. It runs in the cloud and costs about $5–25 per run after 3 free runs, so agents can't start it.
-  3. Investigate every finding and mark it ACCEPT or REFUTE, with proof (a reproduction, file:line or a test). Fix what's accepted, add a regression test for each real bug, and record the verdicts in a PR comment.
+  2. Run the Swift review skill (`.agents/skills/swift-review/SKILL.md`; `/swift-review` in Claude Code) for idioms and project rules.
+  3. Run a bug review on every PR: `/code-review high <PR#>` in Claude Code (included in the plan), or Codex's code review. For big or risky PRs (engine math, color pipeline), also ask the owner to launch `/code-review ultra <PR#>`. It runs in the cloud and costs about $5–25 per run after 3 free runs, so agents can't start it.
+  4. Investigate every finding and mark it ACCEPT or REFUTE, with proof (a reproduction, file:line or a test). Fix what's accepted, add a regression test for each real bug, and record the verdicts in a PR comment.
 
 ## Linear
 - **Projects:**
