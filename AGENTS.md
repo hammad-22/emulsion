@@ -3,6 +3,7 @@
 A free, open-source film lab for iPhone (Mac later): RAW and log footage in, a simulated negative → print film process out. **The engine is the product**: fast, honest about what it models, and verified.
 
 - Background: `docs/ENGINE.md` (how it works), `docs/DECISIONS.md` (owner decisions), `docs/RESEARCH.md`, `docs/MARKET-RESEARCH.md`.
+- Film physics for E2 work: `docs/FILM-THEORY.md` (equations, sources, what the engine models vs approximates, gap list) and `docs/STOCK-DATA.md` (datasheet inventory). Read both before changing the film model.
 - Work: Linear team **Emulsion** (key `MOV`). GitHub: `hammad-22/emulsion` (open source, Apache-2.0).
 - This file is the single source of rules for every coding agent (Codex reads it directly; `CLAUDE.md` imports it). Folder-specific rules live in nested `AGENTS.md` files: `EmulsionCore/Kernels/`, `EmulsionCore/Tests/`, `Emulsion/`. Read the nested file before editing in that folder.
 
