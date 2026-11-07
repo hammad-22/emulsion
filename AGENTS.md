@@ -53,11 +53,23 @@ swift format lint --recursive EmulsionCore Emulsion          # style (config: .s
   - docs-only changes: say "no visual change".
 - **Run the app in the Simulator** for any app change; don't stop at "it compiles". Use the iPhone 17 Pro simulator, plus iPhone Duo once the Xcode 27.1 SDK is installed.
 - **PR descriptions** cover what, why, proof, testing and the Linear issue. No tool-attribution footers.
-- **After opening every PR, review it before asking for a merge:**
-  1. Run a simplify pass for reuse, simplification and efficiency, and apply the fixes. In Claude Code that's `/simplify`.
-  2. Run the Swift review skill (`.agents/skills/swift-review/SKILL.md`; `/swift-review` in Claude Code) for idioms and project rules.
-  3. Run a bug review on every PR: `/code-review high <PR#>` in Claude Code (included in the plan), or Codex's code review. For big or risky PRs (engine math, color pipeline), also ask the owner to launch `/code-review ultra <PR#>`. It runs in the cloud and costs about $5–25 per run after 3 free runs, so agents can't start it.
-  4. Investigate every finding and mark it ACCEPT or REFUTE, with proof (a reproduction, file:line or a test). Fix what's accepted, add a regression test for each real bug, and record the verdicts in a PR comment.
+- **Review before the PR, then open it as a draft:**
+  1. On the finished branch, run a simplify pass (`/simplify` in Claude Code) and apply the fixes.
+  2. Run the Swift review skill (`.agents/skills/swift-review/SKILL.md`; `/swift-review` in Claude Code).
+  3. Run a bug review: `/code-review high` on the branch diff (or Codex's code review). For risky engine or color-pipeline changes, note in the PR that `/code-review ultra` is recommended; only the owner can launch it.
+  4. Investigate every finding and mark it ACCEPT or REFUTE, with proof (a reproduction, file:line or a test). Fix what's accepted, adding a regression test for each real bug.
+  5. Open the PR as a **draft** (`gh pr create --draft`, or `gh stack submit --draft`) with the verdicts in a PR comment.
+  6. Mark it ready (`gh pr ready`) once CI is green.
+- **Merging:** the parent session merges ready PRs once CI is green and the review verdicts are recorded. Stacks merge bottom-up.
+
+## Sessions and project memory
+- **The project's memory lives in Linear**, not in any chat. Start every session by reading the *Emulsion V0 — State & handoff (read first)* document on the **Emulsion V0** initiative, then this file, then your issue.
+- **One session per Linear issue.** A parent session plans the work and starts one child session (Claude or Codex) per issue, on the issue's Linear branch name.
+- **Before ending a session:**
+  - update the issue description (plan, findings, decisions, PR links);
+  - add a dated line to the state document's Log;
+  - refresh its Status section if anything changed.
+  - Decisions made in conversation go into the state document or `docs/DECISIONS.md` the same day.
 
 ## Linear
 - **Projects:**
