@@ -13,7 +13,7 @@ actor RenderService {
     private let maxCachedPreviews = 12
     /// Preview sizes are rounded up to this step, so resizes (iPhone Duo fold/unfold, Mac
     /// windows) reuse a cached develop instead of decoding the RAW again for every size.
-    private let previewSizeStep: CGFloat = 512
+    private let previewSizeStep: CGFloat = 256
 
     private func engine() throws -> Renderer {
         if let renderer { return renderer }
