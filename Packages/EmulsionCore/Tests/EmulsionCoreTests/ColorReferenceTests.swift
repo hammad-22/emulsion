@@ -19,10 +19,17 @@ struct ColorReferenceTests {
 
     /// Scene-referred encodings are compared directly. Display encodings leave the developer as
     /// scene light through the inverse film curve, so the reference goes through the same
-    /// `sceneFromDisplay` step: the decode under test still runs on the GPU from code values.
+    /// `sceneFromDisplay` step. That step clamps to Display P3 0...1, so only in-range display
+    /// samples are checked here; negatives and superwhite are covered by the mirror test only
+    /// until the developer exposes its pre-inverse working light (MOV-80).
     @Test(arguments: InputColorSpace.allCases)
     func kernelMatchesColourScience(space: InputColorSpace) throws {
-        let samples = try ColorReferences.samples(for: space)
+        var samples = try ColorReferences.samples(for: space)
+        if space.isDisplayReferred {
+            let toP3 = InputColorSpace.displayP3.toWorking.inverse
+            samples = samples.filter { all((toP3 * $0.working) .>= 0) && all((toP3 * $0.working) .<= 1) }
+        }
+        try #require(!samples.isEmpty)
         let developer = EmulsionTestCase.sharedRenderer.developer
         let output = Fixtures.linear(try developer.scene(fromEncoded: ColorReferences.encodedImage(samples), as: space).image)
         var expected = samples.map(\.working)
@@ -36,6 +43,10 @@ struct ColorReferenceTests {
                 ColorReferences.expectMatch(actual, expected, ColorReferences.kernelTolerance, sample.label)
             }
         }
+    }
+
+    @Test func referenceTableCoversExactlyTheInputColorSpaces() throws {
+        #expect(try ColorReferences.spaceNames() == Set(InputColorSpace.allCases.map(\.rawValue)))
     }
 
     /// MOV-125: HLG squares sub-black signals into positive light; colour-science mirrors them.

@@ -15,7 +15,7 @@ iOS 26 / macOS 26 only, iPhone 17 Pro and iPhone Duo as targets. Swift 6.4 toolc
   - `Kernels/Emulsion.ci.metal`: GPU kernels; must match the Swift mirror. Compiled `.metallib`s are checked in under `Resources/Kernels/`.
   - `Sources/EmulsionFixtures/`: synthetic test images. `Tests/`: the test suite.
 - `Apps/iOS/`: the iOS app (`Emulsion.xcodeproj`, sources in `Emulsion/`). Only the data layer exists; the camera and screens aren't written, so it doesn't compile yet (MOV-96).
-- `Tools/`: `build-kernels.sh` rebuilds the metallibs.
+- `Tools/`: `build-kernels.sh` rebuilds the metallibs; `color-references/` generates the colour-science test references (offline Python, never shipped).
 
 ## Commands
 Run these yourself to verify every change. A change isn't done until they pass.
@@ -23,6 +23,7 @@ Run these yourself to verify every change. A change isn't done until they pass.
 export DEVELOPER_DIR=/Applications/Xcode.app/Contents/Developer
 sh Tools/build-kernels.sh                                    # after any .metal change
 (cd Packages/EmulsionCore && swift test)                     # must stay green
+.venv/bin/python -I Tools/color-references/generate_input_references.py  # after changing reference samples (pip install -r Tools/color-references/requirements.txt)
 (cd Packages/EmulsionCore && EMULSION_PERF=1 swift test --filter PerformanceProbe)  # Mac timings
 swift format lint --recursive Packages Apps                  # style (config: .swift-format)
 ```
