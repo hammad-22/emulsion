@@ -59,6 +59,15 @@ swift format lint --recursive EmulsionCore Emulsion          # style (config: .s
   3. Run a bug review on every PR: `/code-review high <PR#>` in Claude Code (included in the plan), or Codex's code review. For big or risky PRs (engine math, color pipeline), also ask the owner to launch `/code-review ultra <PR#>`. It runs in the cloud and costs about $5–25 per run after 3 free runs, so agents can't start it.
   4. Investigate every finding and mark it ACCEPT or REFUTE, with proof (a reproduction, file:line or a test). Fix what's accepted, add a regression test for each real bug, and record the verdicts in a PR comment.
 
+## Sessions and project memory
+- **The project's memory lives in Linear**, not in any chat. Start every session by reading the *Emulsion V0 — State & handoff (read first)* document on the **Emulsion V0** initiative, then this file, then your issue.
+- **One session per Linear issue.** A parent session plans the work and starts one child session (Claude or Codex) per issue, on the issue's Linear branch name.
+- **Before ending a session:**
+  - update the issue description (plan, findings, decisions, PR links);
+  - add a dated line to the state document's Log;
+  - refresh its Status section if anything changed.
+  - Decisions made in conversation go into the state document or `docs/DECISIONS.md` the same day.
+
 ## Linear
 - **Projects:**
   - *Emulsion Engine*: milestones E1 inputs, E2 film realism, E3 video/HDR/interop, E4 Windows (later).
