@@ -23,3 +23,14 @@ The contrast with Dehancer iOS: free versus subscription, open versus closed, an
 - Apple Log 2 / Apple Wide Gamut and 48 MP ProRAW are first-class inputs (MOV-81, MOV-79).
 - Being free removes in-app purchases and subscriptions from scope; sustainability is an open question for later.
 - Open-sourcing needs a legal check on publishing digitized datasheet data, plus the patent check (MOV-87, MOV-94).
+
+## 6 November 2026: product shape (owner)
+
+| Question | Decision |
+| --- | --- |
+| iOS apps | **One app.** It opens straight to the camera, with instant capture from the Lock Screen and Camera Control (MOV-122). The editor is one swipe away and simple by default. |
+| Capture | **Always RAW**, with a chosen **recipe** (named look, like Fujifilm film recipes) applied non-destructively on top and shown live in the viewfinder (MOV-121, MOV-65). |
+| Mac app | Aperture/Lightroom-class pro app on the same engine; the iOS app is the simpler, cleaner version (MOV-120). |
+| iPhone Duo | Equal priority with regular iPhones; unfolded layouts use the whole landscape canvas (MOV-119). |
+| Repo layout | One monorepo: `Packages/` (EmulsionCore engine, EmulsionKit, EmulsionUI), `Apps/` (iOS, macOS), `Tools/`, `docs/`. Revisit as it grows (MOV-120). |
+| Agent rules | `AGENTS.md` is the single source for Codex and Claude; Linear issues are living documents with a "For agents" section. |
