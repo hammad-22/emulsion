@@ -15,9 +15,11 @@ struct PhotoRecord: Identifiable, Codable, Equatable {
 final class PhotoStore {
     private(set) var photos: [PhotoRecord] = []
     let folder: URL
+    private let renderService: RenderService
     private var indexURL: URL { folder.appendingPathComponent("library.json") }
 
-    init() {
+    init(renderService: RenderService = .shared) {
+        self.renderService = renderService
         let base = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask)[0]
         folder = base.appendingPathComponent("Emulsion", isDirectory: true)
         try? FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
@@ -52,11 +54,13 @@ final class PhotoStore {
         save()
     }
 
-    func delete(_ id: UUID) {
+    func delete(_ id: UUID) async {
         guard let i = photos.firstIndex(where: { $0.id == id }) else { return }
-        try? FileManager.default.removeItem(at: url(for: photos[i]))
+        let file = url(for: photos[i])
+        try? FileManager.default.removeItem(at: file)
         photos.remove(at: i)
         save()
+        await renderService.forget(file)
     }
 
     private func save() {

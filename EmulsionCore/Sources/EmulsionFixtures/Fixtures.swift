@@ -58,7 +58,9 @@ public enum Fixtures {
     public static func encodedFloats(_ image: CIImage, space: CGColorSpace) -> [SIMD3<Double>] {
         floats(image, space: space)
     }
-    private static let readbackContext = CIContext(options: [.workingColorSpace: linearSRGB, .workingFormat: CIFormat.RGBAf])
+    private static let readbackContext = CIContext(options: [
+        .workingColorSpace: linearSRGB, .workingFormat: CIFormat.RGBAf, .cacheIntermediates: false,
+    ])
 
     static func floats(_ image: CIImage, space: CGColorSpace) -> [SIMD3<Double>] {
         let w = Int(image.extent.width)

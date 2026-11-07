@@ -1,3 +1,4 @@
+import CoreImage
 import EmulsionFixtures
 import XCTest
 
