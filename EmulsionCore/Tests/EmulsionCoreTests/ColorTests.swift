@@ -6,13 +6,15 @@ import simd
 
 final class ColorTests: EmulsionTestCase {
     func testSaturatedColorsStayInP3AndKeepHueFamily() throws {
-        let image = SceneFixtures.patches()
+        let cell = 64
+        let image = SceneFixtures.patches(cell: cell)
+        let width = cell * SceneFixtures.patchesP3.count
         let input = Fixtures.oklab(image)
         let rendered = try render(image)
         let out = codes(rendered)
         let outLab = Fixtures.oklab(rendered)
         for i in 0..<SceneFixtures.patchesP3.count {
-            let p = pixel(x: i * 64 + 32, y: 32, width: 448)
+            let p = pixel(x: i * cell + cell / 2, y: cell / 2, width: width)
             XCTAssertTrue((0...255.01).contains(out[p].x) && (0...255.01).contains(out[p].y) && (0...255.01).contains(out[p].z))
             if Fixtures.chroma(input[p]) > 0.03 {
                 XCTAssertLessThan(Fixtures.hueDifference(input[p], outLab[p]), 12, "patch \(i) hue skew")

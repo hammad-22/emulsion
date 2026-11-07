@@ -54,7 +54,9 @@ final class PhotoStore {
 
     func delete(_ id: UUID) {
         guard let i = photos.firstIndex(where: { $0.id == id }) else { return }
-        try? FileManager.default.removeItem(at: url(for: photos[i]))
+        let file = url(for: photos[i])
+        try? FileManager.default.removeItem(at: file)
+        Task { await RenderService.shared.forget(file) }
         photos.remove(at: i)
         save()
     }
