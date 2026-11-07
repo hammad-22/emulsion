@@ -266,7 +266,7 @@
 /* Begin XCLocalSwiftPackageReference section */
 		E10000000000000000000901 /* XCLocalSwiftPackageReference "EmulsionCore" */ = {
 			isa = XCLocalSwiftPackageReference;
-			relativePath = EmulsionCore;
+			relativePath = ../../Packages/EmulsionCore;
 		};
 /* End XCLocalSwiftPackageReference section */
 
