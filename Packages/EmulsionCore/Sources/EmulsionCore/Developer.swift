@@ -1,4 +1,5 @@
 import CoreImage
+import CoreVideo
 import Foundation
 import ImageIO
 import UniformTypeIdentifiers
@@ -64,12 +65,31 @@ public struct Developer {
         return Negative(image: try kernels.run(kernels.displayToScene, image.extent, args), source: .display)
     }
 
-    /// Decode raw code values (an image created without color matching, e.g. a video frame's
-    /// pixel buffer) from a camera or display encoding into scene light.
-    public func scene(fromEncoded image: CIImage, as space: InputColorSpace) throws -> Negative {
-        let m = space.toWorking
-        let rows = CIVector.rows(of: m)
-        let linear = try kernels.run(kernels.inputTransform, image.extent, [image, Double(space.curve)] + rows)
+    /// Decode R′G′B′ code values (an image created without color matching, sample = code / 1023)
+    /// coded in `range`, from a camera or display encoding into scene light.
+    public func scene(fromEncoded image: CIImage, as space: InputColorSpace, range: SignalRange) throws -> Negative {
+        let transform = CurveInputTransform(rgbIn: range, sampleUnitsPerCode: 1 / 1023, for: space)
+        return try scene(kernels.inputTransform, image.extent, [image], transform, as: space)
+    }
+
+    /// Decode a 10-bit Y′CbCr video frame (`x420`, `xf20`, `x422` or `xf22`) into scene light.
+    /// `signal` defaults to the frame's own range and matrix tag; pass it to override a mistagged file.
+    /// The frame stays retained and locked while the returned negative's image is alive, so a
+    /// frame source should `materialize` (or drop) it before holding it across frames.
+    public func scene(fromYCbCr frame: CVPixelBuffer, as space: InputColorSpace, signal: VideoSignal? = nil) throws -> Negative {
+        guard let layout = YCbCrLayout(frame), let (luma, chroma) = layout.planes(of: frame) else {
+            throw EmulsionError.unsupportedVideoFormat
+        }
+        let signal = signal ?? VideoSignal(frame: frame, layout: layout, fallbackMatrix: space.defaultYCbCrMatrix)
+        let transform = CurveInputTransform(ycbcrIn: signal, sampleUnitsPerCode: YCbCrLayout.sampleUnitsPerCode, for: space)
+        return try scene(kernels.ycbcrInputTransform, luma.extent, [luma, chroma], transform, as: space)
+    }
+
+    private func scene(
+        _ kernel: CIColorKernel, _ extent: CGRect, _ images: [CIImage], _ transform: CurveInputTransform, as space: InputColorSpace
+    ) throws -> Negative {
+        let arguments: [Any] = images + transform.rows + [Double(space.curve)] + CIVector.rows(of: space.toWorking)
+        let linear = try kernels.run(kernel, extent, arguments)
         return space.isDisplayReferred ? try sceneFromDisplay(linear) : Negative(image: linear, source: .raw)
     }
 

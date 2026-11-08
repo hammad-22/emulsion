@@ -46,6 +46,37 @@ public enum InputColorSpace: String, CaseIterable, Identifiable, Codable, Sendab
         }
     }
 
+    /// Whether the published formula takes 10-bit legal-range code values / 1023 rather than the
+    /// normalized signal E′. Sony (S-Log3 18% = code 420), ARRI LogC3 (400) and Panasonic (V-Log
+    /// 433) publish code values; BT.2100 HLG, Apple Log and ARRI LogC4 (its spec plots E′ over the
+    /// whole integer range) take E′.
+    var formulaTakesCodeValues: Bool {
+        switch self {
+        case .sLog3SGamut3Cine, .arriLogC3, .vLog: return true
+        default: return false
+        }
+    }
+
+    /// The Y′CbCr matrix assumed when a video frame isn't tagged with one. BT.2100 specifies
+    /// BT.2020 for HLG, and Apple Log is recorded in BT.2020; for the other inputs BT.709 is the
+    /// common tag, an assumption rather than a camera specification.
+    var defaultYCbCrMatrix: YCbCrMatrix {
+        switch self {
+        case .appleLog, .hlgRec2020: return .bt2020
+        default: return .bt709
+        }
+    }
+
+    /// E′ → the formula's input: code / 1023 = (64 + 876·E′) / 1023 for code-value curves (BT.2100
+    /// narrow range), E′ itself otherwise.
+    var curveInputFromSignal: (scale: Double, offset: Double) { formulaTakesCodeValues ? (876.0 / 1023, 64.0 / 1023) : (1, 0) }
+
+    /// Normalized signal E′ → linear in the source primaries.
+    func decode(signal e: Double) -> Double {
+        let (scale, offset) = curveInputFromSignal
+        return ColorMath.decode(e * scale + offset, curve: curve)
+    }
+
     typealias Primaries = (r: SIMD2<Double>, g: SIMD2<Double>, b: SIMD2<Double>, white: SIMD2<Double>)
     static let d65 = SIMD2(0.3127, 0.3290)
 
@@ -92,7 +123,8 @@ enum ColorMath {
         return m.inverse * scale * m
     }
 
-    /// Reference decode in Swift (mirrors the kernel) for tests and LUT generation.
+    /// Reference decode in Swift (mirrors `decodeCurve`), from each curve's own domain: code
+    /// value / 1023 or signal E′ (see `InputColorSpace.formulaTakesCodeValues`).
     static func decode(_ v: Double, curve: Int) -> Double {
         switch curve {
         case 1:  // Apple Log
@@ -105,7 +137,7 @@ enum ColorMath {
             let pt = sigma * (rt - r0) * (rt - r0)
             if v >= pt { return pow(2, (v - delta) / gamma) - beta }
             return v >= 0 ? (v / sigma).squareRoot() + r0 : r0
-        case 2:  // S-Log3 (full-range normalized code value, reflection)
+        case 2:  // S-Log3 (10-bit code value / 1023, reflection)
             if v >= 171.2102946929 / 1023 { return pow(10, (1023 * v - 420) / 261.5) * 0.19 - 0.01 }
             return (1023 * v - 95) * 0.01125 / (171.2102946929 - 95)
         case 3:  // ARRI LogC3, EI 800

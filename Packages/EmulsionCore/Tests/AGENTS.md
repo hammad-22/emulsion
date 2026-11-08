@@ -8,3 +8,4 @@
 - Input transforms are checked against `References/input-transforms.json` through `ColorReferences` (loader, tolerances, raw-code images); reuse it for any new input or signal-range test.
 - Fixtures are synthetic and deterministic. Never read the user's photo library or private images.
 - Timing lives in `PerformanceProbe` and runs only when `EMULSION_PERF=1` is set.
+- Suites that read video with AVAssetReader are `.serialized`: its blocking reads starve the Swift concurrency pool when many run in parallel.

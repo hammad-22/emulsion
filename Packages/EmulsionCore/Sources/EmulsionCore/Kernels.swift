@@ -5,7 +5,8 @@ import Foundation
 /// scripts/build-kernels.sh).
 struct Kernels {
     // Named exactly like the Metal functions in Emulsion.ci.metal.
-    let filmSystem, displayToScene, inputTransform, halationSource, halationAdd, grain, lightnessGuide, localTone: CIColorKernel
+    let filmSystem, displayToScene, inputTransform, ycbcrInputTransform: CIColorKernel
+    let halationSource, halationAdd, grain, lightnessGuide, localTone: CIColorKernel
 
     init() throws {
         #if os(macOS)
@@ -23,6 +24,7 @@ struct Kernels {
         filmSystem = try load("filmSystem")
         displayToScene = try load("displayToScene")
         inputTransform = try load("inputTransform")
+        ycbcrInputTransform = try load("ycbcrInputTransform")
         halationSource = try load("halationSource")
         halationAdd = try load("halationAdd")
         grain = try load("grain")
