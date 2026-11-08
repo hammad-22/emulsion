@@ -67,6 +67,10 @@ public enum InputColorSpace: String, CaseIterable, Identifiable, Codable, Sendab
         }
     }
 
+    /// The range in which a code value is its formula's own input: legal for code-value curves
+    /// (S-Log3 gray = 420 / 1023), full for the rest (HLG gray = 0.38).
+    var formulaRange: SignalRange { formulaTakesCodeValues ? .legal : .full }
+
     /// E′ → the formula's input: code / 1023 = (64 + 876·E′) / 1023 for code-value curves (BT.2100
     /// narrow range), E′ itself otherwise.
     var curveInputFromSignal: (scale: Double, offset: Double) { formulaTakesCodeValues ? (876.0 / 1023, 64.0 / 1023) : (1, 0) }

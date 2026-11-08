@@ -28,6 +28,22 @@ enum ColorReferences {
     static let mirrorTolerance = Tolerance(absolute: 1e-6, relative: 1e-4)
     static let kernelTolerance = Tolerance(absolute: 1e-6, relative: 2e-4)
 
+    /// A 10-bit Y′CbCr patch from `References/video-signal.json` (MOV-80): codes in `range`,
+    /// decoded with `matrix`.
+    struct VideoSample: Decodable, Sendable, CustomTestStringConvertible {
+        let space: InputColorSpace
+        let range: String
+        let matrix: String
+        let patch: String
+        let code: SIMD3<Int>
+        let working: SIMD3<Double>
+
+        var signal: VideoSignal { VideoSignal(range: range == "legal" ? .legal : .full, matrix: matrix == "bt709" ? .bt709 : .bt2020) }
+        var testDescription: String { "\(space.title) \(range) \(patch)" }
+    }
+
+    static func videoSamples() throws -> [VideoSample] { try videoTable.get() }
+
     static func samples(for space: InputColorSpace) throws -> [Sample] {
         let samples = try #require(try table.get()[space.rawValue], "no references for \(space.rawValue)")
         try #require(!samples.isEmpty)
@@ -35,11 +51,6 @@ enum ColorReferences {
     }
 
     static func spaceNames() throws -> Set<String> { Set(try table.get().keys) }
-
-    /// A one-row image of the samples' raw code values (no color matching), left to right.
-    static func encodedImage(_ samples: [Sample]) -> CIImage {
-        Fixtures.row(samples.map { SIMD3<Float>($0.code) }, space: nil)
-    }
 
     static func expectMatch(
         _ actual: SIMD3<Double>, _ expected: SIMD3<Double>, _ tolerance: Tolerance, _ label: String,
@@ -55,9 +66,19 @@ enum ColorReferences {
     }
 
     private static let table: Result<[String: [Sample]], any Error> = Result {
-        guard let url = Bundle.module.url(forResource: "input-transforms", withExtension: "json", subdirectory: "References") else {
+        try JSONDecoder().decode(Table.self, from: reference("input-transforms")).spaces.mapValues(\.samples)
+    }
+
+    private struct VideoTable: Decodable { let samples: [VideoSample] }
+
+    private static let videoTable: Result<[VideoSample], any Error> = Result {
+        try JSONDecoder().decode(VideoTable.self, from: reference("video-signal")).samples
+    }
+
+    private static func reference(_ name: String) throws -> Data {
+        guard let url = Bundle.module.url(forResource: name, withExtension: "json", subdirectory: "References") else {
             throw CocoaError(.fileNoSuchFile)
         }
-        return try JSONDecoder().decode(Table.self, from: Data(contentsOf: url)).spaces.mapValues(\.samples)
+        return try Data(contentsOf: url)
     }
 }

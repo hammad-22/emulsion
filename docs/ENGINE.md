@@ -41,8 +41,8 @@ Tests, all passing:
 - exports are Display P3, with HEIC at 10-bit;
 - every camera log decodes its published 18% code to 0.18;
 - gamut matrices keep neutrals neutral;
-- the GPU input transform matches the reference decode, in legal and full range;
-- 10-bit HEVC (legal and full range) and ProRes 422 HQ (legal) frames of S-Log3, LogC3, V-Log, Apple Log and HLG decode their gray, white and a chromatic patch within 1e-3 of colour-science (measured worst case 3.3e-6); a wrong range or matrix assumption fails.
+- the GPU input transform matches colour-science on every input, including display negatives and superwhite, in legal and full range;
+- 10-bit HEVC (legal and full range) and ProRes 422 HQ (legal) frames of S-Log3, LogC3, V-Log, Apple Log and HLG decode their gray, white and a chromatic patch to colour-science within the reference tolerance (2e-4 relative); a wrong range or matrix assumption fails, and the Y′CbCr conversion agrees with Core Image's own (within 1e-5 legal; full-range chroma differs by ~0.1%, Emulsion follows BT.2100).
 
 Tone scale of the stock, in output codes:
 

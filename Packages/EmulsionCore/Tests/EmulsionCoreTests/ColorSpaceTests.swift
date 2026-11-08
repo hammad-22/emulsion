@@ -1,5 +1,3 @@
-import CoreImage
-import EmulsionFixtures
 import XCTest
 import simd
 
@@ -23,13 +21,6 @@ final class ColorSpaceTests: XCTestCase {
         XCTAssertEqual(ColorMath.decode(code4, curve: 4), 0.18, accuracy: 1e-6)
     }
 
-    /// MOV-125: sub-black HLG signals (legal-range footroom, compression) stay below black.
-    func testHLGSubBlackDecodesBelowBlack() {
-        let curve = InputColorSpace.hlgRec2020.curve
-        XCTAssertEqual(ColorMath.decode(-0.05, curve: curve), -ColorMath.decode(0.05, curve: curve), accuracy: 1e-12)
-        XCTAssertLessThan(ColorMath.decode(-0.05, curve: curve), 0)
-    }
-
     func testGamutMatricesKeepNeutralsNeutralIncludingACESWhite() {
         for space in InputColorSpace.allCases {
             let gray = space.toWorking * SIMD3(repeating: 0.18)
@@ -39,27 +30,5 @@ final class ColorSpaceTests: XCTestCase {
         let red = InputColorSpace.hlgRec2020.toWorking * SIMD3(1, 0, 0)
         XCTAssertGreaterThan(red.x, 1.5)
         XCTAssertLessThan(red.y, 0)
-    }
-
-    /// The GPU kernel decodes raw code values (no color matching), in either range, exactly like
-    /// the mirror.
-    func testKernelMatchesMirrorOnRawCodeValues() throws {
-        let renderer = try Renderer()
-        let codes: [Float] = [0.05, 0.2, 0.35, 0.5, 0.65, 0.8, 0.95]
-        var values = [Float]()
-        for v in codes { values += [v, v, v, 1] }
-        let raw = CIImage(
-            bitmapData: values.withUnsafeBytes { Data($0) }, bytesPerRow: codes.count * 16,
-            size: CGSize(width: codes.count, height: 1), format: .RGBAf, colorSpace: nil)
-        for space in InputColorSpace.allCases where !space.isDisplayReferred {
-            for range in SignalRange.allCases {
-                let out = Fixtures.linear(try renderer.developer.scene(fromEncoded: raw, as: space, range: range).image)
-                for (i, v) in codes.enumerated() {
-                    let signal = (Double(v) * 1023 - range.lumaBlack) / range.lumaSpan
-                    let expected = space.decode(signal: signal)
-                    XCTAssertEqual(out[i].y, expected, accuracy: max(1e-3, abs(expected) * 2e-3), "\(space.title) \(range) code \(v)")
-                }
-            }
-        }
     }
 }

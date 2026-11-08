@@ -1,9 +1,13 @@
-"""Independent reference vectors for Emulsion's input transforms (MOV-85, MOV-97).
+"""Independent reference vectors for Emulsion's input transforms (MOV-85, MOV-97, MOV-80).
 
 For every `InputColorSpace`, decodes a fixed set of code-value triplets with colour-science
 and converts them to linear sRGB / Rec.709 (D65, Bradford adaptation): the engine's working
 space. The engine is never consulted, so the tests compare it against an outside source rather
 than against its own Swift mirror.
+
+A second table (MOV-80) covers 10-bit Y'CbCr video: published gray/white code values and a
+chromatic patch per camera input, coded in legal and full range, decoded with colour-science's
+own Y'CbCr and range conversions.
 
 Offline tool only: nothing here ships. Re-run after changing a sample set or the pinned
 colour-science version:
@@ -25,9 +29,9 @@ warnings.filterwarnings("ignore", module="colour")  # optional SciPy/Matplotlib 
 import colour  # noqa: E402
 import numpy as np  # noqa: E402
 
-OUTPUT = pathlib.Path(__file__).resolve().parents[2] / (
-    "Packages/EmulsionCore/Tests/EmulsionCoreTests/References/input-transforms.json"
-)
+REFERENCES = pathlib.Path(__file__).resolve().parents[2] / "Packages/EmulsionCore/Tests/EmulsionCoreTests/References"
+OUTPUT = REFERENCES / "input-transforms.json"
+VIDEO_OUTPUT = REFERENCES / "video-signal.json"
 DELTA = 0.002  # code-value offset either side of a curve's linear/log cut
 SIGNIFICANT_DIGITS = 10
 
@@ -140,6 +144,60 @@ def compact_json(table):
     return "{\n" + header + ',\n "spaces": {\n' + spaces + "\n }\n}"
 
 
+# ---- 10-bit Y'CbCr video (MOV-80) ----
+BITS = 10
+# Inputs whose published formula takes 10-bit legal-range code values / 1023 (colour-science's
+# `in_normalised_code_value` / LogC3's code-value domain); the others take the signal E'.
+CODE_VALUE_INPUTS = {"sLog3SGamut3Cine", "arriLogC3", "vLog"}
+YCBCR_WEIGHTS = {"bt709": colour.WEIGHTS_YCBCR["ITU-R BT.709"], "bt2020": colour.WEIGHTS_YCBCR["ITU-R BT.2020"]}
+CHROMA = (450, 600)  # a saturated legal-range Cb, Cr pair, so a wrong matrix shows
+
+
+def legal_code(signal):
+    return int(round(64 + 876 * float(signal)))
+
+
+# rawValue: (Y'CbCr matrix the fixture is tagged with, [(patch, legal-range Y' code, source)])
+VIDEO = {
+    "sLog3SGamut3Cine": ("bt709", [("gray", 420, "Sony S-Log3 technical summary: 18% = 420"),
+                                   ("white", 598, "Sony S-Log3 technical summary: 90% = 598")]),
+    "arriLogC3": ("bt709", [("gray", 400, "ARRI LogC3 EI 800: 18% = 400"),
+                            ("white", int(round(1023 * float(logc3_encode(0.9)))), "colour-science encoding of 90%")]),
+    "vLog": ("bt709", [("gray", 433, "Panasonic V-Log reference manual: 18% = 433"),
+                       ("white", 602, "Panasonic V-Log reference manual: 90% = 602")]),
+    "appleLog": ("bt2020", [("gray", legal_code(m.log_encoding_AppleLogProfile(0.18)), "colour-science encoding of 18%"),
+                            ("white", legal_code(m.log_encoding_AppleLogProfile(0.9)), "colour-science encoding of 90%")]),
+    "hlgRec2020": ("bt2020", [("gray", legal_code(0.38), "ITU-R BT.2408: 18% gray at 38% signal"),
+                              ("white", legal_code(0.75), "ITU-R BT.2408: reference white at 75% signal")]),
+}
+
+
+def to_full_range(y, cb, cr):
+    """The same signal coded in BT.2100 full range."""
+    return (int(round((y - 64) / 876 * 1023)),
+            int(round((cb - 512) / 896 * 1023 + 512)),
+            int(round((cr - 512) / 896 * 1023 + 512)))
+
+
+def video_samples():
+    rows = []
+    for key, (matrix, patches) in VIDEO.items():
+        _, decode, _, colourspace, _, _ = SPACES[key]
+        legal = [(label, (y, 512, 512), source) for label, y, source in patches]
+        legal.append(("chroma", (patches[0][1], *CHROMA), "saturated Cb/Cr on the gray code"))
+        for range_name in ("legal", "full"):
+            for label, code, source in legal:
+                ycbcr = code if range_name == "legal" else to_full_range(*code)
+                signal = colour.YCbCr_to_RGB(np.array(ycbcr, dtype=float), K=YCBCR_WEIGHTS[matrix], in_bits=BITS,
+                                             in_legal=range_name == "legal", in_int=True, out_legal=False, out_int=False)
+                curve_input = m.full_to_legal(signal, BITS) if key in CODE_VALUE_INPUTS else signal
+                working = colour.RGB_to_RGB(decode(curve_input), colourspace, WORKING,
+                                            chromatic_adaptation_transform="Bradford")
+                rows.append({"space": key, "range": range_name, "matrix": matrix, "patch": label, "source": source,
+                             "code": list(ycbcr), "working": rounded(working)})
+    return rows
+
+
 def main():
     table = {
         "generator": "Tools/color-references/generate_input_references.py",
@@ -156,6 +214,12 @@ def main():
         table["spaces"][key] = {"source": description, "samples": rows}
     OUTPUT.write_text(compact_json(table) + "\n")
     print(f"wrote {sum(len(s['samples']) for s in table['spaces'].values())} samples to {OUTPUT}", file=sys.stderr)
+    video = video_samples()
+    header = {k: v for k, v in table.items() if k != "spaces"}
+    VIDEO_OUTPUT.write_text(
+        "{\n" + ",\n".join(f" {json.dumps(k)}: {json.dumps(v)}" for k, v in header.items())
+        + ',\n "samples": [\n' + ",\n".join("  " + json.dumps(row) for row in video) + "\n ]\n}\n")
+    print(f"wrote {len(video)} samples to {VIDEO_OUTPUT}", file=sys.stderr)
 
 
 if __name__ == "__main__":

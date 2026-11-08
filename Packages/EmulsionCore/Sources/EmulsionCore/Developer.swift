@@ -68,8 +68,7 @@ public struct Developer {
     /// Decode R′G′B′ code values (an image created without color matching, sample = code / 1023)
     /// coded in `range`, from a camera or display encoding into scene light.
     public func scene(fromEncoded image: CIImage, as space: InputColorSpace, range: SignalRange) throws -> Negative {
-        let transform = CurveInputTransform(rgbIn: range, sampleUnitsPerCode: 1 / 1023, for: space)
-        return try scene(kernels.inputTransform, image.extent, [image], transform, as: space)
+        try scene(fromWorkingLight: workingLight(fromEncoded: image, as: space, range: range), as: space)
     }
 
     /// Decode a 10-bit Y′CbCr video frame (`x420`, `xf20`, `x422` or `xf22`) into scene light.
@@ -82,15 +81,25 @@ public struct Developer {
         }
         let signal = signal ?? VideoSignal(frame: frame, layout: layout, fallbackMatrix: space.defaultYCbCrMatrix)
         let transform = CurveInputTransform(ycbcrIn: signal, sampleUnitsPerCode: YCbCrLayout.sampleUnitsPerCode, for: space)
-        return try scene(kernels.ycbcrInputTransform, luma.extent, [luma, chroma], transform, as: space)
+        let light = try workingLight(kernels.ycbcrInputTransform, luma.extent, [luma, chroma], transform, as: space)
+        return try scene(fromWorkingLight: light, as: space)
     }
 
-    private func scene(
+    /// The input transform alone (curve and gamut matrix): working-space light before display
+    /// encodings go through the inverse film curve.
+    func workingLight(fromEncoded image: CIImage, as space: InputColorSpace, range: SignalRange) throws -> CIImage {
+        let transform = CurveInputTransform(rgbIn: range, sampleUnitsPerCode: 1 / 1023, for: space)
+        return try workingLight(kernels.inputTransform, image.extent, [image], transform, as: space)
+    }
+
+    private func workingLight(
         _ kernel: CIColorKernel, _ extent: CGRect, _ images: [CIImage], _ transform: CurveInputTransform, as space: InputColorSpace
-    ) throws -> Negative {
-        let arguments: [Any] = images + transform.rows + [Double(space.curve)] + CIVector.rows(of: space.toWorking)
-        let linear = try kernels.run(kernel, extent, arguments)
-        return space.isDisplayReferred ? try sceneFromDisplay(linear) : Negative(image: linear, source: .raw)
+    ) throws -> CIImage {
+        try kernels.run(kernel, extent, images + transform.rows + [Double(space.curve)] + CIVector.rows(of: space.toWorking))
+    }
+
+    private func scene(fromWorkingLight light: CIImage, as space: InputColorSpace) throws -> Negative {
+        space.isDisplayReferred ? try sceneFromDisplay(light) : Negative(image: light, source: .raw)
     }
 
     private func normalized(_ image: CIImage) -> CIImage {
