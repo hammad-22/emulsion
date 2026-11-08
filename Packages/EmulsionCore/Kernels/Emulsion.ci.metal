@@ -161,7 +161,7 @@ float decodeCurve(float v, int curve) {
         float a=0.17883277, b=0.28466892, c=0.55991073, sceneScale=0.18/(0.38*0.38/3.0);
         float e=v<=0.5 ? v*abs(v)/3.0 : (exp((v-c)/a)+b)/12.0;
         return e*sceneScale; }
-    case 9: return pow(max(v,0.0),2.4);
+    case 9: return sign(v)*pow(abs(v),2.4); // odd extension below 0 (sub-black policy, ENGINE.md)
     case 10: return v<=0.04045 ? v/12.92 : pow((v+0.055)/1.055,2.4);
     default: return v;
     }

@@ -46,6 +46,14 @@ struct ColorReferenceTests {
         }
     }
 
+    /// Sub-black policy (docs/ENGINE.md): every decode is monotonic through black, so a sub-black
+    /// signal never decodes brighter than code 0 (MOV-125 found HLG doing exactly that).
+    @Test(arguments: InputColorSpace.allCases)
+    func subBlackNeverDecodesAboveBlack(space: InputColorSpace) {
+        let decoded = [-0.2, -0.1, -0.05, -0.01, 0].map { ColorMath.decode($0, curve: space.curve) }
+        #expect(zip(decoded, decoded.dropFirst()).allSatisfy { $0 <= $1 }, "\(decoded)")
+    }
+
     @Test func referenceTableCoversExactlyTheInputColorSpaces() throws {
         #expect(try ColorReferences.spaceNames() == Set(InputColorSpace.allCases.map(\.rawValue)))
     }

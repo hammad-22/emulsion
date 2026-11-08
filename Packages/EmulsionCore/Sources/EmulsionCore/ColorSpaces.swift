@@ -163,7 +163,7 @@ enum ColorMath {
             let (a, b, c) = (HLG.a, HLG.b, HLG.c)
             let e = v <= 0.5 ? v * abs(v) / 3 : (exp((v - c) / a) + b) / 12
             return e * HLG.sceneScale
-        case 9: return pow(max(v, 0), 2.4)
+        case 9: return v < 0 ? -pow(-v, 2.4) : pow(v, 2.4)  // odd extension below 0 (sub-black policy, ENGINE.md)
         case 10: return v <= 0.04045 ? v / 12.92 : pow((v + 0.055) / 1.055, 2.4)
         default:
             return v

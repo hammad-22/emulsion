@@ -61,7 +61,15 @@ def identity(v):
 LOGC3_EI800 = dict(firmware="SUP 3.x", method="Linear Scene Exposure Factor", EI=800)
 logc3_decode = functools.partial(m.log_decoding_ARRILogC3, **LOGC3_EI800)
 logc3_encode = functools.partial(m.log_encoding_ARRILogC3, **LOGC3_EI800)
-bt1886_decode = functools.partial(m.eotf_BT1886, L_B=0, L_W=1)
+
+
+def bt1886_decode(v):
+    """Engine convention (sub-black policy, docs/ENGINE.md): BT.1886 defines only 0...1 and
+    colour-science clamps below 0; the engine extends oddly so sub-black stays negative light."""
+    v = np.asarray(v, dtype=float)
+    return np.sign(v) * m.eotf_BT1886(np.abs(v), L_B=0, L_W=1)
+
+
 bt1886_encode = functools.partial(m.eotf_inverse_BT1886, L_B=0, L_W=1)
 
 
