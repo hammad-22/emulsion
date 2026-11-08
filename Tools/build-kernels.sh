@@ -2,8 +2,8 @@
 # Compile the Core Image Metal kernels for macOS (tests), iPhone and simulator.
 set -eu
 root=$(CDPATH= cd -- "$(dirname -- "$0")/.." && pwd)
-src="$root/EmulsionCore/Kernels/Emulsion.ci.metal"
-out="$root/EmulsionCore/Sources/EmulsionCore/Resources/Kernels"
+src="$root/Packages/EmulsionCore/Kernels/Emulsion.ci.metal"
+out="$root/Packages/EmulsionCore/Sources/EmulsionCore/Resources/Kernels"
 tmp=$(mktemp -d); trap 'rm -rf "$tmp"' EXIT
 for platform in macosx iphoneos iphonesimulator; do
   case "$platform" in

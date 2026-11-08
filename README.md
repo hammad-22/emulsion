@@ -13,7 +13,7 @@ Status: early development. The engine builds and is tested; the apps are being b
 Requires Xcode 26 or later on macOS 26.
 
 ```bash
-cd EmulsionCore && swift test
+cd Packages/EmulsionCore && swift test
 ```
 
 ## Contributing
