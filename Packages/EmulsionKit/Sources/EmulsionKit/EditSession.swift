@@ -13,7 +13,7 @@ public final class EditSession {
     }
 
     private let store: PhotoStore
-    @ObservationIgnored private var pendingSave: Task<Void, Never>?
+    @ObservationIgnored private(set) var pendingSave: Task<Void, Never>?
     /// Long enough to skip the writes during a drag, short enough to survive a crash.
     static let saveDelay: Duration = .milliseconds(300)
 

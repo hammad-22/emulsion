@@ -21,12 +21,9 @@ struct EditSessionTests {
         let session = EditSession(photo: photo, store: library.store)
 
         session.adjustments.warmth = 0.5
+        let pendingSave = try #require(session.pendingSave)
         #expect(library.store.photo(photo.id)?.adjustments.warmth == 0, "not written mid-drag")
-        // Poll rather than sleep a fixed time, so a slow CI runner doesn't flake.
-        let deadline = ContinuousClock.now + .seconds(5)
-        while library.store.photo(photo.id)?.adjustments.warmth != 0.5, ContinuousClock.now < deadline {
-            try await Task.sleep(for: .milliseconds(20))
-        }
+        await pendingSave.value
 
         #expect(library.store.photo(photo.id)?.adjustments.warmth == 0.5)
     }
