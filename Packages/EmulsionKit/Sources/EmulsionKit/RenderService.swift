@@ -1,6 +1,7 @@
 import CoreGraphics
 import EmulsionCore
 import Foundation
+import ImageIO
 
 /// All developing and rendering happens off the main actor, through one Renderer.
 /// Developed previews are cached so slider moves only re-run the look.
@@ -15,7 +16,7 @@ public actor RenderService {
     /// windows) reuse a cached develop instead of decoding the RAW again for every size.
     private let previewSizeStep: CGFloat = 256
 
-    public init() {}
+    init() {}
 
     private func engine() throws -> Renderer {
         if let renderer { return renderer }
@@ -44,9 +45,29 @@ public actor RenderService {
         return fitted
     }
 
+    /// A rendered preview. Throws `CancellationError` if the caller moved on while it waited
+    /// its turn, so slider drags don't queue up stale renders.
     public func image(_ url: URL, _ adjustments: Adjustments, maxDimension: CGFloat) throws -> CGImage {
+        try Task.checkCancellation()
         let renderer = try engine()
         return try renderer.cgImage(renderer.render(negative(url, maxDimension: maxDimension), adjustments))
+    }
+
+    /// The original photo as the camera or app delivered it, without the film process: the
+    /// "before" in before/after. RAW files show their embedded preview when they have one.
+    /// Touches no actor state, so it runs off both this actor and the caller's: it never
+    /// waits behind a queued film render, and never decodes on the main actor.
+    @concurrent public nonisolated func original(_ url: URL, maxDimension: CGFloat) async throws -> CGImage {
+        try Task.checkCancellation()
+        let options: [CFString: Any] = [
+            kCGImageSourceCreateThumbnailFromImageAlways: true,
+            kCGImageSourceCreateThumbnailWithTransform: true,
+            kCGImageSourceThumbnailMaxPixelSize: Int(maxDimension.rounded(.up)),
+        ]
+        guard let source = CGImageSourceCreateWithURL(url as CFURL, nil),
+            let image = CGImageSourceCreateThumbnailAtIndex(source, 0, options as CFDictionary)
+        else { throw EmulsionError.unsupportedPhoto }
+        return image
     }
 
     /// Full-resolution develop and encode, look baked in.
