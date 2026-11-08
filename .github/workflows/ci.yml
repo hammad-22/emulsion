@@ -29,7 +29,7 @@ jobs:
           swift --version
 
       - name: Lint (swift format)
-        run: swift format lint --strict --recursive Packages Apps
+        run: swift format lint --strict --recursive Packages Apps Tools
 
       # Compile-only for now: byte-for-byte comparison needs path-independent builds (MOV-123).
       - name: Kernels compile
