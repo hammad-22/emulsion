@@ -1,5 +1,3 @@
-import CoreImage
-import EmulsionFixtures
 import XCTest
 import simd
 
@@ -32,24 +30,5 @@ final class ColorSpaceTests: XCTestCase {
         let red = InputColorSpace.hlgRec2020.toWorking * SIMD3(1, 0, 0)
         XCTAssertGreaterThan(red.x, 1.5)
         XCTAssertLessThan(red.y, 0)
-    }
-
-    /// The GPU kernel decodes raw code values (no color matching) exactly like the mirror.
-    func testKernelMatchesMirrorOnRawCodeValues() throws {
-        let renderer = try Renderer()
-        for space in InputColorSpace.allCases where !space.isDisplayReferred {
-            let codes: [Float] = [0.05, 0.2, 0.35, 0.5, 0.65, 0.8, 0.95]
-            var values = [Float]()
-            for v in codes { values += [v, v, v, 1] }
-            let raw = CIImage(
-                bitmapData: values.withUnsafeBytes { Data($0) }, bytesPerRow: codes.count * 16,
-                size: CGSize(width: codes.count, height: 1), format: .RGBAf, colorSpace: nil)
-            let scene = try renderer.developer.scene(fromEncoded: raw, as: space)
-            let out = Fixtures.linear(scene.image)
-            for (i, v) in codes.enumerated() {
-                let expected = ColorMath.decode(Double(v), curve: space.curve)
-                XCTAssertEqual(out[i].y, expected, accuracy: max(1e-3, abs(expected) * 2e-3), "\(space.title) code \(v)")
-            }
-        }
     }
 }

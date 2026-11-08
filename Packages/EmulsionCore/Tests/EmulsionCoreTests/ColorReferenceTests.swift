@@ -15,30 +15,43 @@ struct ColorReferenceTests {
         }
     }
 
-    /// Scene-referred encodings are compared directly. Display encodings leave the developer as
-    /// scene light through the inverse film curve, so the reference goes through the same
-    /// `sceneFromDisplay` step. That step clamps to Display P3 0...1, so only in-range display
-    /// samples are checked here; negatives and superwhite are covered by the mirror test only
-    /// until the developer exposes its pre-inverse working light (MOV-80).
+    /// The GPU input transform (curve and gamut matrix, before display encodings' inverse film
+    /// curve), including display negatives and superwhite. Each sample's code is its formula's own
+    /// input, so it is decoded in `formulaRange`.
     @Test(arguments: InputColorSpace.allCases)
     func kernelMatchesColourScience(space: InputColorSpace) throws {
-        var samples = try ColorReferences.samples(for: space)
-        if space.isDisplayReferred {
-            let toP3 = InputColorSpace.displayP3.toWorking.inverse
-            samples = samples.filter { all((toP3 * $0.working) .>= 0) && all((toP3 * $0.working) .<= 1) }
-        }
-        try #require(!samples.isEmpty)
+        let samples = try ColorReferences.samples(for: space)
+        try expectKernelMatches(samples, codes: samples.map(\.code), in: space.formulaRange, as: space)
+    }
+
+    /// The same samples re-coded into the other signal range decode to the same light (MOV-80).
+    @Test(arguments: InputColorSpace.allCases)
+    func kernelMatchesColourScienceInTheOtherRange(space: InputColorSpace) throws {
+        let samples = try ColorReferences.samples(for: space)
+        let native = space.formulaRange
+        let other: SignalRange = native == .legal ? .full : .legal
+        let codes = samples.map { (($0.code * 1023 - native.lumaBlack) / native.lumaSpan * other.lumaSpan + other.lumaBlack) / 1023 }
+        try expectKernelMatches(samples, codes: codes, in: other, as: space)
+    }
+
+    private func expectKernelMatches(
+        _ samples: [ColorReferences.Sample], codes: [SIMD3<Double>], in range: SignalRange, as space: InputColorSpace
+    ) throws {
+        let image = Fixtures.row(codes.map { SIMD3<Float>($0) }, space: nil)
         let developer = EmulsionTestCase.sharedRenderer.developer
-        let output = Fixtures.linear(try developer.scene(fromEncoded: ColorReferences.encodedImage(samples), as: space).image)
-        var expected = samples.map(\.working)
-        if space.isDisplayReferred {
-            let reference = Fixtures.row(expected.map { SIMD3<Float>($0) }, space: Fixtures.linearSRGB)
-            expected = Fixtures.linear(try developer.sceneFromDisplay(reference).image)
-        }
+        let output = Fixtures.linear(try developer.workingLight(fromEncoded: image, as: space, range: range))
         try #require(output.count == samples.count)
-        for (sample, (actual, expected)) in zip(samples, zip(output, expected)) {
-            ColorReferences.expectMatch(actual, expected, ColorReferences.kernelTolerance, sample.label)
+        for (sample, actual) in zip(samples, output) {
+            ColorReferences.expectMatch(actual, sample.working, ColorReferences.kernelTolerance, "\(range) \(sample.label)")
         }
+    }
+
+    /// Sub-black policy (docs/ENGINE.md): every decode is monotonic through black, so a sub-black
+    /// signal never decodes brighter than code 0 (MOV-125 found HLG doing exactly that).
+    @Test(arguments: InputColorSpace.allCases)
+    func subBlackNeverDecodesAboveBlack(space: InputColorSpace) {
+        let decoded = [-0.2, -0.1, -0.05, -0.01, 0].map { ColorMath.decode($0, curve: space.curve) }
+        #expect(zip(decoded, decoded.dropFirst()).allSatisfy { $0 <= $1 }, "\(decoded)")
     }
 
     @Test func referenceTableCoversExactlyTheInputColorSpaces() throws {

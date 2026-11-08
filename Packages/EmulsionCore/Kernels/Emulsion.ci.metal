@@ -130,7 +130,9 @@ extern "C" float4 displayToScene(coreimage::sample_t sample, float4 m0, float4 m
 }
 
 // ---- Input transforms: camera log / display encodings → working-space light ----
-// Code values arrive untouched (the source image is created without color matching).
+// Code values arrive untouched (the source image is created without color matching). Each curve
+// below takes its formula's own input: 10-bit legal code / 1023 for S-Log3, LogC3 and V-Log, the
+// BT.2100 signal E′ for the rest (see InputColorSpace.formulaTakesCodeValues).
 // Constants: manufacturers' white papers (see ColorSpaces.swift, which mirrors this).
 float decodeCurve(float v, int curve) {
     switch (curve) {
@@ -159,15 +161,28 @@ float decodeCurve(float v, int curve) {
         float a=0.17883277, b=0.28466892, c=0.55991073, sceneScale=0.18/(0.38*0.38/3.0);
         float e=v<=0.5 ? v*abs(v)/3.0 : (exp((v-c)/a)+b)/12.0;
         return e*sceneScale; }
-    case 9: return pow(max(v,0.0),2.4);
+    case 9: return sign(v)*pow(abs(v),2.4); // odd extension below 0 (sub-black policy, ENGINE.md)
     case 10: return v<=0.04045 ? v/12.92 : pow((v+0.055)/1.055,2.4);
     default: return v;
     }
 }
-extern "C" float4 inputTransform(coreimage::sample_t s, float curve, float4 m0, float4 m1, float4 m2) {
+// Samples → working-space scene light. Each row maps (sample 1, 2, 3, 1) to one channel's curve
+// input; Swift folds the signal range, the Y′CbCr matrix and the curve's code-value re-coding
+// into these rows once per clip (see CurveInputTransform in VideoSignal.swift).
+float3 samplesToWorking(float4 p, float4 r0, float4 r1, float4 r2, float curve, float4 m0, float4 m1, float4 m2) {
     int c=int(curve+0.5);
-    float3 v=float3(decodeCurve(s.r,c),decodeCurve(s.g,c),decodeCurve(s.b,c));
-    return float4(dot(m0.xyz,v),dot(m1.xyz,v),dot(m2.xyz,v),1.0);
+    float3 v=float3(decodeCurve(dot(r0,p),c),decodeCurve(dot(r1,p),c),decodeCurve(dot(r2,p),c));
+    return float3(dot(m0.xyz,v),dot(m1.xyz,v),dot(m2.xyz,v));
+}
+// R′G′B′ code values (no color matching, alpha ignored) → working-space scene light, opaque.
+extern "C" float4 inputTransform(coreimage::sample_t s, float4 r0, float4 r1, float4 r2, float curve,
+                                 float4 m0, float4 m1, float4 m2) {
+    return float4(samplesToWorking(float4(s.rgb,1.0),r0,r1,r2,curve,m0,m1,m2),1.0);
+}
+// Y′ and CbCr planes (chroma already upsampled onto the luma grid) → working-space scene light, opaque.
+extern "C" float4 ycbcrInputTransform(coreimage::sample_t luma, coreimage::sample_t chroma, float4 r0, float4 r1, float4 r2,
+                                      float curve, float4 m0, float4 m1, float4 m2) {
+    return float4(samplesToWorking(float4(luma.r,chroma.r,chroma.g,1.0),r0,r1,r2,curve,m0,m1,m2),1.0);
 }
 
 // ---- Halation ----
