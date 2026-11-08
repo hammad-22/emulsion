@@ -122,9 +122,10 @@ enum ColorMath {
             return v > 0.02740668 ? pow(2, v / 0.07329248 - 7) - 0.0075 : v / 10.44426855
         case 7:  // ACEScct
             return v <= 0.155251141552511 ? (v - 0.0729055341958355) / 10.5402377416545 : min(pow(2, v * 17.52 - 9.72), 65504)
-        case 8:  // BT.2100 HLG inverse OETF, scaled so 38% signal = 18% gray (ITU-R BT.2408)
+        case 8:  // BT.2100 HLG inverse OETF, scaled so 38% signal = 18% gray (ITU-R BT.2408);
+            // sub-black signals mirror (odd extension) so the curve stays monotonic
             let (a, b, c) = (HLG.a, HLG.b, HLG.c)
-            let e = v <= 0.5 ? v * v / 3 : (exp((v - c) / a) + b) / 12
+            let e = v <= 0.5 ? v * abs(v) / 3 : (exp((v - c) / a) + b) / 12
             return e * HLG.sceneScale
         case 9: return pow(max(v, 0), 2.4)
         case 10: return v <= 0.04045 ? v / 12.92 : pow((v + 0.055) / 1.055, 2.4)
