@@ -11,7 +11,8 @@ let package = Package(
     targets: [
         .target(name: "EmulsionCore", resources: [.process("Resources")]),
         .target(name: "EmulsionFixtures"),
-        .testTarget(name: "EmulsionCoreTests", dependencies: ["EmulsionCore", "EmulsionFixtures"]),
+        .testTarget(
+            name: "EmulsionCoreTests", dependencies: ["EmulsionCore", "EmulsionFixtures"], resources: [.copy("References")]),
     ],
     swiftLanguageModes: [.v6]
 )
