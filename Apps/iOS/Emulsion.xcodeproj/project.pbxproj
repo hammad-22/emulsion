@@ -8,6 +8,7 @@
 
 /* Begin PBXBuildFile section */
 		E10000000000000000000B01 /* EmulsionCore in Frameworks */ = {isa = PBXBuildFile; productRef = E10000000000000000000D01 /* EmulsionCore */; };
+		E10000000000000000000B02 /* EmulsionKit in Frameworks */ = {isa = PBXBuildFile; productRef = E10000000000000000000D02 /* EmulsionKit */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
@@ -24,6 +25,7 @@
 			buildActionMask = 2147483647;
 			files = (
 				E10000000000000000000B01 /* EmulsionCore in Frameworks */,
+				E10000000000000000000B02 /* EmulsionKit in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -67,6 +69,7 @@
 			name = Emulsion;
 			packageProductDependencies = (
 				E10000000000000000000D01 /* EmulsionCore */,
+				E10000000000000000000D02 /* EmulsionKit */,
 			);
 			productName = Emulsion;
 			productReference = E10000000000000000000F01 /* Emulsion.app */;
@@ -98,6 +101,7 @@
 			minimizedProjectReferenceProxies = 1;
 			packageReferences = (
 				E10000000000000000000901 /* XCLocalSwiftPackageReference "EmulsionCore" */,
+				E10000000000000000000902 /* XCLocalSwiftPackageReference "EmulsionKit" */,
 			);
 			preferredProjectObjectVersion = 77;
 			productRefGroup = E10000000000000000000602 /* Products */;
@@ -268,12 +272,20 @@
 			isa = XCLocalSwiftPackageReference;
 			relativePath = ../../Packages/EmulsionCore;
 		};
+		E10000000000000000000902 /* XCLocalSwiftPackageReference "EmulsionKit" */ = {
+			isa = XCLocalSwiftPackageReference;
+			relativePath = ../../Packages/EmulsionKit;
+		};
 /* End XCLocalSwiftPackageReference section */
 
 /* Begin XCSwiftPackageProductDependency section */
 		E10000000000000000000D01 /* EmulsionCore */ = {
 			isa = XCSwiftPackageProductDependency;
 			productName = EmulsionCore;
+		};
+		E10000000000000000000D02 /* EmulsionKit */ = {
+			isa = XCSwiftPackageProductDependency;
+			productName = EmulsionKit;
 		};
 /* End XCSwiftPackageProductDependency section */
 	};

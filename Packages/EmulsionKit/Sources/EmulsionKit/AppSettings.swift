@@ -1,0 +1,29 @@
+import EmulsionCore
+import Foundation
+import Observation
+
+/// User preferences, persisted in UserDefaults.
+@MainActor @Observable
+public final class AppSettings {
+    public enum Resolution: String, CaseIterable, Identifiable, Sendable {
+        case standard, full
+        public var id: String { rawValue }
+        public var title: String { self == .standard ? "12 MP" : "48 MP" }
+    }
+
+    private enum Key {
+        static let autoSave = "autoSave", format = "format", resolution = "resolution"
+    }
+
+    public var autoSave: Bool { didSet { defaults.set(autoSave, forKey: Key.autoSave) } }
+    public var format: Renderer.ExportFormat { didSet { defaults.set(format.rawValue, forKey: Key.format) } }
+    /// Capture resolution; read by the camera once it exists (MOV-60).
+    public var resolution: Resolution { didSet { defaults.set(resolution.rawValue, forKey: Key.resolution) } }
+
+    private let defaults = UserDefaults.standard
+    public init() {
+        autoSave = defaults.bool(forKey: Key.autoSave)
+        format = Renderer.ExportFormat(rawValue: defaults.string(forKey: Key.format) ?? "") ?? .heic
+        resolution = Resolution(rawValue: defaults.string(forKey: Key.resolution) ?? "") ?? .standard
+    }
+}

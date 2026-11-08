@@ -9,4 +9,4 @@
   - Respect reserved regions (fold, camera) and use `ArrangementView` / adaptive layout APIs, not the hinge angle. Keep state when folding mid-edit.
   - Every UI PR shows proof on the iPhone 17 Pro simulator and the iPhone Duo simulator (folded and unfolded). That needs the Xcode 27.1 SDK.
 - **Accessibility:** every control has a label and supports Dynamic Type.
-- Folders are organized by feature (`Camera/`, `Library/`, `Editor/`), with shared models in `Model/`.
+- Folders are organized by feature (`Camera/`, `Library/`, `Editor/`). Models and app logic live in `Packages/EmulsionKit`, not in the app.
