@@ -24,7 +24,7 @@
 **Findings.**
 - **Kodak replaced rem-jet with an Anti-Halation Undercoat (AHU) on all four VISION3 negatives in the Mar 2026 sheets:** "An Anti-halation undercoat replaces the traditional remjet backing layer." Kodak's announcement: https://www.kodak.com/en/motion/page/ahu-announcement/ (also lists a "Product Change Notice", not downloaded).
 - **The 2026 charts are the 2022 charts.** For 250D and 50D every embedded chart image is byte-identical between the two revisions (SHA-256 of the images extracted with `pdfimages`). 200T and 500T were not compared. So the published curves do not show any effect of the AHU change, and we cannot tell whether they were re-measured.
-- The embedded charts are low-resolution rasters (e.g. 250D sensitometry 664×688 px, 2383 sensitometry 490×496 px at 150 ppi). Digitizing accuracy is limited to roughly 0.05–0.1 density (review F-6).
+- The embedded charts are low-resolution rasters (e.g. 250D sensitometry 664×688 px, 250D chart images 213–257 ppi; 2383 sensitometry 490×496 px at 150 ppi). Digitizing accuracy is limited to roughly 0.05–0.1 density (review F-6).
 
 ## Kodak print films (ECP-2)
 
@@ -32,7 +32,7 @@
 | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
 | VISION 2383/3383 | H-1-2383 | **Aug 2026** | Y | Y | Y | Y | Y | Status A; 1/500 s tungsten + Heat Absorbing Glass No. 2043 + Series 1700 filter; chart says "ECP-2D" while the text says ECP-2E; SS at D = 1.0; dye curves "Normalized dyes to form a visual neutral density of 1.0 for a xenon-arc viewing illuminant", peak-normalized, with a Visual Neutral spectrum. The dye chart is redrawn at 577×593 px (was 401×390), the best source for MOV-17. | https://www.kodak.com/content/products-brochures/motion-picture/KODAK-VISION-Color-Print-Film-2383-3383-technical-information.pdf |
 | VISION 2383/3383 | H-1-2383 | Mar 2022 | Y | Y | Y | Y | Y | as above | https://www.kodak.com/content/products-brochures/Film/KODAK-VISION-Color-Print-Film-2383-3383-data-sheet.pdf |
-| VISION Premier 2393/3393 | H-1-2393 | Sept 1998 | Y | Y | N | Y | Y | curves unlabeled (LAD aim in Status A: 1.09/1.06/1.03; ECP-2B; "print density… about .1 higher than 2383" for soundtracks. ). Third-party copy. | https://www.cinematography.net/Files/VISPREM.PDF |
+| VISION Premier 2393/3393 | H-1-2393 | Sept 1998 | Y | Y | N | Y | Y | curves unlabeled; LAD aim in Status A: 1.09/1.06/1.03; ECP-2B; "print density… about .1 higher than 2383" for soundtracks. Third-party copy. | https://www.cinematography.net/Files/VISPREM.PDF |
 | LAD for VISION print films | H-61b | © 1992 (PDF 2001) | Y (typical 2383 and 2393 curves, E.N.D.) | N | N | N | N | LAD patch = 1.0 visual density; Status A aim 1.09 R / 1.06 G / 1.03 B on 2383 and 2393; one printer light (0.025 log E) ≈ 0.07 print density near aim | https://www.kodak.com/content/products-brochures/Film/LAD-for-KODAK-VISION-Color-Print-Film-H-61b.pdf |
 
 No Kodak-hosted 2393 data sheet was found. Kodak's 2393 product page and resources page did not list one on 7 Nov 2026.
@@ -57,9 +57,9 @@ Fujifilm ended motion-picture film production around 2013 and no longer hosts th
 | F-64D (8522) | same | same | Y | N | N | N | N | Status M; 5400 K, 1/50 s |
 | ETERNA 250D (8563) | same | same | Y | N | N | N | N | Status M; 5400 K, 1/50 s |
 | REALA 500D (8592) | same | same | Y | N | N | N | N | Status M; 5400 K, 1/50 s |
-| F-CP (positive) | same | same | Y | N | N | N | N | Status A; 2854 K, 1/100 s; aim R 1.10 / G 1.05 / B 1.05 for xenon projection |
+| F-CP (positive) | same | same | Y | N | N | N | N | Status A; 2854 K, 1/100 s; aim R 1.10 / G 1.05 / B 1.05 for xenon projection; G and B shifted 1.0 log H |
 | **ETERNA-CP 3513DI** (positive) | same | same | Y | N | N | N | N | Status A; 2854 K tungsten 1/100 s through SC-41 + CC-90Y + CC-60M; aim R 1.10 / G 1.05 / B 1.05 for xenon projection; **"Curves G and B are shifted 1.0 Log H to avoid overlapping"**; no gamma stated |
-| ETERNA-CP 3521XD (positive) | same | same | Y | N | N | N | N | Status A; 2854 K, 1/100 s |
+| ETERNA-CP 3521XD (positive) | same | same | Y | N | N | N | N | Status A; 2854 K, 1/100 s; G and B shifted 1.0 log H |
 | ETERNA 250 (8553) | *ETERNA 250 product information* | PDF dated Sept 2005 | N | N | N | N | N | Text only: EI 250 tungsten / 160 daylight; describes DIR-coupler and grain technologies |
 
 - Manual URL: https://www.theodoropoulos.info/attachments/076_fujifilm_motion_picture_film_manual.pdf (40 pages; also covers ETERNA-CI and ETERNA-RDI intermediates).
@@ -86,7 +86,7 @@ Fujifilm ended motion-picture film production around 2013 and no longer hosts th
 
 ## Archive
 
-The PDFs are kept **outside git** (license above). Archive them in the owner's storage. SHA-256 lets anyone confirm they hold the same file:
+The PDFs are kept **outside git** (license above) in `~/Documents/Emulsion Research/Film science 2026-11-07/` on the owner's machine. This is a local archive, not a redistribution license. SHA-256 lets anyone confirm they hold the same file:
 
 | File | SHA-256 |
 | --- | --- |

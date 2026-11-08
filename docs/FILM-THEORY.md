@@ -2,7 +2,7 @@
 
 **What this is.** The physics and measurement conventions that the E2 "film realism" work implements, with equations and primary sources, and a map of what the engine does today against each of them. It answers MOV-18 (literature notes: DIR/interimage, Status M vs A vs printing density, projection flare) and MOV-19 (primary-literature review of couplers and masking).
 
-**Date:** 7 November 2026 · **Engine reviewed:** `main` at `c9fd154` (`FilmModel.swift`, `Emulsion.ci.metal`, `Renderer.swift`, `FilmLook.swift`) · **Data inventory:** `docs/STOCK-DATA.md` (MOV-15).
+**Date:** 7 November 2026 · **Engine reviewed:** `main` at `0ea0473` (film-model constants unchanged since `c9fd154`) (`FilmModel.swift`, `Emulsion.ci.metal`, `Renderer.swift`, `FilmLook.swift`) · **Data inventory:** `docs/STOCK-DATA.md` (MOV-15).
 
 **Rules followed.**
 - Primary sources only: Kodak and Fujifilm publications, ISO/SMPTE documents, patents, and the standard textbooks. No spektrafilm/agx-emulsion code, profiles or documentation was opened (GPL / CC BY-SA, see MOV-19).
@@ -11,7 +11,7 @@
 
 Plain-language glossary for terms used below:
 - **Density** $D$: how much light a film area blocks, on a log scale. $D = -\log_{10} T$, where $T$ is transmittance (fraction of light passing). $D = 1$ passes 10%, $D = 2$ passes 1%.
-- **Log exposure** $\log_{10} H$: exposure $H$ is illuminance × time (lux·s); film responds roughly to its logarithm.
+- **Log exposure** $\log_{10} H$: published characteristic curves use photometric exposure (illuminance × time, lux·s). A spectral model instead computes weighted layer exposures, which need calibration to that published scale; film responds roughly to their logarithms.
 - **Gamma** $\gamma$: the slope $dD/d\log_{10}H$ of the characteristic curve.
 - **Spectral product / responsivity**: the wavelength-by-wavelength product of a light source, filters and a detector; it defines what a "density" measures.
 
@@ -26,7 +26,7 @@ $$
 D_i = F_i(\log_{10} H_i), \qquad H_i = \int E(\lambda)\, t\, s_i(\lambda)\, d\lambda \quad (i = R, G, B)
 $$
 
-- $E(\lambda)$ is spectral irradiance at the film, $t$ the exposure time, $s_i(\lambda)$ the spectral sensitivity of layer $i$.
+- $E(\lambda)$ is spectral irradiance at the film, $t$ the exposure time, $s_i(\lambda)$ the spectral sensitivity of layer $i$. The integral gives an effective layer exposure: sensitivity normalization and a per-layer exposure offset must calibrate it to the lux·s scale of the published $F_i$ curves under their stated illuminant. It is not automatically a photometric lux·s integral. **[Derived: model calibration requirement]**
 - Kodak plots $F_i$ against "LOG EXPOSURE (lux-seconds)" (2383; the 500T chart's top axis) or against log exposure plus a "Camera Stops" axis (250D). **[Verified: H-1-2383, H-1-5207, H-1-5219 chart axes]** Digitize against the log axis: the 250D stop labels disagree with it by about 6% (review E10).
 - Reciprocity: within a stated range of exposure times the curve depends only on $H$, not on how it splits between intensity and time. VISION3 250D needs no correction "from 1/1000 of a second to 1 second"; 2383 shows "little or no change in tone scale" from 1/10 s to about 1/3000 s. **[Verified: H-1-5207 Mar 2022 p.2; H-1-2383 Mar 2022 p.3]**
 - Hurter & Driffield, *J. Soc. Chem. Ind.* 9 (1890). **[Book]**
@@ -60,7 +60,7 @@ Getting the frame right matters more than digitizing precisely:
 
 - **Negative characteristic curves are Status M.** 250D: "Exposure: 5500 K Daylight, 1/50 sec; Process: ECN-2; Densitometry: Status M". **[Verified: H-1-5207 chart label, 2022 and Mar 2026 sheets carry the same chart image]** The 500T characteristic chart is labeled "Densitometry: ECN-2" in both the Jul 2015 and Mar 2026 sheets (a mislabel); only its MTF and spectral-sensitivity charts say Status M. **[Verified: H-1-5219t 2015 p.4; H-1-5219 Mar 2026 p.3]** Status M for the 500T curves is an inference. **[Unverified]**
 - **Print characteristic curves are Status A**, exposed through a tungsten source with "KODAK Heat Absorbing Glass, No. 2043 (plus Series 1700 Filter)", 1/500 s. **[Verified: H-1-2383 chart label]**
-- **Spectral sensitivity curves are defined at a density criterion**: "Sensitivity = reciprocal of exposure (erg/cm²) required to produce specified density"; 250D uses "Density: 0.2 > D-min" (Status M), 2383 uses "D = 1.0". **[Verified: chart labels]** Using them as linear weights $s_i(\lambda)$ assumes the curve shape does not change with density. That is a standard approximation, not something the sheets state. **[Derived]**
+- **Spectral sensitivity curves are defined at a density criterion**: "Sensitivity = reciprocal of exposure (erg/cm²) required to produce specified density"; 250D uses "Density: 0.2>D-min" (Status M), 2383 uses "D = 1.0". **[Verified: chart labels]** Using them as linear weights $s_i(\lambda)$ assumes the curve shape does not change with density. That is a standard approximation, not something the sheets state. **[Derived]**
 - **Negative spectral dye curves are "D-mins subtracted" and peak-normalized**, and the chart also plots "Midscale Neutral" and "Minimum Density" spectra. **[Verified: H-1-5207 p.4 chart]** The minimum-density curve contains base, fog and the unused masking couplers (§3.3), so it is the starting point for reconstructing the orange mask.
 - **Print spectral dye curves** are "Normalized dyes to form a visual neutral density of 1.0 for a xenon-arc viewing illuminant" and peak-normalized. **[Verified: H-1-2383 p.5 chart]**
 
@@ -74,7 +74,7 @@ $$
 D_c = -\log_{10} \frac{\int \Pi_c(\lambda)\, T(\lambda)\, d\lambda}{\int \Pi_c(\lambda)\, d\lambda}
 $$
 
-$\Pi_c$ is the **spectral product** (source × optics × filter × detector) for channel $c$. **[Verified: ST 2065-2:2020 Eq. 1 and definitions 3.4, 3.7; ISO 5-3:2009 Introduction 0.4]**
+$\Pi_c$ is the **spectral product** (source × optics × filter × detector) for channel $c$. **[Verified: ST 2065-2:2020 Eq. 1 and definitions 3.4, 3.7; ISO 5-3:2009 Introduction 0.2–0.3]**
 
 ### 2.1 Status A and Status M (ISO 5-3)
 - ISO 5-3:2009 defines both as tabulated spectral products: "ISO 5 standard status A density" (clause 6.3) and "status M density" (clause 6.4), plus a clause 6.2 "ISO 5 standard printing density". Transmittance densities use CIE illuminant A (≈2856 K) modified by a heat-absorbing filter. **[Verified: ISO 5-3:2009 public preview, contents and §0.4]** The tables themselves are paywalled and were **not** read. **[Unverified: Status A/M peak wavelengths and bandwidths]**
@@ -106,14 +106,16 @@ $$
 \qquad k_R = 1.00,\ k_G = 0.92,\ k_B = 0.95
 $$
 
-**[Verified: ST 2065-3:2020 Eqs. 1–2]** The per-channel $k_c$ scale green and blue down so the three records fit the same code range. The offset (1520 / 95) gives footroom for densities below the assumed Dmin. **[Verified: §4.3.2 NOTE]**
+**[Verified: ST 2065-3:2020 Eqs. 1–2]** The per-channel $k_c$ scale green and blue down relative to red. **[Derived; the standard does not explain the choice of factors]** The offset (1520 / 95) gives footroom for densities below the assumed Dmin. **[Verified: §4.3.2 NOTE]**
+
+ST 2065-2 NOTE 3 says Status M → APD conversion is product-specific and may use a 3×3 matrix plus offset, a polynomial or a 3D LUT. A matrix must therefore be validated rather than assumed exact. **[Verified: ST 2065-2 NOTE 3, p.7]**
 
 **Why it matters for Emulsion:** printing density is the natural internal variable between our negative and print stages (§4), and ADX is how scanned negatives arrive in a colorist's world. An ADX input (scan → our print stage) and an APD-referred negative stage would make the engine interoperable with ACES film workflows (see gap G-12).
 
 ### 2.4 Visual density and the print aim
 - **Kodak LAD** (Laboratory Aim Density): the LAD patch "is printed to a neutral gray of 1.0 visual density". On 2383/3383 and 2393/3393, "the Status A density aim is 1.09 red, 1.06 green, and 1.03 blue". **[Verified: H-61b; the same aim as a table in H-1-2393 (1998); H-1-5207 states only the 1.0 visual density]**
 - **Fujifilm** aims a normally exposed 18% gray card to Status A R 1.10, G 1.05, B 1.05 on ETERNA-CP 3513DI (and on F-CP), "based on the assumption that the film will be projected with a xenon lamp projector". **[Verified: Fujifilm Motion Picture Film Manual KB-0707E, pp. 47, 51]**
-- Relative to a print Dmin of about 0.05 (review E9), a 1.0 visual density puts mid-gray at $10^{-(1.0-0.05)} \approx 0.11$ of open-gate (clear-print) luminance. **[Derived]**
+- Taking the LAD aim of 1.0 as total visual density, mid-gray transmits $10^{-1.0} = 0.10$ of open-gate luminance. Relative to a clear print with visual Dmin about 0.05 (review E9), it transmits $10^{-(1.0-0.05)} \approx 0.11$. Open gate means no film; it is a different reference from clear print. **[Derived; Dmin is an approximate chart read]**
 
 ---
 
@@ -125,42 +127,42 @@ $$
 - Layer exposure is $H_i = \int E(\lambda)\, t\, s_i(\lambda)\, d\lambda$ (§1.1). The 250D sensitivity curves overlap noticeably (e.g. green and red between about 560–620 nm; chart read, approximate). **[Verified visually: H-1-5207 p.4]**
 
 ### 3.2 Dye formation
-In chromogenic development, oxidized developer couples with a coupler in each layer to form dye in proportion to developed silver; the silver is then bleached and fixed out (ECN-2 for negatives, ECP-2E for prints). **[Book: Hunt; James]** **[Verified: process names, H-1-5207 and H-1-2383]** The dye amount per layer is what the characteristic curve $F_i$ describes, measured through the densitometer's spectral product.
+In chromogenic development, oxidized developer couples with a coupler in each layer to form dye in proportion to developed silver; the silver is then bleached and fixed out (ECN-2 for negatives, ECP-2E for prints). **[Book: Hunt; James]** **[Verified: process names, H-1-5207 and H-1-2383]** The characteristic curve $F_i$ measures integral density through the densitometer's spectral product, not dye concentration directly. A spectral model must infer dye amounts from those measurements and the dye spectra, including base and masking couplers (§1.2, §3.3). **[Derived]**
 
 ### 3.3 Masking couplers (the orange mask)
 Real dyes absorb outside their intended band ("unwanted absorptions"): magenta absorbs some blue, cyan absorbs some green and blue. Printing would then turn those into color errors. Colored (masking) couplers correct this:
 
 - In the green record, the coupler itself is **yellow** (it absorbs blue). Where magenta dye forms, coupler is consumed, so its yellow absorption disappears in proportion to the magenta formed. **[Book: Hanson & Vittum, "Colored dye-forming couplers in subtractive color photography", *J. Photogr. Soc. Am.* 13 (1947); Hunt; Giorgianni & Madden, *Digital Color Management*, 2nd ed., Wiley 2008]**
-- Kodak's own DIR patent names these "yellow-colored magenta masking couplers" and notes they cause "undesirably high blue minimum densities". **[Verified: US 5,981,158, background]**
+- Kodak's DIR patent describes reducing "yellow-colored magenta dye-forming masking couplers" to lower blue minimum density. **[Verified: US 5,981,158, detailed description]**
 
-Model for the green record's contribution to *blue* density, with $m$ the magenta dye amount, $m_{\max}$ the coupler supply, $\varepsilon_{mB}$ magenta's unwanted blue density per unit dye and $\varepsilon_{cB}$ the colored coupler's blue density per unit coupler:
+Spectral model for the green record's contribution at wavelength $\lambda$ in the blue band, with $m$ the magenta dye amount, $m_{\max}$ the coupler supply, $\varepsilon_m(\lambda)$ magenta's spectral density per unit dye and $\varepsilon_c(\lambda)$ the colored coupler's spectral density per unit coupler:
 
 $$
-D_B^{(\text{green record})} = \varepsilon_{mB}\, m + \varepsilon_{cB}\,(m_{\max} - m)
+D^{(\text{green record})}(\lambda) = \varepsilon_m(\lambda)\, m + \varepsilon_c(\lambda)\,(m_{\max} - m)
 \;\;\Rightarrow\;\;
-\frac{\partial D_B}{\partial m} = \varepsilon_{mB} - \varepsilon_{cB}
+\frac{\partial D(\lambda)}{\partial m} = \varepsilon_m(\lambda) - \varepsilon_c(\lambda)
 $$
 
-With $\varepsilon_{cB} = \varepsilon_{mB}$ the blue density no longer depends on how much magenta formed: the unwanted absorption has become a constant, $\varepsilon_{mB}\, m_{\max}$, which shows up as extra Dmin (part of the orange cast) and is removed by the printer lights. With $\varepsilon_{cB} > \varepsilon_{mB}$ the mask over-corrects, which raises color separation. The cyan record uses a reddish (magenta+yellow-absorbing) coupler the same way for its unwanted green and blue absorptions. **[Derived from the mechanism in the sources above]**
+With $\varepsilon_c(\lambda) = \varepsilon_m(\lambda)$ across the blue band, that spectral density no longer depends on how much magenta formed: the unwanted absorption has become a constant spectrum, $\varepsilon_m(\lambda)\, m_{\max}$, which shows up as extra Dmin (part of the orange cast) and is removed by the printer lights. Where $\varepsilon_c(\lambda) > \varepsilon_m(\lambda)$, the mask over-corrects the unwanted absorption, which can raise color separation. Equality of fitted broadband coefficients alone does not establish spectral cancellation. The cyan record uses a reddish coupler (absorbing green and blue light, adding magenta and yellow density) the same way for its unwanted green and blue absorptions. **[Derived from the mechanism in the sources above]**
 
-In integral-density terms this is a **negative-side 3×3 correction applied to dye amounts before printing**, with off-diagonal terms that can cancel (or overcancel) the dyes' cross-absorptions. Because it acts per dye amount and adds a constant, it is linear in printing density — but only if the bookkeeping is spectral (§1.2) or uses the correct printing-density frame (§2.2). **[Derived]**
+In integral-density terms this is a **negative-side 3×3 correction applied to dye amounts before printing**, with off-diagonal terms that can cancel (or overcancel) the dyes' cross-absorptions. The dye-and-coupler bookkeeping is linear in spectral density, but the subsequent spectral integral and logarithm are nonlinear. A 3×3 mapping in integral printing density is a fitted approximation, even when the density frame is correct (§1.2, §2.2). **[Derived]**
 
 ### 3.4 DIR couplers and interimage effects
 **Mechanism.** Development-inhibitor-releasing (DIR) couplers form dye and release an inhibitor where a layer develops. The inhibitor restrains development in the same layer and in neighboring layers. Kodak's patents state the effects directly: DIR couplers "release inhibitors that can restrain silver development in the layer in which release occurs"; they can "control gamma or contrast", "enhance sharpness or acutance", "reduce granularity" and provide "color correction via interlayer interimage effects". **[Verified: US 5,965,341 and US 5,981,158 background]**
 
 - **Interlayer (color) interimage:** inhibitor from a "causer" layer lowers development in a "receiver" layer. Exposing red therefore *lowers* green and blue density where red light fell, beyond what neutral exposures show: more color separation without changing the neutral scale (if the film is designed for it). Interimage effects as a measurable color-reproduction mechanism: Hanson & Horton, "Subtractive color reproduction: interimage effects", *JOSA* 42 (1952). **[Book]** DIR couplers: Barr, Thirtle & Vittum, *Photogr. Sci. Eng.* 13 (1969). **[Book]**
 - **Patent metric:** US 5,965,341 measures interimage as the ratio of receiver gamma to causer gamma, $G_r/G_g$ (red-record gamma over green-record gamma, from exposures in its test films), with a no-inhibitor reference of $1.10/1.27 = 0.87$; a DIR coupler counts as effective when the ratio falls below that. **[Verified: US 5,965,341, examples]** US 5,981,158 uses blue as causer and green as receiver. **[Verified]** Neither patent gives a general equation for interimage.
-- **Fujifilm** markets the same mechanism ("Super-Efficient DIR-Coupler Technology… improved definition and color reproduction") for ETERNA 250. **[Verified: ETERNA 250 product information, 2005]**
+- **Fujifilm** describes its new Super-Efficient DIR-Coupler Technology for ETERNA 250 as giving "further enhancements in color and sharpness"; the earlier phrase about improved definition and color reproduction refers to existing DIR couplers. **[Verified: ETERNA 250 product information, 2005]**
 
-**Model we will implement (engineering form, not from a source).** Inhibition reduces development in proportion to the density formed in other layers. Linearized about the neutral axis:
+**Model we will implement (engineering form, not from a source).** Inhibition reduces development in proportion to the density formed in other layers. Let $e$ be a neutral log-exposure coordinate, and let $F_j(e)$ be record $j$'s fitted neutral characteristic curve at that coordinate. For a uniform neutral input, choose $e$ to be its common layer log exposure. The color residual is $q_j = D_j - F_j(e)$:
 
 $$
-D_i' = D_i - \sum_{j \neq i} k_{ij}\,\big(D_j - \bar D\big), \qquad \bar D = \tfrac13 \textstyle\sum_j D_j
+D_i' = D_i - \sum_{j \neq i} k_{ij}\,q_j, \qquad q_j = D_j - F_j(e)
 $$
 
-- For a neutral exposure $D_j = \bar D$ for all $j$, so the neutral scale is untouched by construction; the datasheet's neutral curves already *include* the film's real interimage, so we fit $F_i$ to them and add only the color-dependent part. **[Derived]**
-- $k_{ij} > 0$ increases separation between records (more saturated color). Because density, not exposure, drives inhibition, the effect grows with density (stronger in brighter colors) and would ideally act before the curves saturate. **[Derived]**
-- **Local (edge) interimage** uses the same equation with $D_j$ replaced by a blurred $h * D_j$ (inhibitor diffuses tens of micrometres; see §6.3). **[Unverified: diffusion distance for VISION3]**
+- For a uniform neutral exposure $D_j = F_j(e)$, every $q_j$ is zero, so each record's neutral scale is untouched even when the R/G/B curves differ; the datasheet's neutral curves already *include* the film's real interimage, so we fit $F_i$ to them and add only the color-dependent part. **[Derived]**
+- Positive cross-channel inhibition can increase record separation; for equal curves and a shared coefficient $k$, zero-mean color residuals are multiplied by $1+k$. With unequal curves or coefficients, this is not a guarantee of increased saturation. The coordinate $e$, coefficients and saturation behavior must be fitted and tested; this is a candidate local approximation, not an established film law. **[Derived]**
+- **Local (edge) interimage** uses the same equation with $q_j$ replaced by a blurred $h * q_j$ (inhibitor diffuses tens of micrometres; see §6.3). **[Unverified: diffusion distance for VISION3]**
 - The strengths $k_{ij}$ are not published. They must be fitted to real-film references (MOV-89) or tuned on charts and labeled **Approximated**.
 
 ---
@@ -177,7 +179,7 @@ $$
 If the printing-density responsivities match the printer × print film product (that is what RP 180 and APD aim for), this collapses to
 
 $$
-\log_{10} H^{\text{print}}_i = \log_{10} H^{0}_i - PD_i \qquad \textbf{[Derived from RP 180 §§1–3 and ST 2065-2 §0]}
+\log_{10} H^{\text{print}}_i = \log_{10} H^{0}_i - PD_i \qquad \textbf{[Derived from RP 180 §§1–3 and ST 2065-2 Introduction]}
 $$
 
 so the negative's printing density simply subtracts from the printer's log exposure, channel by channel. That is exactly the engine's current form (`logP = printerLights + lights − dNeg`), **provided `dNeg` is printing density**. Today it is a generic density with no defined frame (gap G-1).
@@ -189,10 +191,10 @@ so the negative's printing density simply subtracts from the printer's log expos
 - Fujifilm documents an example Bell & Howell Model C setup for ETERNA-CP: 1000 W lamp, SC41 + heat-absorbing filter 2043, trimmer 13-13-13, tape 25-25-25, ND R 0.50 / G 0.55 / B 0.90. **[Verified: KB-0707E p.51]**
 
 ### 4.3 The print stock
-- Print dye amounts follow the print H&D curves, $c^{\text{print}}_i = F^{\text{print}}_i(\log_{10} H^{\text{print}}_i)$, and the print's spectral transmittance is $T_p(\lambda) = 10^{-(D_{\min,p}(\lambda) + \sum_i c^{\text{print}}_i \varepsilon^{\text{print}}_i(\lambda))}$. **[Book: Hunt; §1.2]**
+- Print dye amounts are fitted functions $c^{\text{print}}_i = G^{\text{print}}_i(\log_{10} H^{\text{print}}_i)$, chosen so the resulting Status A measurements reproduce the published H&D curves $F_i$. A measured integral density $F_i$ cannot be substituted directly for dye amount, and base density must be counted once. **[Derived: spectral reconstruction requirement]** The print's spectral transmittance is $T_p(\lambda) = 10^{-(D_{\min,p}(\lambda) + \sum_i c^{\text{print}}_i \varepsilon^{\text{print}}_i(\lambda))}$. **[Book: Hunt; §1.2]**
 - **2383** is the reference: Status A curves, Dmax ≈ 4.1, midscale slope ≈ 3.3–3.7 (§1.1); polyester ESTAR base 120 µm; antihalation layer of "proprietary solid particle dyes… coated under the emulsion"; no rem-jet. **[Verified: H-1-2383 Mar 2022; the Aug 2026 revision keeps the same text and charts, with the dye-density chart redrawn at higher resolution]**
 - **2393 (VISION Premier)**: "The upper tone scale… is significantly higher in density than EASTMAN EXR Color Print Film… The toe areas of the sensitometric curves are matched more closely, producing more neutral highlights"; same LAD Status A aim as 2383; with the same soundtrack negative its print density "is about .1 higher than 2383". **[Verified: H-1-2393, Sept 1998 (cinematography.net copy)]** No current Kodak-hosted 2393 sheet was found (see `STOCK-DATA.md`).
-- **Fujifilm ETERNA-CP 3513DI**: characteristic curves in Status A, exposed at 2854 K 1/100 s through SC-41, CC-90Y and CC-60M; **"Curves G and B are shifted 1.0 Log H to avoid overlapping"**. **[Verified: KB-0707E p.53]** Anyone digitizing it must undo that shift. The manual states no gamma. The frequently quoted "ASC: 3513 gamma 2.6" is **not used** here: it was never traced to a primary source (MOV-15).
+- **Fujifilm ETERNA-CP 3513DI**: characteristic curves in Status A, exposed at 2854 K 1/100 s through SC-41, CC-90Y and CC-60M; **"Curves G and B are shifted 1.0 Log H to avoid overlapping"**. **[Verified: KB-0707E p.53]** Anyone digitizing it must undo that shift; the manual gives the same shift for F-CP (p.47) and 3521XD (p.55). The manual states no gamma. The frequently quoted "ASC: 3513 gamma 2.6" is **not used** here: it was never traced to a primary source (MOV-15).
 
 ### 4.4 Lab variations (for MOV-35)
 - Push/pull and "skip-bleach" processing "may require more extreme adjustment from the LAD printing condition" (Mar 2022 sheet); the Mar 2026 sheet says instead "Testing is recommended with specialized negative processing techniques (push, pull, 'skip-bleach', etc.)". **[Verified: H-1-5207 LAD section, both revisions]**
@@ -213,10 +215,10 @@ so the negative's printing density simply subtracts from the printer's log expos
 Screen luminance with flare, as a fraction $f$ of open-gate luminance $L_0$:
 
 $$
-L = L_0 \left(10^{-(D_{\text{vis}} - D_{\text{vis,min}})} + f\right), \qquad f \le 0.0016 \text{ (review room)}
+L = L_0 \left(10^{-D_{\text{vis}}} + f\right), \qquad 0 \le f < 0.0016 \text{ (review room)}
 $$
 
-**[Derived from ST 196 §10.2; the additive-veil form is the standard flare model, Book: Hunt]** With 2383 reaching density ≈ 4 above Dmin ($10^{-4} = 0.0001$), flare (up to 0.0016) can be up to about 16× larger than the print's own black: **flare, not Dmax, sets the projected black and lifts the shadow tone scale.** That is why a steep 2383 print "only looks right" with flare (`docs/REVIEW-2026-10-28.md` F-6). **[Derived]**
+**[Derived from ST 196 §10.2; the additive-veil form is the standard flare model, Book: Hunt]** Here $D_{\text{vis}}$ is total visual density; subtracting Dmin would instead normalize transmission to a clear print. If a print reaches total visual density 4 ($10^{-4} = 0.0001$), flare near the 0.0016 ceiling can be about 16× larger than its own black transmission. **When flare dominates, it sets the projected black and lifts the shadow tone scale.** Kodak's ≈4.1 Dmax is a Status A chart reading, so using it as visual density is only an estimate. ST 196 provides an upper bound on stray light, not a required flare floor. **[Derived]**
 
 ### 5.3 Surround and system gamma
 - Film is viewed in a dark surround. A dark surround lowers perceived contrast, so projected images need a higher end-to-end gamma than images viewed in an average surround; Hunt gives about 1.5 for dark, 1.25 for dim and 1.0 for average surrounds. **[Book: Hunt, tone reproduction chapter; Bartleson & Breneman, "Brightness perception in complex fields", *JOSA* 57 (1967)]** **[Unverified: exact figures and page]**
@@ -231,7 +233,7 @@ $$
 - **Color.** The layer nearest the base (red-sensitive in a conventional negative, §3.1) receives the reflected light first, and the blue and green parts are largely absorbed on the way down, so halation on color negative is red/orange. **[Book: James, Hunt]** **[Unverified for VISION3: layer order not published]**
 - **Rem-jet → AHU.** The Mar 2022 VISION3 sheets: "acetate safety base with rem-jet backing". **[Verified: H-1-5207 2022]** The **Mar 2026** sheets for 50D, 250D, 200T and 500T: "An Anti-halation undercoat replaces the traditional remjet backing layer", base "acetate safety base". **[Verified: H-1-5203/5207/5213/5219, Revised 3-26]** Kodak's AHU page calls it "a new VISION3 Camera Negative Film structure – without remjet backing… an Anti-Halation Undercoat layer". **[Verified: kodak.com/en/motion/page/ahu-announcement]** The sheets make no quantitative halation claim for either design. **[Unverified: AHU vs rem-jet halation strength]**
 - **The 2026 sheets reuse the 2022 charts byte for byte** (MTF, granularity, sensitometry, spectral sensitivity, dye density) for 250D and 50D. **[Verified: SHA-256 of extracted chart images]** So either the AHU change does not alter the published curves, or the curves were not re-measured. We cannot tell which. **[Unverified]**
-- **Print film** has its own antihalation layer "coated under the emulsion" plus absorber dyes that "reduce intragrain light scatter… and further [reduce] halation". **[Verified: H-1-2383]** Print halation is negligible for our purposes.
+- **Print film** has its own antihalation layer "coated under the emulsion" plus absorber dyes that reduce intragrain light scatter, "further reducing halation". **[Verified: H-1-2383]** Treating print halation as negligible is an engineering assumption, not a measured bound. **[Unverified: magnitude]**
 - **No backing (e.g. rem-jet removed by the user or a reseller):** strong red halation. This is widely observed but we have no primary measurement. **[Unverified: magnitude]**
 
 **What a physical model needs** (for MOV-32): halation added to the *red-layer exposure* (not luminance), from light that has passed the emulsion (so weighted by the scene's red-band exposure and the emulsion's transmittance), spread by a ring/disk kernel whose radius scales with base thickness relative to the frame, with strength set by the backing (none / AHU / rem-jet). **[Derived]**
@@ -270,16 +272,16 @@ $$
 
 ## 7. How the engine maps onto this
 
-Measured with a Python mirror of `FilmModel.swift` (calibrated printer lights; neutral input; measured below +1.5 stops, where highlight chroma retention is inactive). Script kept outside the repo; numbers reproduce from the constants in `FilmModel.swift`.
+Measured with a Python mirror of `FilmModel.swift` (calibrated printer lights; neutral input; measured below +1.5 stops, where highlight chroma retention is inactive). The probe is archived outside git at `~/Documents/Emulsion Research/Film science 2026-11-07/engine_probe.py`; numbers reproduce from the constants in `Packages/EmulsionCore/Sources/EmulsionCore/FilmModel.swift`. It measures the color chain without spatial effects (halation, local tone or grain).
 
 | Quantity | Engine today | Reference | Source |
 | --- | --- | --- | --- |
 | Negative slope at mid-gray | 0.58 / 0.60 / 0.63 (R/G/B) | 0.47–0.56 Status M; ≈0.58 printing density from the 7-points rule | §1.1, §4.2 |
 | Print slope at the mid-gray operating point | 2.12 / 2.07 / 1.98 | ≈2.8 near LAD (H-61b); 3.3–3.7 midscale | §1.1 |
 | Print peak slope | 2.43–2.61 | 4.0–4.7 | §1.1 |
-| Mid-gray print density above paper | 0.77 (output 0.17 of white) | ≈0.95 visual (≈0.11 of open gate) | §2.4 |
+| Mid-gray print density above paper | 0.77 (output 0.17 of white) | ≈0.95 above clear-print Dmin (≈0.11 of clear print; 0.10 of open gate) | §2.4 |
 | System gamma at mid-gray (display/scene, log-log) | 1.24 | ≈1.5 for dark-surround projection | §5.3 |
-| Black / paper-white contrast | ≈1000:1 | ≤600:1 projected, flare-limited | §5.2 |
+| Black / paper-white contrast | ≈1000:1 | ≈600:1 at the review-room stray-light ceiling; higher contrast possible below it | §5.2 |
 
 Stage-by-stage:
 
@@ -308,15 +310,15 @@ Ordered roughly by impact on the look. Each gap names the E2 issue that owns it.
 
 | ID | Gap | Physics section | Issue |
 | --- | --- | --- | --- |
-| G-1 | Define the negative's density frame: fit negative curves in Status M from the sheets, then convert to printing density (APD) with a per-stock 3×3 from the dye spectra (RP 180 §3). | §1.3, §2.2–2.3, §4.1 | MOV-25, MOV-88 |
+| G-1 | Define the negative's density frame: fit negative curves in Status M from the sheets, then fit a per-stock conversion to printing density (APD) from dye spectra; test whether 3×3 plus offset is sufficient (RP 180 §3; ST 2065-2 NOTE 3). | §1.3, §2.2–2.3, §4.1 | MOV-25, MOV-88 |
 | G-2 | Negative dye set: unwanted absorptions + masking couplers, reconstructed from the "Minimum Density" and "Midscale Neutral" spectra on H-1-5207. | §3.3 | MOV-88, MOV-17 |
 | G-3 | Interimage: neutral-preserving density coupling (§3.4 equation) plus a local edge term; fit $k_{ij}$ to real film. | §3.4 | MOV-27 |
 | G-4 | Spectral layer exposure from scene spectra × Kodak spectral sensitivities (note the density criterion they are defined at). | §1.1, §1.3, §3.1 | MOV-22, MOV-23, MOV-16 |
 | G-5 | Tone refit together: printing-density negative + 2383 print (≈2.8 slope near LAD, 3.3–3.7 midscale) + flare. Fitting the print alone over-contrasts. | §1.1, §4, §5.2 | MOV-5 |
-| G-6 | Spectral print + projection: print dyes (xenon-normalized) × xenon 5400 K SPD × observer, flare $f \le 0.0016$, adaptation to the display white. | §4.3, §5.1–5.2 | MOV-26, MOV-17 |
+| G-6 | Spectral print + projection: print dyes (xenon-normalized) × xenon 5400 K SPD × observer, flare $0 \le f < 0.0016$, adaptation to the display white. | §4.3, §5.1–5.2 | MOV-26, MOV-17 |
 | G-7 | Display adaptation: decide and document how a dark-surround theater print maps to a phone/monitor (system gamma, mid-gray 0.17 vs LAD 0.11). | §5.3, §7 | MOV-5 (decision), MOV-9 (output transforms) |
 | G-8 | Halation v2: red-layer exposure source, base-thickness-scaled kernel, backing switch (none / AHU / rem-jet), exposure-order fix. | §6.1 | MOV-32, MOV-102, MOV-31 |
-| G-9 | Grain v2: per-layer density noise from Kodak $\sigma_D$ curves at 48 µm, Selwyn-scaled to pixel size and gauge; through the print. | §6.2 | MOV-30, MOV-31 |
+| G-9 | Grain v2: per-layer density noise from Kodak negative $\sigma_D$ curves at 48 µm (print measurement apertures unresolved), Selwyn-scaled to pixel size and gauge; through the print. | §6.2 | MOV-30, MOV-31 |
 | G-10 | Per-layer MTF from Kodak curves (negative and print), applied in exposure/density at the right stage. | §6.3 | MOV-34 |
 | G-11 | Adjacency effect as an unsharp mask in density. | §6.3 | MOV-33 |
 | G-12 | ADX/APD interoperability: accept ADX16/ADX10 scans as negatives and expose the negative stage in APD. | §2.3 | **No issue yet (proposed)** |
