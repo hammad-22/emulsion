@@ -11,9 +11,7 @@ struct ColorReferenceTests {
     func swiftMirrorMatchesColourScience(space: InputColorSpace) throws {
         for sample in try ColorReferences.samples(for: space) {
             let decoded = sample.code.decoded(curve: space.curve)
-            withHLGSubBlackKnownIssue(space, sample) {
-                ColorReferences.expectMatch(space.toWorking * decoded, sample.working, ColorReferences.mirrorTolerance, sample.label)
-            }
+            ColorReferences.expectMatch(space.toWorking * decoded, sample.working, ColorReferences.mirrorTolerance, sample.label)
         }
     }
 
@@ -39,21 +37,12 @@ struct ColorReferenceTests {
         }
         try #require(output.count == samples.count)
         for (sample, (actual, expected)) in zip(samples, zip(output, expected)) {
-            withHLGSubBlackKnownIssue(space, sample) {
-                ColorReferences.expectMatch(actual, expected, ColorReferences.kernelTolerance, sample.label)
-            }
+            ColorReferences.expectMatch(actual, expected, ColorReferences.kernelTolerance, sample.label)
         }
     }
 
     @Test func referenceTableCoversExactlyTheInputColorSpaces() throws {
         #expect(try ColorReferences.spaceNames() == Set(InputColorSpace.allCases.map(\.rawValue)))
-    }
-
-    /// MOV-125: HLG squares sub-black signals into positive light; colour-science mirrors them.
-    /// Remove this once the decode is fixed (the known issue then fails for not occurring).
-    private func withHLGSubBlackKnownIssue(_ space: InputColorSpace, _ sample: ColorReferences.Sample, _ body: () -> Void) {
-        guard space == .hlgRec2020, simd_reduce_min(sample.code) < 0 else { return body() }
-        withKnownIssue("MOV-125: HLG sub-black signals decode to positive light", body)
     }
 }
 
