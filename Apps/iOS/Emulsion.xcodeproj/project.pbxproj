@@ -8,14 +8,28 @@
 
 /* Begin PBXBuildFile section */
 		E10000000000000000000B01 /* EmulsionCore in Frameworks */ = {isa = PBXBuildFile; productRef = E10000000000000000000D01 /* EmulsionCore */; };
+		E10000000000000000000B02 /* EmulsionKit in Frameworks */ = {isa = PBXBuildFile; productRef = E10000000000000000000D02 /* EmulsionKit */; };
+		E10000000000000000000B03 /* EmulsionUI in Frameworks */ = {isa = PBXBuildFile; productRef = E10000000000000000000D03 /* EmulsionUI */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
 		E10000000000000000000F01 /* Emulsion.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = Emulsion.app; sourceTree = BUILT_PRODUCTS_DIR; };
+		E10000000000000000000F02 /* EmulsionUITests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = EmulsionUITests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 /* End PBXFileReference section */
+
+/* Begin PBXContainerItemProxy section */
+		E10000000000000000001001 /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = E10000000000000000000801 /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = E10000000000000000000701;
+			remoteInfo = Emulsion;
+		};
+/* End PBXContainerItemProxy section */
 
 /* Begin PBXFileSystemSynchronizedRootGroup section */
 		E10000000000000000000501 /* Emulsion */ = {isa = PBXFileSystemSynchronizedRootGroup; path = Emulsion; sourceTree = "<group>"; };
+		E10000000000000000000502 /* EmulsionUITests */ = {isa = PBXFileSystemSynchronizedRootGroup; path = EmulsionUITests; sourceTree = "<group>"; };
 /* End PBXFileSystemSynchronizedRootGroup section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -24,6 +38,15 @@
 			buildActionMask = 2147483647;
 			files = (
 				E10000000000000000000B01 /* EmulsionCore in Frameworks */,
+				E10000000000000000000B02 /* EmulsionKit in Frameworks */,
+				E10000000000000000000B03 /* EmulsionUI in Frameworks */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		E10000000000000000000A12 /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -34,6 +57,7 @@
 			isa = PBXGroup;
 			children = (
 				E10000000000000000000501 /* Emulsion */,
+				E10000000000000000000502 /* EmulsionUITests */,
 				E10000000000000000000602 /* Products */,
 			);
 			sourceTree = "<group>";
@@ -42,6 +66,7 @@
 			isa = PBXGroup;
 			children = (
 				E10000000000000000000F01 /* Emulsion.app */,
+				E10000000000000000000F02 /* EmulsionUITests.xctest */,
 			);
 			name = Products;
 			sourceTree = "<group>";
@@ -67,10 +92,33 @@
 			name = Emulsion;
 			packageProductDependencies = (
 				E10000000000000000000D01 /* EmulsionCore */,
+				E10000000000000000000D02 /* EmulsionKit */,
+				E10000000000000000000D03 /* EmulsionUI */,
 			);
 			productName = Emulsion;
 			productReference = E10000000000000000000F01 /* Emulsion.app */;
 			productType = "com.apple.product-type.application";
+		};
+		E10000000000000000000702 /* EmulsionUITests */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = E10000000000000000000C03 /* Build configuration list for PBXNativeTarget "EmulsionUITests" */;
+			buildPhases = (
+				E10000000000000000000A11 /* Sources */,
+				E10000000000000000000A12 /* Frameworks */,
+				E10000000000000000000A13 /* Resources */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+				E10000000000000000001101 /* PBXTargetDependency */,
+			);
+			fileSystemSynchronizedGroups = (
+				E10000000000000000000502 /* EmulsionUITests */,
+			);
+			name = EmulsionUITests;
+			productName = EmulsionUITests;
+			productReference = E10000000000000000000F02 /* EmulsionUITests.xctest */;
+			productType = "com.apple.product-type.bundle.ui-testing";
 		};
 /* End PBXNativeTarget section */
 
@@ -85,6 +133,10 @@
 					E10000000000000000000701 = {
 						CreatedOnToolsVersion = 27.0;
 					};
+					E10000000000000000000702 = {
+						CreatedOnToolsVersion = 27.0;
+						TestTargetID = E10000000000000000000701;
+					};
 				};
 			};
 			buildConfigurationList = E10000000000000000000C01 /* Build configuration list for PBXProject "Emulsion" */;
@@ -98,6 +150,8 @@
 			minimizedProjectReferenceProxies = 1;
 			packageReferences = (
 				E10000000000000000000901 /* XCLocalSwiftPackageReference "EmulsionCore" */,
+				E10000000000000000000902 /* XCLocalSwiftPackageReference "EmulsionKit" */,
+				E10000000000000000000903 /* XCLocalSwiftPackageReference "EmulsionUI" */,
 			);
 			preferredProjectObjectVersion = 77;
 			productRefGroup = E10000000000000000000602 /* Products */;
@@ -105,12 +159,20 @@
 			projectRoot = "";
 			targets = (
 				E10000000000000000000701 /* Emulsion */,
+				E10000000000000000000702 /* EmulsionUITests */,
 			);
 		};
 /* End PBXProject section */
 
 /* Begin PBXResourcesBuildPhase section */
 		E10000000000000000000A03 /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		E10000000000000000000A13 /* Resources */ = {
 			isa = PBXResourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
@@ -127,7 +189,22 @@
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
+		E10000000000000000000A11 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
 /* End PBXSourcesBuildPhase section */
+
+/* Begin PBXTargetDependency section */
+		E10000000000000000001101 /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			target = E10000000000000000000701 /* Emulsion */;
+			targetProxy = E10000000000000000001001 /* PBXContainerItemProxy */;
+		};
+/* End PBXTargetDependency section */
 
 /* Begin XCBuildConfiguration section */
 		E10000000000000000000E01 /* Debug */ = {
@@ -203,7 +280,7 @@
 				SUPPORTED_PLATFORMS = "iphoneos iphonesimulator";
 				SUPPORTS_MACCATALYST = NO;
 				SWIFT_EMIT_LOC_STRINGS = YES;
-				SWIFT_VERSION = 5.0;
+				SWIFT_VERSION = 6.0;
 				TARGETED_DEVICE_FAMILY = 1;
 			};
 			name = Debug;
@@ -235,8 +312,40 @@
 				SUPPORTED_PLATFORMS = "iphoneos iphonesimulator";
 				SUPPORTS_MACCATALYST = NO;
 				SWIFT_EMIT_LOC_STRINGS = YES;
-				SWIFT_VERSION = 5.0;
+				SWIFT_VERSION = 6.0;
 				TARGETED_DEVICE_FAMILY = 1;
+			};
+			name = Release;
+		};
+		E10000000000000000000E05 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				GENERATE_INFOPLIST_FILE = YES;
+				MARKETING_VERSION = 0.1;
+				PRODUCT_BUNDLE_IDENTIFIER = com.hammad.emulsion.uitests;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SUPPORTED_PLATFORMS = "iphoneos iphonesimulator";
+				SWIFT_VERSION = 6.0;
+				TARGETED_DEVICE_FAMILY = 1;
+				TEST_TARGET_NAME = Emulsion;
+			};
+			name = Debug;
+		};
+		E10000000000000000000E06 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				GENERATE_INFOPLIST_FILE = YES;
+				MARKETING_VERSION = 0.1;
+				PRODUCT_BUNDLE_IDENTIFIER = com.hammad.emulsion.uitests;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SUPPORTED_PLATFORMS = "iphoneos iphonesimulator";
+				SWIFT_VERSION = 6.0;
+				TARGETED_DEVICE_FAMILY = 1;
+				TEST_TARGET_NAME = Emulsion;
 			};
 			name = Release;
 		};
@@ -261,6 +370,15 @@
 			defaultConfigurationIsVisible = 0;
 			defaultConfigurationName = Release;
 		};
+		E10000000000000000000C03 /* Build configuration list for PBXNativeTarget "EmulsionUITests" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				E10000000000000000000E05 /* Debug */,
+				E10000000000000000000E06 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
 /* End XCConfigurationList section */
 
 /* Begin XCLocalSwiftPackageReference section */
@@ -268,12 +386,28 @@
 			isa = XCLocalSwiftPackageReference;
 			relativePath = ../../Packages/EmulsionCore;
 		};
+		E10000000000000000000902 /* XCLocalSwiftPackageReference "EmulsionKit" */ = {
+			isa = XCLocalSwiftPackageReference;
+			relativePath = ../../Packages/EmulsionKit;
+		};
+		E10000000000000000000903 /* XCLocalSwiftPackageReference "EmulsionUI" */ = {
+			isa = XCLocalSwiftPackageReference;
+			relativePath = ../../Packages/EmulsionUI;
+		};
 /* End XCLocalSwiftPackageReference section */
 
 /* Begin XCSwiftPackageProductDependency section */
 		E10000000000000000000D01 /* EmulsionCore */ = {
 			isa = XCSwiftPackageProductDependency;
 			productName = EmulsionCore;
+		};
+		E10000000000000000000D02 /* EmulsionKit */ = {
+			isa = XCSwiftPackageProductDependency;
+			productName = EmulsionKit;
+		};
+		E10000000000000000000D03 /* EmulsionUI */ = {
+			isa = XCSwiftPackageProductDependency;
+			productName = EmulsionUI;
 		};
 /* End XCSwiftPackageProductDependency section */
 	};

@@ -9,4 +9,11 @@
   - Respect reserved regions (fold, camera) and use `ArrangementView` / adaptive layout APIs, not the hinge angle. Keep state when folding mid-edit.
   - Every UI PR shows proof on the iPhone 17 Pro simulator and the iPhone Duo simulator (folded and unfolded). That needs the Xcode 27.1 SDK.
 - **Accessibility:** every control has a label and supports Dynamic Type.
-- Folders are organized by feature (`Camera/`, `Library/`, `Editor/`), with shared models in `Model/`.
+- Folders are organized by feature (`Camera/`, `Library/`, `Editor/`). Models and app logic live in `Packages/EmulsionKit`, not in the app.
+- **Run it before every app PR.** Build, then run the UI walkthrough on a fresh install. It adds the sample photos, edits, compares, rotates and saves to Photos, and keeps screenshots in the result bundle for the PR Proof:
+  ```bash
+  xcrun simctl uninstall booted com.hammad.emulsion; rm -rf /tmp/ui.xcresult /tmp/ui-shots
+  xcodebuild test -project Apps/iOS/Emulsion.xcodeproj -scheme Emulsion -destination 'platform=iOS Simulator,name=iPhone 17 Pro,OS=26.2' -resultBundlePath /tmp/ui.xcresult
+  xcrun xcresulttool export attachments --path /tmp/ui.xcresult --output-path /tmp/ui-shots
+  ```
+  XCUITest's own landscape screenshots come out garbled; for landscape proof, take a frame from `xcrun simctl io booted recordVideo`.

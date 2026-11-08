@@ -29,7 +29,7 @@ jobs:
           swift --version
 
       - name: Lint (swift format)
-        run: swift format lint --strict --recursive Packages Apps
+        run: swift format lint --strict --recursive Packages Apps Tools
 
       # Compile-only for now: byte-for-byte comparison needs path-independent builds (MOV-123).
       - name: Kernels compile
@@ -37,4 +37,8 @@ jobs:
 
       - name: Engine tests
         working-directory: Packages/EmulsionCore
+        run: swift test
+
+      - name: App logic tests (EmulsionKit)
+        working-directory: Packages/EmulsionKit
         run: swift test
