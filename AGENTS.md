@@ -5,27 +5,28 @@ A free, open-source film lab for iPhone (Mac later): RAW and log footage in, a s
 - Background: `docs/ENGINE.md` (how it works), `docs/DECISIONS.md` (owner decisions), `docs/RESEARCH.md`, `docs/MARKET-RESEARCH.md`.
 - Film physics for E2 work: `docs/FILM-THEORY.md` (equations, sources, what the engine models vs approximates, gap list) and `docs/STOCK-DATA.md` (datasheet inventory). Read both before changing the film model.
 - Work: Linear team **Emulsion** (key `MOV`). GitHub: `hammad-22/emulsion` (open source, Apache-2.0).
-- This file is the single source of rules for every coding agent (Codex reads it directly; `CLAUDE.md` imports it). Folder-specific rules live in nested `AGENTS.md` files: `EmulsionCore/Kernels/`, `EmulsionCore/Tests/`, `Emulsion/`. Read the nested file before editing in that folder.
+- This file is the single source of rules for every coding agent (Codex reads it directly; `CLAUDE.md` imports it). Folder-specific rules live in nested `AGENTS.md` files: `Packages/EmulsionCore/Kernels/`, `Packages/EmulsionCore/Tests/`, `Apps/iOS/`. Read the nested file before editing in that folder.
 
 ## Stack
 iOS 26 / macOS 26 only, iPhone 17 Pro and iPhone Duo as targets. Swift 6.4 toolchain, SwiftUI with Liquid Glass, Core Image color kernels compiled to Metal libraries, SwiftPM. No third-party dependencies yet; any new one needs a reason and a license check.
 
 ## Layout
-- `EmulsionCore/`: the engine package. Every look decision lives here.
+- `Packages/EmulsionCore/`: the engine package. Every look decision lives here.
   - `Sources/EmulsionCore/`: film math (`FilmModel`), input transforms (`ColorSpaces`), develop (`Developer`), render graph and export (`Renderer`), stock and texture constants (`FilmLook`), kernel argument packing (`FilmModel+Kernel`).
   - `Kernels/Emulsion.ci.metal`: GPU kernels; must match the Swift mirror. Compiled `.metallib`s are checked in under `Resources/Kernels/`.
   - `Sources/EmulsionFixtures/`: synthetic test images. `Tests/`: the test suite.
-- `Emulsion/`: the SwiftUI app. Only the data layer exists; the camera and screens aren't written, so it doesn't compile yet (MOV-96).
-- `scripts/`: `build-kernels.sh` rebuilds the metallibs.
+- `Apps/iOS/`: the iOS app (`Emulsion.xcodeproj`, sources in `Emulsion/`). Only the data layer exists; the camera and screens aren't written, so it doesn't compile yet (MOV-96).
+- `Tools/`: `build-kernels.sh` rebuilds the metallibs; `color-references/` generates the colour-science test references (offline Python, never shipped).
 
 ## Commands
 Run these yourself to verify every change. A change isn't done until they pass.
 ```bash
 export DEVELOPER_DIR=/Applications/Xcode.app/Contents/Developer
-sh scripts/build-kernels.sh                                  # after any .metal change
-(cd EmulsionCore && swift test)                              # must stay green
-(cd EmulsionCore && EMULSION_PERF=1 swift test --filter PerformanceProbe)  # Mac timings
-swift format lint --recursive EmulsionCore Emulsion          # style (config: .swift-format)
+sh Tools/build-kernels.sh                                    # after any .metal change
+(cd Packages/EmulsionCore && swift test)                     # must stay green
+.venv/bin/python -I Tools/color-references/generate_input_references.py  # after changing reference samples (pip install -r Tools/color-references/requirements.txt)
+(cd Packages/EmulsionCore && EMULSION_PERF=1 swift test --filter PerformanceProbe)  # Mac timings
+swift format lint --recursive Packages Apps                  # style (config: .swift-format)
 ```
 
 ## The Apple way

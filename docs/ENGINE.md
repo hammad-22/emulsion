@@ -16,7 +16,7 @@ source ──▶ input transform ──▶ scene light (linear, 0.18 = mid-gray)
 | Stage | File | What it does |
 | --- | --- | --- |
 | RAW develop | `Developer.swift` | Apple `CIRAWFilter`, with Apple's look switched off (no boost, no local tone map, no extra contrast): demosaiced, white-balanced, linear scene light |
-| Input transforms | `ColorSpaces.swift`, `inputTransform` kernel | Apple Log, S-Log3/S-Gamut3.Cine, ARRI LogC3/LogC4, V-Log, DaVinci Intermediate/DWG, ACEScct (Bradford from ACES white), HLG (BT.2408 scaling), Rec.709 and Display P3 display encodings |
+| Input transforms | `ColorSpaces.swift`, `VideoSignal.swift`, `inputTransform` / `ycbcrInputTransform` kernels | Apple Log, S-Log3/S-Gamut3.Cine, ARRI LogC3/LogC4, V-Log, DaVinci Intermediate/DWG, ACEScct (Bradford from ACES white), HLG (BT.2408 scaling), Rec.709 and Display P3 display encodings. Code values become the BT.2100 signal E′ using the declared range (legal or full); 10-bit Y′CbCr frames use their tagged matrix (BT.709 or BT.2020). S-Log3, LogC3 and V-Log formulas take 10-bit legal-range code values, the rest take E′ |
 | Display-referred sources | `displayToScene` kernel | JPEG/HEIC/Rec.709 are inverted through the film system's own neutral response, so they are re-printed rather than having film stacked on top of Apple's rendering. Approximate: low-saturation colors round-trip well, strongly saturated colors darken |
 | Film system | `FilmModel.swift`, `filmSystem` kernel | Layer sensitivities (crosstalk) → negative H&D curves → printer lights → print H&D curves (Richards toe) → print dye cross-absorption → 10^−density relative to paper white. Mid-gray is calibrated neutral, like a timing lab |
 | Highlight chroma retention | same | The one non-physical step. Bright saturated light (neon) blends toward a ratio-preserving render above +1.5 stops, so it doesn't band. Midtones are unaffected; timed (warm/cool) neutrals above +1.5 stops lose part of their timing, and very bright saturated colors stay tinted instead of reaching white (artistic choice under review) |
@@ -25,9 +25,11 @@ source ──▶ input transform ──▶ scene light (linear, 0.18 = mid-gray)
 | Grain | `grain` kernel | Density noise on perceptual lightness, peaking in the midtones. The cell size is relative to the image, and sub-pixel cells are attenuated, so preview and export carry matching grain statistics |
 | Interactive speed | `Renderer.materialize` | The developed preview is rendered once into a half-float buffer, so slider moves never re-run the RAW develop or the JPEG inversion |
 
+**Sub-black policy.** Decoding keeps sub-black signals (legal-range footroom, compression undershoot) as negative light; clipping is the film model's job. Where a specification defines values below its range, the engine follows it: Apple Log holds at R₀, and the log curves' toes and sRGB's linear segment extend linearly. Where it doesn't (BT.2100 HLG, BT.1886 gamma 2.4), the curve is extended oddly (mirrored), so every decode stays monotonic through black. colour-science mirrors HLG the same way; for BT.1886, which colour-science clamps, the reference generator applies the engine's convention.
+
 ## Verified behavior (synthetic tests, `swift test`)
 
-20 tests, all passing:
+Tests, all passing:
 - the GPU film system matches the Swift model within 0.6 codes on 200 colors;
 - printed 18% gray is neutral, and the neutral response is monotone over 20 stops;
 - skin keeps its hue family from −2 to +1 stops;
@@ -41,7 +43,8 @@ source ──▶ input transform ──▶ scene light (linear, 0.18 = mid-gray)
 - exports are Display P3, with HEIC at 10-bit;
 - every camera log decodes its published 18% code to 0.18;
 - gamut matrices keep neutrals neutral;
-- the GPU input transform matches the reference decode.
+- the GPU input transform matches colour-science on every input, including display negatives and superwhite, in legal and full range;
+- 10-bit HEVC (legal and full range) and ProRes 422 HQ (legal) frames of S-Log3, LogC3, V-Log, Apple Log and HLG decode their gray, white and a chromatic patch to colour-science within the reference tolerance (2e-4 relative); a wrong range or matrix assumption fails, and the Y′CbCr conversion agrees with Core Image's own (within 1e-5 legal; full-range chroma differs by ~0.1%, Emulsion follows BT.2100).
 
 Tone scale of the stock, in output codes:
 
