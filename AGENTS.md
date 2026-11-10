@@ -5,7 +5,7 @@ A free, open-source film lab for iPhone (Mac later): RAW and log footage in, a s
 - Background: `docs/ENGINE.md` (how it works), `docs/DECISIONS.md` (owner decisions), `docs/RESEARCH.md`, `docs/MARKET-RESEARCH.md`.
 - Film physics for E2 work: `docs/FILM-THEORY.md` (equations, sources, what the engine models vs approximates, gap list) and `docs/STOCK-DATA.md` (datasheet inventory). Read both before changing the film model.
 - Work: Linear team **Emulsion** (key `MOV`). GitHub: `hammad-22/emulsion` (open source, Apache-2.0).
-- This file is the single source of rules for every coding agent (Codex reads it directly; `CLAUDE.md` imports it). Folder-specific rules live in nested `AGENTS.md` files: `Packages/EmulsionCore/Kernels/`, `Packages/EmulsionCore/Tests/`, `Packages/EmulsionKit/`, `Packages/EmulsionUI/`, `Apps/iOS/`. Read the nested file before editing in that folder.
+- This file is the single source of rules for every coding agent (Codex reads it directly; `CLAUDE.md` imports it). Folder-specific rules live in nested `AGENTS.md` files: `Packages/EmulsionCore/Kernels/`, `Packages/EmulsionCore/Tests/`, `Packages/EmulsionKit/`, `Packages/EmulsionUI/`, `Apps/iOS/`, `Apps/macOS/`. Read the nested file before editing in that folder.
 
 ## Stack
 iOS 26 / macOS 26 only, iPhone 17 Pro and iPhone Duo as targets. Swift 6.4 toolchain, SwiftUI with Liquid Glass, Core Image color kernels compiled to Metal libraries, SwiftPM. No third-party dependencies yet; any new one needs a reason and a license check.
@@ -18,6 +18,7 @@ iOS 26 / macOS 26 only, iPhone 17 Pro and iPhone Duo as targets. Swift 6.4 toolc
 - `Packages/EmulsionKit/`: shared app logic for iOS and Mac (library, `RenderService`, editor controls, settings, export, sample photos). No UI.
 - `Packages/EmulsionUI/`: shared SwiftUI components (rendered photo, sliders, photo import).
 - `Apps/iOS/`: the iOS app (`Emulsion.xcodeproj`, sources in `Emulsion/`, UI walkthrough in `EmulsionUITests/`). Library → editor today; the camera comes with MOV-60.
+- `Apps/macOS/`: minimal native Mac shell on the same packages (`Emulsion.xcodeproj`); library, edit and compare.
 - `Tools/`: `build-kernels.sh` rebuilds the metallibs; `make-sample-photos.swift` regenerates the bundled sample photos; `color-references/` generates the colour-science test references (offline Python, never shipped).
 
 ## Commands
