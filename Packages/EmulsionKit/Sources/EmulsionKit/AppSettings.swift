@@ -8,7 +8,12 @@ public final class AppSettings {
     public enum Resolution: String, CaseIterable, Identifiable, Sendable {
         case standard, full
         public var id: String { rawValue }
-        public var title: String { self == .standard ? "12 MP" : "48 MP" }
+        public var title: String {
+            switch self {
+            case .standard: String(localized: "12 MP", bundle: .module, comment: "Capture resolution in megapixels")
+            case .full: String(localized: "48 MP", bundle: .module, comment: "Capture resolution in megapixels")
+            }
+        }
     }
 
     private enum Key {

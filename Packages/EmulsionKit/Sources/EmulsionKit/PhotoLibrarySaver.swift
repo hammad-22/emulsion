@@ -2,13 +2,15 @@ import Foundation
 import Photos
 
 /// Add-only access: Emulsion never reads the user's library.
-public enum PhotoLibrarySaver {
-    public enum Failure: LocalizedError {
+enum PhotoLibrarySaver {
+    enum Failure: LocalizedError {
         case denied
-        public var errorDescription: String? { "Allow Emulsion to add photos in Settings to save exports." }
+        var errorDescription: String? {
+            String(localized: "Allow Emulsion to add photos in Settings to save exports.", bundle: .module)
+        }
     }
 
-    public static func save(_ data: Data) async throws {
+    static func save(_ data: Data) async throws {
         let status = await PHPhotoLibrary.requestAuthorization(for: .addOnly)
         guard status == .authorized || status == .limited else { throw Failure.denied }
         try await PHPhotoLibrary.shared().performChanges {

@@ -35,3 +35,25 @@ public struct Adjustments: Codable, Equatable, Sendable {
         return a
     }
 }
+
+extension Adjustments {
+    /// Reads edits saved by any version. A field missing from the file keeps its default,
+    /// so adding a field never makes an existing library unreadable (MOV-128). Every
+    /// stored property needs a line here; `AdjustmentsCodingTests` checks the count.
+    public init(from decoder: any Decoder) throws {
+        self.init()
+        let saved = try decoder.container(keyedBy: CodingKeys.self)
+        func decode(_ key: CodingKeys, into value: inout Double) throws {
+            value = try saved.decodeIfPresent(Double.self, forKey: key) ?? value
+        }
+        try decode(.exposure, into: &exposure)
+        try decode(.warmth, into: &warmth)
+        try decode(.tint, into: &tint)
+        try decode(.color, into: &color)
+        try decode(.highlights, into: &highlights)
+        try decode(.shadows, into: &shadows)
+        try decode(.grain, into: &grain)
+        try decode(.halation, into: &halation)
+        try decode(.seed, into: &seed)
+    }
+}
