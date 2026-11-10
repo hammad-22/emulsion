@@ -33,7 +33,7 @@ public final class PhotoStore {
         let saved: Data
         do {
             saved = try Data(contentsOf: indexURL)
-        } catch let error as CocoaError where error.code == .fileReadNoSuchFile {
+        } catch CocoaError.fileReadNoSuchFile {
             let originals = originalFiles()
             if !originals.isEmpty { recoverOriginals(originals) }
             return
@@ -89,7 +89,8 @@ public final class PhotoStore {
         }
         do {
             try FileManager.default.removeItem(at: file)
-        } catch let error as CocoaError where error.code == .fileNoSuchFile {
+        } catch CocoaError.fileNoSuchFile {
+            // Already gone: nothing to report.
         } catch {
             report(.libraryDeleteFailed)
         }
@@ -133,8 +134,10 @@ public final class PhotoStore {
     }
 
     private func report(_ error: EmulsionError) {
-        guard !hasReportedSaveFailure else { return }
-        hasReportedSaveFailure = true
+        if error == .librarySaveFailed {
+            guard !hasReportedSaveFailure else { return }
+            hasReportedSaveFailure = true
+        }
         lastError = error
     }
 

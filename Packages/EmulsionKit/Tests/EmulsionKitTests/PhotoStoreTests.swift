@@ -53,6 +53,30 @@ struct PhotoStoreTests {
         #expect(FileManager.default.fileExists(atPath: original.path(percentEncoded: false)))
     }
 
+    @Test func aSaveFailureIsReportedAfterADeleteFailure() async throws {
+        let library = TestLibrary()
+        let other = try library.store.add(TestPhoto.jpeg, fileExtension: "jpg")
+        let photo = try library.store.add(TestPhoto.jpeg, fileExtension: "jpg")
+        let original = library.store.url(for: photo)
+        try FileManager.default.removeItem(at: original)
+        try FileManager.default.createDirectory(at: original, withIntermediateDirectories: false)
+        try TestPhoto.jpeg.write(to: original.appending(path: "blocked.jpg"))
+        try FileManager.default.setAttributes([.posixPermissions: 0], ofItemAtPath: original.path(percentEncoded: false))
+        defer { try? FileManager.default.setAttributes([.posixPermissions: 0o755], ofItemAtPath: original.path(percentEncoded: false)) }
+        await library.store.delete(photo.id)
+        #expect(library.store.lastError == .libraryDeleteFailed)
+        library.store.lastError = nil
+
+        let folder = library.folder.path(percentEncoded: false)
+        try FileManager.default.setAttributes([.posixPermissions: 0o555], ofItemAtPath: folder)
+        defer { try? FileManager.default.setAttributes([.posixPermissions: 0o755], ofItemAtPath: folder) }
+        var edit = other.adjustments
+        edit.exposure = 1
+        library.store.update(other.id, adjustments: edit)
+
+        #expect(library.store.lastError == .librarySaveFailed)
+    }
+
     @Test func importNamesTheFileAfterWhatItIs() throws {
         let library = TestLibrary()
         #expect(try library.store.add(TestPhoto.jpeg).fileName.hasSuffix(".jpeg"))
