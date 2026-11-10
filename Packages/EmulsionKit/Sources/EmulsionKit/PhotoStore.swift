@@ -5,13 +5,19 @@ import Observation
 import UniformTypeIdentifiers
 
 /// Originals live in one folder (Application Support by default); edits are
-/// non-destructive and stored in an index next to them.
+/// non-destructive and stored in an index next to them. The index is written before the
+/// library changes, so what the app shows is what the next launch finds.
 @MainActor @Observable
 public final class PhotoStore {
     public private(set) var photos: [PhotoRecord] = []
+    /// The last library problem that no caller could be told about directly (loading,
+    /// saving an edit, deleting), for the app to show. Set it to nil once shown.
+    public var lastError: EmulsionError?
     let folder: URL
     let renderService: RenderService
     private var indexURL: URL { folder.appending(path: "library.json") }
+    /// False only if an unreadable index couldn't be moved aside: it must never be overwritten.
+    private var canWriteIndex = true
 
     public convenience init() {
         self.init(folder: URL.applicationSupportDirectory.appending(path: "Emulsion", directoryHint: .isDirectory), renderService: .shared)
@@ -21,12 +27,10 @@ public final class PhotoStore {
         self.folder = folder
         self.renderService = renderService
         try? FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
-        if let data = try? Data(contentsOf: indexURL),
-            let saved = try? JSONDecoder().decode([PhotoRecord].self, from: data)
-        {
-            photos = saved.filter {
-                FileManager.default.fileExists(atPath: folder.appending(path: $0.fileName).path(percentEncoded: false))
-            }
+        do {
+            photos = try savedIndex()
+        } catch {
+            recoverFromUnreadableIndex()
         }
     }
 
@@ -43,48 +47,97 @@ public final class PhotoStore {
 
     @discardableResult
     public func add(_ data: Data, fileExtension: String) throws -> PhotoRecord {
-        let record = try insert(data, fileExtension: fileExtension)
-        save()
-        return record
+        try insert([(data, fileExtension)])[0]
     }
 
     /// Adds the bundled synthetic sample photos (made by `Tools/make-sample-photos.swift`),
     /// so there is something to develop before the user imports their own.
     public func addSamples() throws {
         let samples = Bundle.module.urls(forResourcesWithExtension: "jpg", subdirectory: "Samples") ?? []
-        defer { save() }
-        for url in samples.sorted(by: { $0.lastPathComponent > $1.lastPathComponent }) {
-            try insert(Data(contentsOf: url), fileExtension: url.pathExtension)
-        }
+        try insert(samples.sorted { $0.lastPathComponent < $1.lastPathComponent }.map { (try Data(contentsOf: $0), $0.pathExtension) })
     }
 
     public func update(_ id: UUID, adjustments: Adjustments) {
         guard let i = photos.firstIndex(where: { $0.id == id }), photos[i].adjustments != adjustments else { return }
-        photos[i].adjustments = adjustments
-        save()
+        var updated = photos
+        updated[i].adjustments = adjustments
+        do { try commit(updated) } catch { lastError = error }
     }
 
     public func delete(_ id: UUID) async {
         guard let i = photos.firstIndex(where: { $0.id == id }) else { return }
         let file = url(for: photos[i])
+        var updated = photos
+        updated.remove(at: i)
+        do { try commit(updated) } catch {
+            lastError = error
+            return
+        }
         try? FileManager.default.removeItem(at: file)
-        photos.remove(at: i)
-        save()
         await renderService.forget(file)
     }
 
+    /// Copies originals in and lists them first, in the given order, with one index write.
+    /// If anything fails, the files already copied are removed and the library is unchanged.
     @discardableResult
-    private func insert(_ data: Data, fileExtension: String) throws -> PhotoRecord {
-        let id = UUID()
-        let name = "\(id.uuidString).\(fileExtension.lowercased())"
-        try data.write(to: folder.appending(path: name), options: .atomic)
-        let record = PhotoRecord(id: id, created: .now, fileName: name, isRAW: Developer.isRAW(data), adjustments: .defaults(for: id))
-        photos.insert(record, at: 0)
-        return record
+    private func insert(_ originals: [(data: Data, fileExtension: String)]) throws -> [PhotoRecord] {
+        var added: [PhotoRecord] = []
+        do {
+            for original in originals {
+                let id = UUID()
+                let name = "\(id.uuidString).\(original.fileExtension.lowercased())"
+                try original.data.write(to: folder.appending(path: name), options: .atomic)
+                added.append(
+                    PhotoRecord(
+                        id: id, created: .now, fileName: name, isRAW: Developer.isRAW(original.data), adjustments: .defaults(for: id)))
+            }
+            try commit(added + photos)
+            return added
+        } catch {
+            for record in added { try? FileManager.default.removeItem(at: url(for: record)) }
+            throw error
+        }
     }
 
-    private func save() {
-        if let data = try? JSONEncoder().encode(photos) { try? data.write(to: indexURL, options: .atomic) }
+    /// Writes `updated` as the index, then shows it.
+    private func commit(_ updated: [PhotoRecord]) throws(EmulsionError) {
+        guard canWriteIndex else { throw .librarySaveFailed }
+        do {
+            try JSONEncoder().encode(updated).write(to: indexURL, options: .atomic)
+        } catch {
+            throw .librarySaveFailed
+        }
+        photos = updated
+    }
+
+    /// The saved library, minus photos whose original is gone; empty on first launch.
+    private func savedIndex() throws -> [PhotoRecord] {
+        guard FileManager.default.fileExists(atPath: indexURL.path(percentEncoded: false)) else { return [] }
+        return try JSONDecoder().decode([PhotoRecord].self, from: Data(contentsOf: indexURL)).filter {
+            FileManager.default.fileExists(atPath: url(for: $0).path(percentEncoded: false))
+        }
+    }
+
+    /// Keeps the unreadable index under a new name, so its edits can still be recovered,
+    /// and lists the originals again with the default look.
+    private func recoverFromUnreadableIndex() {
+        lastError = .libraryUnreadable
+        let kept = folder.appending(path: "library-unreadable-\(Int(Date.now.timeIntervalSince1970)).json")
+        do {
+            try FileManager.default.moveItem(at: indexURL, to: kept)
+        } catch {
+            canWriteIndex = false
+        }
+        let originals = (try? FileManager.default.contentsOfDirectory(at: folder, includingPropertiesForKeys: [.creationDateKey])) ?? []
+        let recovered = originals.compactMap { file -> PhotoRecord? in
+            guard let id = UUID(uuidString: file.deletingPathExtension().lastPathComponent) else { return nil }
+            let created = (try? file.resourceValues(forKeys: [.creationDateKey]).creationDate) ?? .distantPast
+            let isRAW = (try? Data(contentsOf: file, options: .mappedIfSafe)).map(Developer.isRAW) ?? false
+            return PhotoRecord(id: id, created: created, fileName: file.lastPathComponent, isRAW: isRAW, adjustments: .defaults(for: id))
+        }
+        photos = recovered.sorted { $0.created > $1.created }
+        // Written now, so the next launch finds the recovered list rather than no index.
+        try? commit(photos)
     }
 }
 

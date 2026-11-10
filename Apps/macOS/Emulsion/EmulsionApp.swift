@@ -1,4 +1,5 @@
 import EmulsionKit
+import EmulsionUI
 import SwiftUI
 
 @main
@@ -11,6 +12,7 @@ struct EmulsionApp: App {
     var body: some Scene {
         Window("Emulsion", id: "library") {
             LibraryScreen()
+                .libraryErrorAlert(store)
                 .environment(store)
         }
         .defaultSize(width: initialSize.width, height: initialSize.height)

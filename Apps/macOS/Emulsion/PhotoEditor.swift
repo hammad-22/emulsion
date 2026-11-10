@@ -38,5 +38,9 @@ struct PhotoEditor: View {
         .onChange(of: scenePhase) { _, phase in
             if phase != .active { session.close() }
         }
+        // Quitting doesn't change the scene phase, so a pending edit is written here.
+        .onReceive(NotificationCenter.default.publisher(for: NSApplication.willTerminateNotification)) { _ in
+            session.close()
+        }
     }
 }

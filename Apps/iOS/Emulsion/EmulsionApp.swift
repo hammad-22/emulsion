@@ -1,4 +1,5 @@
 import EmulsionKit
+import EmulsionUI
 import SwiftUI
 
 @main
@@ -9,6 +10,7 @@ struct EmulsionApp: App {
     var body: some Scene {
         WindowGroup {
             LibraryScreen()
+                .libraryErrorAlert(store)
                 .environment(store)
                 .environment(settings)
                 .preferredColorScheme(.dark)
