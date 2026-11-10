@@ -43,14 +43,17 @@ extension Adjustments {
     public init(from decoder: any Decoder) throws {
         self.init()
         let saved = try decoder.container(keyedBy: CodingKeys.self)
-        exposure = try saved.decodeIfPresent(Double.self, forKey: .exposure) ?? exposure
-        warmth = try saved.decodeIfPresent(Double.self, forKey: .warmth) ?? warmth
-        tint = try saved.decodeIfPresent(Double.self, forKey: .tint) ?? tint
-        color = try saved.decodeIfPresent(Double.self, forKey: .color) ?? color
-        highlights = try saved.decodeIfPresent(Double.self, forKey: .highlights) ?? highlights
-        shadows = try saved.decodeIfPresent(Double.self, forKey: .shadows) ?? shadows
-        grain = try saved.decodeIfPresent(Double.self, forKey: .grain) ?? grain
-        halation = try saved.decodeIfPresent(Double.self, forKey: .halation) ?? halation
-        seed = try saved.decodeIfPresent(Double.self, forKey: .seed) ?? seed
+        func decode(_ key: CodingKeys, into value: inout Double) throws {
+            value = try saved.decodeIfPresent(Double.self, forKey: key) ?? value
+        }
+        try decode(.exposure, into: &exposure)
+        try decode(.warmth, into: &warmth)
+        try decode(.tint, into: &tint)
+        try decode(.color, into: &color)
+        try decode(.highlights, into: &highlights)
+        try decode(.shadows, into: &shadows)
+        try decode(.grain, into: &grain)
+        try decode(.halation, into: &halation)
+        try decode(.seed, into: &seed)
     }
 }

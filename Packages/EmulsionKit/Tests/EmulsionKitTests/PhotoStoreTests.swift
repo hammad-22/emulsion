@@ -70,7 +70,7 @@ struct PhotoStoreTests {
               "adjustments": {"exposure": 1, "warmth": 0, "tint": 0, "color": 0,
                               "highlights": 0, "shadows": 0, "grain": 0.5}}]
             """
-        try Data(olderIndex.utf8).write(to: library.indexURL)
+        try Data(olderIndex.utf8).write(to: library.store.indexURL)
 
         let reopened = library.reopened()
 
@@ -86,7 +86,7 @@ struct PhotoStoreTests {
         let library = TestLibrary()
         let photo = try library.store.add(TestPhoto.jpeg, fileExtension: "jpg")
         let minimalIndex = #"[{"id": "\#(photo.id)", "fileName": "\#(photo.fileName)"}]"#
-        try Data(minimalIndex.utf8).write(to: library.indexURL)
+        try Data(minimalIndex.utf8).write(to: library.store.indexURL)
 
         let reopened = library.reopened()
 
@@ -97,7 +97,7 @@ struct PhotoStoreTests {
         let library = TestLibrary()
         let photo = try library.store.add(TestPhoto.jpeg, fileExtension: "jpg")
         let corrupt = Data("[{\"id\": tru".utf8)
-        try corrupt.write(to: library.indexURL)
+        try corrupt.write(to: library.store.indexURL)
 
         let reopened = library.reopened()
         #expect(reopened.lastError == .libraryUnreadable)
@@ -119,8 +119,8 @@ struct PhotoStoreTests {
         let library = TestLibrary()
         let photo = try library.store.add(TestPhoto.jpeg, fileExtension: "jpg")
         // A folder where the index should be makes every index write fail.
-        try FileManager.default.removeItem(at: library.indexURL)
-        try FileManager.default.createDirectory(at: library.indexURL, withIntermediateDirectories: false)
+        try FileManager.default.removeItem(at: library.store.indexURL)
+        try FileManager.default.createDirectory(at: library.store.indexURL, withIntermediateDirectories: false)
 
         var edit = photo.adjustments
         edit.exposure = 1

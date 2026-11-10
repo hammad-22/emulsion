@@ -20,7 +20,6 @@ final class TestLibrary {
     let folder = URL.temporaryDirectory.appending(path: "EmulsionKitTests-\(UUID().uuidString)", directoryHint: .isDirectory)
     let renderService = RenderService()
     lazy var store = PhotoStore(folder: folder, renderService: renderService)
-    var indexURL: URL { folder.appending(path: "library.json") }
 
     /// The same folder opened again, as on the next launch.
     func reopened() -> PhotoStore { PhotoStore(folder: folder, renderService: RenderService()) }

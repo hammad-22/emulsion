@@ -15,7 +15,7 @@ public final class PhotoStore {
     public var lastError: EmulsionError?
     let folder: URL
     let renderService: RenderService
-    private var indexURL: URL { folder.appending(path: "library.json") }
+    var indexURL: URL { folder.appending(path: "library.json") }
     /// False only if an unreadable index couldn't be moved aside: it must never be overwritten.
     private var canWriteIndex = true
 
@@ -59,17 +59,13 @@ public final class PhotoStore {
 
     public func update(_ id: UUID, adjustments: Adjustments) {
         guard let i = photos.firstIndex(where: { $0.id == id }), photos[i].adjustments != adjustments else { return }
-        var updated = photos
-        updated[i].adjustments = adjustments
-        do { try commit(updated) } catch { lastError = error }
+        do { try commit { $0[i].adjustments = adjustments } } catch { lastError = error }
     }
 
     public func delete(_ id: UUID) async {
         guard let i = photos.firstIndex(where: { $0.id == id }) else { return }
         let file = url(for: photos[i])
-        var updated = photos
-        updated.remove(at: i)
-        do { try commit(updated) } catch {
+        do { try commit { $0.remove(at: i) } } catch {
             lastError = error
             return
         }
@@ -91,7 +87,7 @@ public final class PhotoStore {
                     PhotoRecord(
                         id: id, created: .now, fileName: name, isRAW: Developer.isRAW(original.data), adjustments: .defaults(for: id)))
             }
-            try commit(added + photos)
+            try commit { $0.insert(contentsOf: added, at: 0) }
             return added
         } catch {
             for record in added { try? FileManager.default.removeItem(at: url(for: record)) }
@@ -99,9 +95,11 @@ public final class PhotoStore {
         }
     }
 
-    /// Writes `updated` as the index, then shows it.
-    private func commit(_ updated: [PhotoRecord]) throws(EmulsionError) {
+    /// Applies `change` to a copy of the library, writes it as the index, then shows it.
+    private func commit(_ change: (inout [PhotoRecord]) -> Void) throws(EmulsionError) {
         guard canWriteIndex else { throw .librarySaveFailed }
+        var updated = photos
+        change(&updated)
         do {
             try JSONEncoder().encode(updated).write(to: indexURL, options: .atomic)
         } catch {
@@ -135,9 +133,10 @@ public final class PhotoStore {
             let isRAW = (try? Data(contentsOf: file, options: .mappedIfSafe)).map(Developer.isRAW) ?? false
             return PhotoRecord(id: id, created: created, fileName: file.lastPathComponent, isRAW: isRAW, adjustments: .defaults(for: id))
         }
-        photos = recovered.sorted { $0.created > $1.created }
-        // Written now, so the next launch finds the recovered list rather than no index.
-        try? commit(photos)
+        let newestFirst = recovered.sorted { $0.created > $1.created }
+        // Written now, so the next launch finds the recovered list rather than no index;
+        // shown either way.
+        do { try commit { $0 = newestFirst } } catch { photos = newestFirst }
     }
 }
 

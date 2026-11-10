@@ -9,9 +9,10 @@ public final class AppSettings {
         case standard, full
         public var id: String { rawValue }
         public var title: String {
-            self == .standard
-                ? String(localized: "12 MP", bundle: .module, comment: "Capture resolution in megapixels")
-                : String(localized: "48 MP", bundle: .module, comment: "Capture resolution in megapixels")
+            switch self {
+            case .standard: String(localized: "12 MP", bundle: .module, comment: "Capture resolution in megapixels")
+            case .full: String(localized: "48 MP", bundle: .module, comment: "Capture resolution in megapixels")
+            }
         }
     }
 
