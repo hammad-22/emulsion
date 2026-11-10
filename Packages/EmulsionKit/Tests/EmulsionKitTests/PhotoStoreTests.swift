@@ -23,6 +23,16 @@ struct PhotoStoreTests {
         #expect(!FileManager.default.fileExists(atPath: store.url(for: photo).path))
     }
 
+    @Test func deletingASelectionRemovesOnlyThosePhotos() async throws {
+        let library = TestLibrary()
+        let photos = try (0..<3).map { _ in try library.store.add(TestPhoto.jpeg, fileExtension: "jpg") }
+
+        await library.store.delete([photos[0].id, photos[2].id])
+
+        #expect(library.reopened().photos.map(\.id) == [photos[1].id])
+        #expect(!FileManager.default.fileExists(atPath: library.store.url(for: photos[0]).path(percentEncoded: false)))
+    }
+
     @Test func editsPersistAcrossLaunches() throws {
         let library = TestLibrary()
         let photo = try library.store.add(TestPhoto.jpeg, fileExtension: "jpg")

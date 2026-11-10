@@ -2,10 +2,11 @@ import EmulsionKit
 import EmulsionUI
 import SwiftUI
 
-/// Compare, save to Photos, reset, and delete for the photo being edited.
+/// Compare and Reset together, Save to Photos as the one prominent action, and Delete
+/// under More.
 struct EditorToolbar: ToolbarContent {
     let session: EditSession
-    @Binding var isShowingOriginal: Bool
+    @Binding var isComparing: Bool
 
     @Environment(PhotoStore.self) private var store
     @Environment(AppSettings.self) private var settings
@@ -15,19 +16,24 @@ struct EditorToolbar: ToolbarContent {
     @State private var isConfirmingDelete = false
 
     var body: some ToolbarContent {
-        ToolbarItem(placement: .primaryAction) {
-            Toggle("Compare", systemImage: "square.split.2x1", isOn: $isShowingOriginal)
+        ToolbarItemGroup(placement: .topBarTrailing) {
+            // Neutral like the rest of the editor: no accent color beside the photograph.
+            Toggle("Compare", systemImage: "square.split.2x1", isOn: $isComparing)
+                .tint(.white)
+            Button("Reset Edits", systemImage: "arrow.counterclockwise") { session.reset() }
+                .disabled(!session.isEdited)
         }
-        ToolbarItem(placement: .primaryAction) {
+        ToolbarSpacer(.fixed, placement: .topBarTrailing)
+        ToolbarItem(placement: .topBarTrailing) {
             Button("Save to Photos", systemImage: "square.and.arrow.down") {
                 Task { await export() }
             }
+            .buttonStyle(.glassProminent)
+            .tint(.white)
+            .foregroundStyle(.black)
             .disabled(isExporting)
             .alert(exportResult?.message ?? "", isPresented: Binding(isPresenting: $exportResult)) {}
             .sensoryFeedback(trigger: exportResult) { _, result in result?.feedback }
-        }
-        ToolbarItem(placement: .secondaryAction) {
-            Button("Reset Edits", systemImage: "arrow.counterclockwise") { session.reset() }
         }
         ToolbarItem(placement: .secondaryAction) {
             Button("Delete", systemImage: "trash", role: .destructive) { isConfirmingDelete = true }

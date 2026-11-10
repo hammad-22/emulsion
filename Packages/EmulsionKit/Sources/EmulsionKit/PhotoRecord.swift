@@ -8,6 +8,9 @@ public struct PhotoRecord: Identifiable, Codable, Equatable, Sendable {
     public let fileName: String
     public let isRAW: Bool
     public var adjustments: Adjustments
+
+    /// True once the edit differs from the default look the photo was imported with.
+    public var isEdited: Bool { adjustments != .defaults(for: id) }
 }
 
 extension PhotoRecord {

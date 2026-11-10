@@ -25,6 +25,9 @@ public final class EditSession {
 
     public var url: URL { store.url(for: photo) }
 
+    /// True while there is something for `reset()` to undo.
+    public var isEdited: Bool { adjustments != .defaults(for: photo.id) }
+
     /// Back to the default look; the photo keeps its grain pattern.
     public func reset() {
         adjustments = .defaults(for: photo.id)

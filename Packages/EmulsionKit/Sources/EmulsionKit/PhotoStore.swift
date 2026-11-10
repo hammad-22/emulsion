@@ -71,8 +71,16 @@ public final class PhotoStore {
     /// Adds the bundled synthetic sample photos (made by `Tools/make-sample-photos.swift`),
     /// so there is something to develop before the user imports their own.
     public func addSamples() throws {
-        let samples = Bundle.module.urls(forResourcesWithExtension: "jpg", subdirectory: "Samples") ?? []
-        try insert(samples.sorted { $0.lastPathComponent < $1.lastPathComponent }.map { (try Data(contentsOf: $0), $0.pathExtension) })
+        try insert(Self.sampleURLs.map { (try Data(contentsOf: $0), $0.pathExtension) })
+    }
+
+    /// The bundled sample photos, in the order they're added.
+    public nonisolated static let sampleURLs: [URL] = (Bundle.module.urls(forResourcesWithExtension: "jpg", subdirectory: "Samples") ?? [])
+        .sorted { $0.lastPathComponent < $1.lastPathComponent }
+
+    /// Deletes several photos, e.g. the library's selection.
+    public func delete(_ ids: some Sequence<UUID>) async {
+        for id in ids { await delete(id) }
     }
 
     public func update(_ id: UUID, adjustments: Adjustments) {

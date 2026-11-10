@@ -1,7 +1,8 @@
 import XCTest
 
-/// End-to-end walk through the prototype from an empty library: add the sample photos,
-/// open one, edit with the sliders, compare with the original, rotate, and save to Photos.
+/// End-to-end walk through the app from an empty library: add the sample photos, select
+/// one, open one, edit with the sliders, compare with the original, reset, rotate, save to
+/// Photos and delete.
 /// Screenshots are kept in the result bundle as PR proof. Run on a fresh install
 /// (`xcrun simctl uninstall booted com.hammad.emulsion`) so the library starts empty.
 final class LibraryToEditorUITests: XCTestCase {
@@ -20,6 +21,14 @@ final class LibraryToEditorUITests: XCTestCase {
         XCTAssertTrue(firstPhoto.waitForExistence(timeout: 5))
         sleep(2)
         keepScreenshot(app, named: "2 Library with samples")
+
+        app.buttons["Select"].tap()
+        firstPhoto.tap()
+        XCTAssertTrue(app.navigationBars["1 Selected"].waitForExistence(timeout: 2))
+        XCTAssertTrue(firstPhoto.isSelected)
+        keepScreenshot(app, named: "2b Selecting")
+        app.buttons["Done"].tap()
+        XCTAssertTrue(app.navigationBars["Library"].waitForExistence(timeout: 2))
         firstPhoto.tap()
 
         let exposure = app.sliders["Exposure"]
@@ -27,6 +36,12 @@ final class LibraryToEditorUITests: XCTestCase {
         sleep(2)
         keepScreenshot(app, named: "3 Editor")
 
+        let reset = app.buttons["Reset Edits"]
+        XCTAssertFalse(reset.isEnabled, "Nothing to reset before the first edit")
+        exposure.adjust(toNormalizedSliderPosition: 0.6)
+        XCTAssertTrue(reset.isEnabled)
+        reset.tap()
+        XCTAssertFalse(reset.isEnabled)
         exposure.adjust(toNormalizedSliderPosition: 0.6)
         app.buttons["Color"].tap()
         app.sliders["Warmth"].adjust(toNormalizedSliderPosition: 0.7)
@@ -38,6 +53,7 @@ final class LibraryToEditorUITests: XCTestCase {
         sleep(2)
         keepScreenshot(app, named: "5 Original")
         app.buttons["Compare"].tap()
+        XCTAssertFalse(app.staticTexts["Original"].exists)
 
         XCUIDevice.shared.orientation = .landscapeLeft
         sleep(2)

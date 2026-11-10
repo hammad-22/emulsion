@@ -2,48 +2,35 @@ import EmulsionCore
 import EmulsionUI
 import SwiftUI
 
-/// The photo being edited. Touch and hold it, or turn on Compare, to see the original.
+/// The photo being edited, with nothing drawn over it. Touch and hold to see the original;
+/// `isHolding` tells the editor, which names what's on screen in its title.
 struct ComparablePhoto: View {
     let url: URL
     let adjustments: Adjustments
     let isComparing: Bool
+    @Binding var isHolding: Bool
 
-    @GestureState private var isHolding = false
-    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    @GestureState private var isPressed = false
     /// Long enough that taps and slider reaches don't flash the original.
     private let holdDuration = 0.2
 
-    private var showsOriginal: Bool { isComparing || isHolding }
+    private var showsOriginal: Bool { isComparing || isPressed }
 
     var body: some View {
         RenderedPhoto(url: url, adjustments: adjustments, showsOriginal: showsOriginal)
             .accessibilityLabel(showsOriginal ? "Original photo" : "Edited photo")
             .accessibilityAddTraits(.isImage)
             .gesture(hold)
-            .sensoryFeedback(.impact(weight: .light), trigger: isHolding) { _, isHolding in isHolding }
-            .overlay(alignment: .topLeading) {
-                if showsOriginal {
-                    Text("Original")
-                        .font(.caption.bold())
-                        .padding(.horizontal, FilmLabLayout.gap)
-                        .padding(.vertical, FilmLabLayout.compact)
-                        .glassEffect()
-                        .padding(FilmLabLayout.compact)
-                        .transition(.opacity)
-                }
-            }
-            .animation(reduceMotion ? nil : .easeOut(duration: badgeFade), value: showsOriginal)
+            .onChange(of: isPressed) { _, isPressed in isHolding = isPressed }
+            .sensoryFeedback(.impact(weight: .light), trigger: isPressed) { _, isPressed in isPressed }
     }
-
-    /// Quick enough to keep up with a press; a fade, so it's also fine with Reduce Motion.
-    private let badgeFade = 0.15
 
     /// True from the moment the hold is recognized until the finger lifts.
     private var hold: some Gesture {
         LongPressGesture(minimumDuration: holdDuration)
             .sequenced(before: DragGesture(minimumDistance: 0))
-            .updating($isHolding) { value, isHolding, _ in
-                if case .second(true, _) = value { isHolding = true }
+            .updating($isPressed) { value, isPressed, _ in
+                if case .second(true, _) = value { isPressed = true }
             }
     }
 }
