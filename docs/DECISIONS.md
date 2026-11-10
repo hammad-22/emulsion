@@ -1,5 +1,9 @@
 # Decisions
 
+## 7 November 2026: native visual quality (owner)
+
+The working prototype is not the final visual design. The iOS app should be beautiful and unmistakably native, with more transparency and Liquid Glass, while feeling fast and lightweight. MOV-54 owns the reusable visual system; MOV-55, MOV-56 and MOV-119 apply it to the library, editor and Duo layouts. Keep the photograph central and its color trustworthy, use system typography and controls, and avoid redundant effects or continuous decorative animation. Accessibility and measured device performance remain acceptance criteria.
+
 ## 28 October 2026: positioning and scope (owner)
 
 | Question | Decision |

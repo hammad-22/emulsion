@@ -9,6 +9,7 @@ struct ComparablePhoto: View {
     let isComparing: Bool
 
     @GestureState private var isHolding = false
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
     /// Long enough that taps and slider reaches don't flash the original.
     private let holdDuration = 0.2
 
@@ -19,17 +20,23 @@ struct ComparablePhoto: View {
             .accessibilityLabel(showsOriginal ? "Original photo" : "Edited photo")
             .accessibilityAddTraits(.isImage)
             .gesture(hold)
+            .sensoryFeedback(.impact(weight: .light), trigger: isHolding) { _, isHolding in isHolding }
             .overlay(alignment: .topLeading) {
                 if showsOriginal {
                     Text("Original")
                         .font(.caption.bold())
-                        .padding(.horizontal, 10)
-                        .padding(.vertical, 6)
+                        .padding(.horizontal, FilmLabLayout.gap)
+                        .padding(.vertical, FilmLabLayout.compact)
                         .glassEffect()
-                        .padding(8)
+                        .padding(FilmLabLayout.compact)
+                        .transition(.opacity)
                 }
             }
+            .animation(reduceMotion ? nil : .easeOut(duration: badgeFade), value: showsOriginal)
     }
+
+    /// Quick enough to keep up with a press; a fade, so it's also fine with Reduce Motion.
+    private let badgeFade = 0.15
 
     /// True from the moment the hold is recognized until the finger lifts.
     private var hold: some Gesture {

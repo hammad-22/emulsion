@@ -11,7 +11,7 @@ struct EditorToolbar: ToolbarContent {
     @Environment(AppSettings.self) private var settings
     @Environment(\.dismiss) private var dismiss
     @State private var isExporting = false
-    @State private var message: String?
+    @State private var exportResult: ExportResult?
     @State private var isConfirmingDelete = false
 
     var body: some ToolbarContent {
@@ -23,7 +23,8 @@ struct EditorToolbar: ToolbarContent {
                 Task { await export() }
             }
             .disabled(isExporting)
-            .alert(message ?? "", isPresented: Binding(isPresenting: $message)) {}
+            .alert(exportResult?.message ?? "", isPresented: Binding(isPresenting: $exportResult)) {}
+            .sensoryFeedback(trigger: exportResult) { _, result in result?.feedback }
         }
         ToolbarItem(placement: .secondaryAction) {
             Button("Reset Edits", systemImage: "arrow.counterclockwise") { session.reset() }
@@ -48,9 +49,28 @@ struct EditorToolbar: ToolbarContent {
         defer { isExporting = false }
         do {
             try await session.saveToPhotos(format: settings.format)
-            message = "Saved to Photos"
+            exportResult = .saved
         } catch {
-            message = error.localizedDescription
+            exportResult = .failed(error.localizedDescription)
+        }
+    }
+}
+
+private enum ExportResult: Equatable {
+    case saved
+    case failed(String)
+
+    var message: String {
+        switch self {
+        case .saved: String(localized: "Saved to Photos")
+        case .failed(let message): message
+        }
+    }
+
+    var feedback: SensoryFeedback {
+        switch self {
+        case .saved: .success
+        case .failed: .error
         }
     }
 }

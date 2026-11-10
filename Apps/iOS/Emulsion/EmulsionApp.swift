@@ -9,12 +9,22 @@ struct EmulsionApp: App {
 
     var body: some Scene {
         WindowGroup {
-            LibraryScreen()
+            content
                 .libraryErrorAlert(store)
                 .environment(store)
                 .environment(settings)
-                .preferredColorScheme(.dark)
-                .tint(.white)
         }
+    }
+
+    @ViewBuilder private var content: some View {
+        #if DEBUG
+            if ProcessInfo.processInfo.arguments.contains("--component-gallery") {
+                ComponentGallery()
+            } else {
+                LibraryScreen()
+            }
+        #else
+            LibraryScreen()
+        #endif
     }
 }

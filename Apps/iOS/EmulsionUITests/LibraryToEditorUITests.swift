@@ -51,6 +51,22 @@ final class LibraryToEditorUITests: XCTestCase {
         app.tap()  // Lets the interruption monitor answer the permission alert.
         XCTAssertTrue(app.alerts["Saved to Photos"].waitForExistence(timeout: 20))
         keepScreenshot(app, named: "7 Saved")
+        app.alerts["Saved to Photos"].buttons["OK"].tap()
+
+        deleteCurrentPhoto(app)
+        XCTAssertTrue(app.navigationBars["Library"].waitForExistence(timeout: 5))
+        firstPhoto.tap()
+        XCTAssertTrue(exposure.waitForExistence(timeout: 5))
+        deleteCurrentPhoto(app)
+        XCTAssertTrue(app.navigationBars["Library"].waitForExistence(timeout: 5))
+        XCTAssertTrue(app.staticTexts["1 photo"].waitForExistence(timeout: 5))
+    }
+
+    @MainActor
+    private func deleteCurrentPhoto(_ app: XCUIApplication) {
+        app.buttons["More"].tap()
+        app.buttons["Delete"].tap()
+        app.buttons["Delete Photo"].tap()
     }
 
     @MainActor
