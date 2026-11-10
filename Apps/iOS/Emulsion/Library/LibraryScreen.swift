@@ -7,46 +7,32 @@ import SwiftUI
 struct LibraryScreen: View {
     @Environment(PhotoStore.self) private var store
     @State private var importError: String?
+    @Namespace private var editorTransition
 
     var body: some View {
         NavigationStack {
             Group {
                 if store.photos.isEmpty {
-                    emptyState
+                    LibraryEmptyState(error: $importError)
                 } else {
-                    PhotoGrid()
+                    PhotoGrid(transition: editorTransition)
                 }
             }
             .navigationTitle("Library")
-            .navigationDestination(for: PhotoRecord.ID.self) { EditorScreen(photoID: $0) }
+            .navigationSubtitle(store.photos.isEmpty ? Text("") : Text("^[\(store.photos.count) photo](inflect: true)"))
+            .navigationDestination(for: PhotoRecord.ID.self) { id in
+                EditorScreen(photoID: id)
+                    .navigationTransition(.zoom(sourceID: id, in: editorTransition))
+            }
             .toolbar {
-                ToolbarItem(placement: .primaryAction) { importButton }
+                ToolbarItem(placement: .primaryAction) {
+                    PhotoImportButton { importError = $0.localizedDescription }
+                }
             }
             .alert("Couldn't import", isPresented: Binding(isPresenting: $importError), presenting: importError) { _ in
             } message: {
                 Text($0)
             }
         }
-    }
-
-    private var emptyState: some View {
-        ContentUnavailableView {
-            Label("No Photos Yet", systemImage: "film")
-        } description: {
-            Text("Import a photo, or try a sample, to develop it as a film negative and print.")
-        } actions: {
-            importButton.buttonStyle(.glass)
-            Button("Try Sample Photos", systemImage: "photo.stack") {
-                do {
-                    try store.addSamples()
-                } catch {
-                    importError = error.localizedDescription
-                }
-            }
-        }
-    }
-
-    private var importButton: some View {
-        PhotoImportButton { importError = $0.localizedDescription }
     }
 }
