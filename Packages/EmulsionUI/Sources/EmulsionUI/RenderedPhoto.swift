@@ -4,8 +4,8 @@ import SwiftUI
 
 /// A photo developed and printed with its adjustments, or the untouched original for
 /// before/after, rendered off the main actor at the size it's shown.
-/// A filled frame (a thumbnail) waits as a quiet placeholder; a fitted one shows progress. Re-renders when the
-/// edit or the size changes; the last image stays up meanwhile, so slider drags don't flash.
+/// A filled frame (a thumbnail) waits as a quiet placeholder; a fitted one shows progress.
+/// Re-renders when the edit or size changes, keeping the last image so slider drags don't flash.
 public struct RenderedPhoto: View {
     private let url: URL
     private let adjustments: Adjustments

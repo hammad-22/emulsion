@@ -33,6 +33,25 @@ struct PhotoStoreTests {
         #expect(!FileManager.default.fileExists(atPath: library.store.url(for: photos[0]).path(percentEncoded: false)))
     }
 
+    @Test func failedSelectionDeletionKeepsEveryRecordAndOriginal() async throws {
+        let library = TestLibrary()
+        let photos = try (0..<3).map { _ in try library.store.add(TestPhoto.jpeg, fileExtension: "jpg") }
+        let saved = try Data(contentsOf: library.store.indexURL)
+        try FileManager.default.removeItem(at: library.store.indexURL)
+        try FileManager.default.createDirectory(at: library.store.indexURL, withIntermediateDirectories: false)
+
+        await library.store.delete([photos[0].id, photos[2].id])
+
+        #expect(library.store.lastError == .librarySaveFailed)
+        #expect(Set(library.store.photos.map(\.id)) == Set(photos.map(\.id)))
+        for photo in photos {
+            #expect(FileManager.default.fileExists(atPath: library.store.url(for: photo).path(percentEncoded: false)))
+        }
+        try FileManager.default.removeItem(at: library.store.indexURL)
+        try saved.write(to: library.store.indexURL)
+        #expect(Set(library.reopened().photos.map(\.id)) == Set(photos.map(\.id)))
+    }
+
     @Test func editsPersistAcrossLaunches() throws {
         let library = TestLibrary()
         let photo = try library.store.add(TestPhoto.jpeg, fileExtension: "jpg")

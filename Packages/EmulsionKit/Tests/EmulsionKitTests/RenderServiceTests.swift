@@ -10,7 +10,7 @@ struct RenderServiceTests {
         let library = TestLibrary()
         let url = library.store.url(for: try library.store.add(TestPhoto.jpeg, fileExtension: "jpg"))
         let service = library.renderService
-        let name = url.lastPathComponent
+        let name = url.absoluteString
 
         _ = try await service.image(url, .init(), maxDimension: 900)
         _ = try await service.image(url, .init(), maxDimension: 1024)
@@ -49,6 +49,30 @@ extension RenderServiceTests {
 
         await service.forget(url)
         #expect(service.cachedThumbnail(url, .init(), maxDimension: 300) == nil)
+    }
+
+    @Test func sameNamedPhotosInDifferentFoldersHaveSeparateCaches() async throws {
+        let library = TestLibrary()
+        _ = library.store
+        let firstFolder = library.folder.appending(path: "first")
+        let secondFolder = library.folder.appending(path: "second")
+        try FileManager.default.createDirectory(at: firstFolder, withIntermediateDirectories: true)
+        try FileManager.default.createDirectory(at: secondFolder, withIntermediateDirectories: true)
+        let first = firstFolder.appending(path: "photo.jpg")
+        let second = secondFolder.appending(path: "photo.jpg")
+        try Data(contentsOf: PhotoStore.sampleURLs[0]).write(to: first)
+        try Data(contentsOf: PhotoStore.sampleURLs[1]).write(to: second)
+        let service = library.renderService
+
+        _ = try await service.image(first, .init(), maxDimension: 300)
+        #expect(service.cachedThumbnail(second, .init(), maxDimension: 300) == nil)
+        _ = try await service.image(second, .init(), maxDimension: 300)
+        let keys = await service.cachedPreviewKeys
+        #expect(keys.count == 2, "the developed sources are independent, too")
+
+        await service.forget(first)
+        let remaining = await service.cachedPreviewKeys
+        #expect(remaining == ["\(second.absoluteString)@512"])
     }
 
     @Test func editorSizedRendersAreNotKept() async throws {

@@ -28,7 +28,7 @@ public actor RenderService {
 
     private func negative(_ url: URL, maxDimension requested: CGFloat) throws -> Negative {
         let maxDimension = (requested / previewSizeStep).rounded(.up) * previewSizeStep
-        let key = "\(url.lastPathComponent)@\(Int(maxDimension))"
+        let key = "\(url.absoluteString)@\(Int(maxDimension))"
         if let cached = previews[key] {
             lruKeys.removeAll { $0 == key }
             lruKeys.append(key)
@@ -58,7 +58,7 @@ public actor RenderService {
     }
 
     /// A thumbnail already rendered with exactly this edit, if it's still cached. Safe to
-    /// call from the main actor: it only looks the image up.
+    /// call from the main actor: it encodes the edit key and looks the image up.
     public nonisolated func cachedThumbnail(_ url: URL, _ adjustments: Adjustments, maxDimension: CGFloat) -> CGImage? {
         thumbnails.image(url, adjustments, maxDimension: maxDimension)
     }
@@ -89,7 +89,7 @@ public actor RenderService {
 
     /// Drops every cached preview of a photo (after it's deleted or its source changes).
     public func forget(_ url: URL) {
-        let prefix = url.lastPathComponent + "@"
+        let prefix = url.absoluteString + "@"
         for key in previews.keys where key.hasPrefix(prefix) { previews[key] = nil }
         lruKeys.removeAll { $0.hasPrefix(prefix) }
         thumbnails.removeAll()

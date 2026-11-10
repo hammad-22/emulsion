@@ -36,6 +36,6 @@ final class ThumbnailCache: @unchecked Sendable {
         let encoder = JSONEncoder()
         encoder.outputFormatting = .sortedKeys
         guard let edit = try? encoder.encode(adjustments) else { return nil }
-        return "\(url.lastPathComponent)@\(Int(maxDimension.rounded(.up)))#\(String(decoding: edit, as: UTF8.self))" as NSString
+        return "\(url.absoluteString)@\(Int(maxDimension.rounded(.up)))#\(String(decoding: edit, as: UTF8.self))" as NSString
     }
 }

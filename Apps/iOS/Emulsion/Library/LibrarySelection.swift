@@ -29,8 +29,9 @@ extension View {
         _ pending: Binding<Set<PhotoRecord.ID>>, delete: @escaping (Set<PhotoRecord.ID>) -> Void
     ) -> some View {
         let count = pending.wrappedValue.count
+        let title = count == 1 ? Text("Delete this photo?") : Text("Delete \(count) photos?")
         return confirmationDialog(
-            "^[Delete \(count) photo](inflect: true)?",
+            title,
             isPresented: Binding(get: { !pending.wrappedValue.isEmpty }, set: { if !$0 { pending.wrappedValue = [] } }),
             titleVisibility: .visible
         ) {
