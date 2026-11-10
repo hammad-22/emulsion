@@ -15,6 +15,7 @@ public actor RenderService {
     /// Preview sizes are rounded up to this step, so resizes (iPhone Duo fold/unfold, Mac
     /// windows) reuse a cached develop instead of decoding the RAW again for every size.
     private let previewSizeStep: CGFloat = 256
+    private nonisolated let thumbnails = ThumbnailCache()
 
     init() {}
 
@@ -27,7 +28,7 @@ public actor RenderService {
 
     private func negative(_ url: URL, maxDimension requested: CGFloat) throws -> Negative {
         let maxDimension = (requested / previewSizeStep).rounded(.up) * previewSizeStep
-        let key = "\(url.lastPathComponent)@\(Int(maxDimension))"
+        let key = "\(url.absoluteString)@\(Int(maxDimension))"
         if let cached = previews[key] {
             lruKeys.removeAll { $0 == key }
             lruKeys.append(key)
@@ -48,9 +49,18 @@ public actor RenderService {
     /// A rendered preview. Throws `CancellationError` if the caller moved on while it waited
     /// its turn, so slider drags don't queue up stale renders.
     public func image(_ url: URL, _ adjustments: Adjustments, maxDimension: CGFloat) throws -> CGImage {
+        if let cached = cachedThumbnail(url, adjustments, maxDimension: maxDimension) { return cached }
         try Task.checkCancellation()
         let renderer = try engine()
-        return try renderer.cgImage(renderer.render(negative(url, maxDimension: maxDimension), adjustments))
+        let image = try renderer.cgImage(renderer.render(negative(url, maxDimension: maxDimension), adjustments))
+        thumbnails.keep(image, url, adjustments, maxDimension: maxDimension)
+        return image
+    }
+
+    /// A thumbnail already rendered with exactly this edit, if it's still cached. Safe to
+    /// call from the main actor: it encodes the edit key and looks the image up.
+    public nonisolated func cachedThumbnail(_ url: URL, _ adjustments: Adjustments, maxDimension: CGFloat) -> CGImage? {
+        thumbnails.image(url, adjustments, maxDimension: maxDimension)
     }
 
     /// The original photo as the camera or app delivered it, without the film process: the
@@ -79,9 +89,10 @@ public actor RenderService {
 
     /// Drops every cached preview of a photo (after it's deleted or its source changes).
     public func forget(_ url: URL) {
-        let prefix = url.lastPathComponent + "@"
+        let prefix = url.absoluteString + "@"
         for key in previews.keys where key.hasPrefix(prefix) { previews[key] = nil }
         lruKeys.removeAll { $0.hasPrefix(prefix) }
+        thumbnails.removeAll()
     }
 
     /// Cache keys, least recently developed first; for tests.

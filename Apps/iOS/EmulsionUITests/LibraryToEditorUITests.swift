@@ -1,9 +1,10 @@
 import XCTest
 
-/// End-to-end walk through the prototype from an empty library: add the sample photos,
-/// open one, edit with the sliders, compare with the original, rotate, and save to Photos.
+/// End-to-end walk through the app from an empty library: add the sample photos, select
+/// two, cancel and confirm deleting the selection, edit the remaining photo, compare with
+/// the original, reset, rotate, save to Photos and delete.
 /// Screenshots are kept in the result bundle as PR proof. Run on a fresh install
-/// (`xcrun simctl uninstall booted com.hammad.emulsion`) so the library starts empty.
+/// with an isolated test bundle identifier so the owner's library stays untouched.
 final class LibraryToEditorUITests: XCTestCase {
     @MainActor
     func testSamplesEditCompareAndSave() throws {
@@ -20,6 +21,27 @@ final class LibraryToEditorUITests: XCTestCase {
         XCTAssertTrue(firstPhoto.waitForExistence(timeout: 5))
         sleep(2)
         keepScreenshot(app, named: "2 Library with samples")
+
+        app.buttons["Select"].tap()
+        firstPhoto.tap()
+        XCTAssertTrue(app.navigationBars["1 Selected"].waitForExistence(timeout: 2))
+        XCTAssertTrue(firstPhoto.isSelected)
+        keepScreenshot(app, named: "2b Selecting")
+        let photos = app.buttons.matching(NSPredicate(format: "label BEGINSWITH 'Photo from'"))
+        photos.element(boundBy: 1).tap()
+        XCTAssertTrue(app.navigationBars["2 Selected"].waitForExistence(timeout: 2))
+        app.buttons["Delete"].tap()
+        XCTAssertTrue(app.buttons["Delete 2 Photos"].waitForExistence(timeout: 2))
+        keepScreenshot(app, named: "2c Confirm selection deletion")
+        XCTAssertTrue(app.staticTexts["Delete 2 photos?"].exists, "The title resolves its localized inflection")
+        app.otherElements["dismiss popup"].tap()
+        XCTAssertTrue(app.navigationBars["2 Selected"].waitForExistence(timeout: 2))
+        XCTAssertEqual(photos.count, 3, "Cancel keeps all photos and the selection")
+        app.buttons["Delete"].tap()
+        app.buttons["Delete 2 Photos"].tap()
+        XCTAssertTrue(app.navigationBars["Library"].waitForExistence(timeout: 5))
+        XCTAssertTrue(app.staticTexts["1 photo"].waitForExistence(timeout: 5))
+        XCTAssertEqual(photos.count, 1, "Confirm removes exactly the selected photos")
         firstPhoto.tap()
 
         let exposure = app.sliders["Exposure"]
@@ -27,6 +49,12 @@ final class LibraryToEditorUITests: XCTestCase {
         sleep(2)
         keepScreenshot(app, named: "3 Editor")
 
+        let reset = app.buttons["Reset Edits"]
+        XCTAssertFalse(reset.isEnabled, "Nothing to reset before the first edit")
+        exposure.adjust(toNormalizedSliderPosition: 0.6)
+        XCTAssertTrue(reset.isEnabled)
+        reset.tap()
+        XCTAssertFalse(reset.isEnabled)
         exposure.adjust(toNormalizedSliderPosition: 0.6)
         app.buttons["Color"].tap()
         app.sliders["Warmth"].adjust(toNormalizedSliderPosition: 0.7)
@@ -38,6 +66,7 @@ final class LibraryToEditorUITests: XCTestCase {
         sleep(2)
         keepScreenshot(app, named: "5 Original")
         app.buttons["Compare"].tap()
+        XCTAssertFalse(app.staticTexts["Original"].exists)
 
         XCUIDevice.shared.orientation = .landscapeLeft
         sleep(2)
@@ -55,11 +84,7 @@ final class LibraryToEditorUITests: XCTestCase {
 
         deleteCurrentPhoto(app)
         XCTAssertTrue(app.navigationBars["Library"].waitForExistence(timeout: 5))
-        firstPhoto.tap()
-        XCTAssertTrue(exposure.waitForExistence(timeout: 5))
-        deleteCurrentPhoto(app)
-        XCTAssertTrue(app.navigationBars["Library"].waitForExistence(timeout: 5))
-        XCTAssertTrue(app.staticTexts["1 photo"].waitForExistence(timeout: 5))
+        XCTAssertTrue(samples.waitForExistence(timeout: 5), "Deleting the remaining photo returns to the empty library")
     }
 
     @MainActor

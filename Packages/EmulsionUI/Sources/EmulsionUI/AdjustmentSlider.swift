@@ -2,8 +2,9 @@ import EmulsionCore
 import EmulsionKit
 import SwiftUI
 
-/// One labeled slider for an `AdjustmentControl`. Double-tap the value to reset it. A light
-/// haptic tap marks leaving, crossing or returning to the unedited value, like a detent.
+/// One slider for an `AdjustmentControl`, as a row of an `AdjustmentPanel`'s grid: title,
+/// slider, value. Double-tap the value to reset it. A light haptic tap marks leaving,
+/// crossing or returning to the unedited value, like a detent.
 public struct AdjustmentSlider: View {
     private let control: AdjustmentControl
     @Binding private var adjustments: Adjustments
@@ -20,33 +21,56 @@ public struct AdjustmentSlider: View {
     private var side: Int {
         value.wrappedValue < defaultValue ? -1 : value.wrappedValue > defaultValue ? 1 : 0
     }
+    /// Two-sided controls fill from their middle, so the track shows the direction of the change.
+    private var neutralValue: Double? { control.range.lowerBound < 0 ? 0 : nil }
 
     public var body: some View {
-        VStack(alignment: .leading, spacing: FilmLabLayout.compact) {
-            labelLayout {
-                Text(control.title)
-                    .fontWeight(.medium)
-                    .frame(maxWidth: .infinity, alignment: .leading)
-                Text(control.formatted(value.wrappedValue))
+        GridRow {
+            if dynamicTypeSize.isAccessibilitySize {
+                // Stacked, so long titles aren't broken mid-word and the slider keeps its length.
+                VStack(alignment: .leading, spacing: FilmLabLayout.hairline) {
+                    HStack(alignment: .firstTextBaseline) {
+                        title
+                        Spacer()
+                        currentValue
+                    }
+                    slider
+                }
+                .gridCellColumns(3)
+            } else {
+                title
+                slider
+                // As wide as the widest value the control can show, so the slider doesn't
+                // change length while it's dragged.
+                Text(control.formatted(control.range.lowerBound))
                     .monospacedDigit()
-                    .foregroundStyle(.secondary)
-                    .onTapGesture(count: 2) { value.wrappedValue = defaultValue }
-                    .accessibilityHidden(true)
+                    .hidden()
+                    .overlay(alignment: .trailing) { currentValue.fixedSize() }
             }
-            .font(.subheadline)
-            Slider(value: value, in: control.range)
-                .accessibilityLabel(control.title)
-                .accessibilityValue(control.formatted(value.wrappedValue))
-                .accessibilityAction(named: "Reset") { value.wrappedValue = defaultValue }
         }
+        .font(.subheadline)
         .sensoryFeedback(.impact(weight: .light), trigger: side)
     }
 
-    /// Title and value on one line, or stacked at accessibility text sizes so long titles
-    /// aren't broken mid-word.
-    private var labelLayout: AnyLayout {
-        dynamicTypeSize.isAccessibilitySize
-            ? AnyLayout(VStackLayout(alignment: .leading))
-            : AnyLayout(HStackLayout(alignment: .firstTextBaseline))
+    private var title: some View {
+        Text(control.title)
+            .fontWeight(.medium)
+    }
+
+    private var slider: some View {
+        Slider(value: value, in: control.range, neutralValue: neutralValue) {
+            Text(control.title)
+        }
+        .accessibilityValue(control.formatted(value.wrappedValue))
+        .accessibilityAction(named: "Reset") { value.wrappedValue = defaultValue }
+    }
+
+    private var currentValue: some View {
+        Text(control.formatted(value.wrappedValue))
+            .monospacedDigit()
+            .foregroundStyle(.secondary)
+            .contentShape(.rect)
+            .onTapGesture(count: 2) { value.wrappedValue = defaultValue }
+            .accessibilityHidden(true)
     }
 }

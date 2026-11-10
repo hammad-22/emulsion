@@ -5,6 +5,7 @@ import SwiftUI
 struct PhotoEditor: View {
     @State private var session: EditSession
     @State private var showsOriginal = false
+    @State private var group = AdjustmentGroup.light
     @Environment(\.scenePhase) private var scenePhase
 
     // Fits the same labels and controls as the iPhone panel, with room to resize.
@@ -26,7 +27,7 @@ struct PhotoEditor: View {
                 .padding()
                 .frame(minWidth: minimumPhotoSize, minHeight: minimumPhotoSize)
             ScrollView {
-                AdjustmentPanel(adjustments: $session.adjustments)
+                AdjustmentPanel(adjustments: $session.adjustments, group: $group)
                     .padding()
             }
             .frame(minWidth: minimumPanelWidth, idealWidth: minimumPanelWidth, maxWidth: maximumPanelWidth)

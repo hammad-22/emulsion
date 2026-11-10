@@ -3,8 +3,9 @@ import EmulsionKit
 import SwiftUI
 
 /// A photo developed and printed with its adjustments, or the untouched original for
-/// before/after, rendered off the main actor at the size it's shown. Re-renders when the
-/// edit or the size changes; the last image stays up meanwhile, so slider drags don't flash.
+/// before/after, rendered off the main actor at the size it's shown.
+/// A filled frame (a thumbnail) waits as a quiet placeholder; a fitted one shows progress.
+/// Re-renders when the edit or size changes, keeping the last image so slider drags don't flash.
 public struct RenderedPhoto: View {
     private let url: URL
     private let adjustments: Adjustments
@@ -26,15 +27,17 @@ public struct RenderedPhoto: View {
     public var body: some View {
         GeometryReader { proxy in
             let request = Request(url: url, adjustments: adjustments, showsOriginal: showsOriginal, pixels: pixels(for: proxy.size))
-            content
+            content(request)
                 .frame(width: proxy.size.width, height: proxy.size.height)
                 .task(id: request) { await render(request) }
         }
         .clipped()
     }
 
-    @ViewBuilder private var content: some View {
-        if let image {
+    /// The last render, or until there is one, the cached thumbnail for this exact request:
+    /// a photo scrolled back into the library grid appears without a placeholder frame.
+    @ViewBuilder private func content(_ request: Request) -> some View {
+        if let image = image ?? cachedThumbnail(request) {
             Image(decorative: image, scale: 1)
                 .resizable()
                 .aspectRatio(contentMode: contentMode)
@@ -42,9 +45,15 @@ public struct RenderedPhoto: View {
             Image(systemName: "exclamationmark.triangle")
                 .foregroundStyle(.secondary)
                 .accessibilityLabel("This photo couldn't be rendered")
+        } else if contentMode == .fill {
+            Rectangle().fill(.quaternary)
         } else {
             ProgressView()
         }
+    }
+
+    private func cachedThumbnail(_ request: Request) -> CGImage? {
+        request.showsOriginal ? nil : renderService.cachedThumbnail(request.url, request.adjustments, maxDimension: request.pixels)
     }
 
     /// Longest side of the frame in pixels, so the preview is sharp but no larger than shown.

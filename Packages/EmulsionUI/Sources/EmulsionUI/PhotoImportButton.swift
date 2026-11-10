@@ -7,16 +7,25 @@ import SwiftUI
 public struct PhotoImportButton: View {
     @Environment(PhotoStore.self) private var store
     @State private var selection: [PhotosPickerItem] = []
+    @State private var isPicking = false
+    private let fillsWidth: Bool
     private let onError: (any Error) -> Void
 
-    public init(onError: @escaping (any Error) -> Void) {
+    /// `fillsWidth` stretches the label, for a button stacked with others of equal width.
+    public init(fillsWidth: Bool = false, onError: @escaping (any Error) -> Void) {
+        self.fillsWidth = fillsWidth
         self.onError = onError
     }
 
     public var body: some View {
-        PhotosPicker(selection: $selection, matching: .images, preferredItemEncoding: .current) {
+        // A plain button presenting the picker, so button and label styles apply as usual.
+        Button {
+            isPicking = true
+        } label: {
             Label("Import", systemImage: "plus")
+                .frame(maxWidth: fillsWidth ? .infinity : nil)
         }
+        .photosPicker(isPresented: $isPicking, selection: $selection, matching: .images, preferredItemEncoding: .current)
         .onChange(of: selection) { _, items in
             guard !items.isEmpty else { return }
             selection = []

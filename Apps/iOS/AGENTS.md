@@ -8,6 +8,7 @@
   - On Duo unfolded, use the whole landscape canvas with its own layout. Never a stretched phone UI. Examples: the photo large plus a persistent control panel, a grid plus a big preview, before/after across the fold.
   - Respect reserved regions (fold, camera) and use `ArrangementView` / adaptive layout APIs, not the hinge angle. Keep state when folding mid-edit.
   - Every UI PR shows proof on the iPhone 17 Pro simulator and the iPhone Duo simulator (folded and unfolded). That needs the Xcode 27.1 SDK.
+- **Screen idiom (MOV-55/56):** the library is an edge-to-edge grid under system toolbars (Select at the top, Import or Delete in the bottom bar). The editor is a neutral black, white-tinted workspace: toolbars stay monochrome beside the photograph, nothing is drawn over it (the title says "Original" while comparing), and the glass panel sits below or beside the photo, never on it.
 - **Accessibility:** every control has a label and supports Dynamic Type.
 - Folders are organized by feature (`Camera/`, `Library/`, `Editor/`). Models and app logic live in `Packages/EmulsionKit`, not in the app.
 - **Run it before every app PR.** Build, then run the UI walkthrough on a fresh install. It adds the sample photos, edits, compares, rotates and saves to Photos, and keeps screenshots in the result bundle for the PR Proof:

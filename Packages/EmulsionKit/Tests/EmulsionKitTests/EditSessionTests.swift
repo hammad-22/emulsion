@@ -39,4 +39,20 @@ struct EditSessionTests {
 
         #expect(session.adjustments == photo.adjustments)
     }
+
+    @Test func aSessionIsEditedUntilReset() throws {
+        let library = TestLibrary()
+        let photo = try library.store.add(TestPhoto.jpeg, fileExtension: "jpg")
+        let session = EditSession(photo: photo, store: library.store)
+        #expect(!session.isEdited)
+        #expect(!photo.isEdited)
+
+        session.adjustments.exposure = 1
+        session.close()
+        #expect(session.isEdited)
+        #expect(library.store.photo(photo.id)?.isEdited == true)
+
+        session.reset()
+        #expect(!session.isEdited)
+    }
 }

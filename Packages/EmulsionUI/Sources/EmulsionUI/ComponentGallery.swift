@@ -1,5 +1,6 @@
 #if DEBUG
     import EmulsionCore
+    import EmulsionKit
     import SwiftUI
 
     /// The shared controls on one screen, for checking them in light and dark, at large text
@@ -7,6 +8,7 @@
     public struct ComponentGallery: View {
         @State private var adjustments = Adjustments()
         @State private var isComparing = false
+        @State private var group = AdjustmentGroup.light
 
         public init() {}
 
@@ -22,7 +24,12 @@
                             }
                             .buttonStyle(.glass)
                         }
-                        AdjustmentPanel(adjustments: $adjustments)
+                        HStack {
+                            SelectionBadge(isSelected: false)
+                            SelectionBadge(isSelected: true)
+                        }
+                        .background(.gray, in: .rect)
+                        AdjustmentPanel(adjustments: $adjustments, group: $group)
                     }
                     .padding(FilmLabLayout.inset)
                 }

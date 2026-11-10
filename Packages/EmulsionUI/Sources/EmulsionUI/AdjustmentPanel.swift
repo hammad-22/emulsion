@@ -2,55 +2,49 @@ import EmulsionCore
 import EmulsionKit
 import SwiftUI
 
-/// Floating group controls and sliders, with one shared Liquid Glass container.
+/// The editor's controls on one sheet of Liquid Glass: a group picker above that group's
+/// sliders. Every group is laid out and only the chosen one shown, so the panel keeps one
+/// height and the photo beside it doesn't resize when the group changes.
 public struct AdjustmentPanel: View {
-    @Binding var adjustments: Adjustments
-    @State private var group = AdjustmentGroup.light
+    @Binding private var adjustments: Adjustments
+    @Binding private var group: AdjustmentGroup
     @Environment(\.dynamicTypeSize) private var dynamicTypeSize
-    // A restrained tint distinguishes the selected group without coloring the photo.
-    private let selectedTintOpacity = 0.16
 
-    public init(adjustments: Binding<Adjustments>) {
+    public init(adjustments: Binding<Adjustments>, group: Binding<AdjustmentGroup>) {
         _adjustments = adjustments
+        _group = group
     }
 
     public var body: some View {
-        GlassEffectContainer(spacing: FilmLabLayout.gap) {
-            VStack(spacing: FilmLabLayout.space) {
-                groupLayout {
-                    ForEach(AdjustmentGroup.allCases) { item in
-                        Button {
-                            group = item
-                        } label: {
-                            Text(item.title)
-                                .font(.subheadline.weight(.semibold))
-                                .padding(.vertical, FilmLabLayout.gap)
-                                .padding(.horizontal, FilmLabLayout.compact)
-                                .frame(maxWidth: .infinity, minHeight: FilmLabLayout.minimumControlHeight)
-                                .contentShape(.capsule)
-                        }
-                        .buttonStyle(.plain)
-                        .glassEffect(
-                            .regular.tint(item == group ? Color.accentColor.opacity(selectedTintOpacity) : .clear).interactive()
-                        )
-                        .accessibilityAddTraits(item == group ? .isSelected : [])
+        VStack(spacing: FilmLabLayout.inset) {
+            groupPicker
+            ZStack {
+                ForEach(AdjustmentGroup.allCases) { item in
+                    Grid(alignment: .leading, horizontalSpacing: FilmLabLayout.gap, verticalSpacing: FilmLabLayout.compact) {
+                        ForEach(item.controls) { AdjustmentSlider($0, adjustments: $adjustments) }
                     }
+                    .opacity(item == group ? 1 : 0)
+                    .allowsHitTesting(item == group)
+                    .accessibilityHidden(item != group)
                 }
-                .accessibilityElement(children: .contain)
-                .accessibilityLabel("Adjustments")
-                VStack(spacing: FilmLabLayout.inset) {
-                    ForEach(group.controls) { AdjustmentSlider($0, adjustments: $adjustments) }
-                }
-                .padding(FilmLabLayout.space)
-                .glassEffect(.regular, in: .rect(cornerRadius: FilmLabLayout.panelCorner))
             }
         }
+        .padding(FilmLabLayout.inset)
+        .glassEffect(.regular, in: .rect(cornerRadius: FilmLabLayout.panelCorner))
         .sensoryFeedback(.selection, trigger: group)
     }
 
-    private var groupLayout: AnyLayout {
-        dynamicTypeSize.isAccessibilitySize
-            ? AnyLayout(VStackLayout(spacing: FilmLabLayout.gap))
-            : AnyLayout(HStackLayout(spacing: FilmLabLayout.gap))
+    /// Segments side by side; a menu at accessibility text sizes, where three titles
+    /// can't share the width.
+    @ViewBuilder private var groupPicker: some View {
+        let picker = Picker("Adjustments", selection: $group) {
+            ForEach(AdjustmentGroup.allCases) { Text($0.title).tag($0) }
+        }
+        if dynamicTypeSize.isAccessibilitySize {
+            picker.pickerStyle(.menu)
+                .frame(maxWidth: .infinity, alignment: .leading)
+        } else {
+            picker.pickerStyle(.segmented)
+        }
     }
 }
