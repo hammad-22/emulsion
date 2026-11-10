@@ -37,6 +37,22 @@ struct PhotoStoreTests {
         #expect(reopened.photo(photo.id)?.isRAW == false)
     }
 
+    @Test func aFailedOriginalRemovalIsReported() async throws {
+        let library = TestLibrary()
+        let photo = try library.store.add(TestPhoto.jpeg, fileExtension: "jpg")
+        let original = library.store.url(for: photo)
+        try FileManager.default.removeItem(at: original)
+        try FileManager.default.createDirectory(at: original, withIntermediateDirectories: false)
+        try TestPhoto.jpeg.write(to: original.appending(path: "blocked.jpg"))
+        try FileManager.default.setAttributes([.posixPermissions: 0], ofItemAtPath: original.path(percentEncoded: false))
+        defer { try? FileManager.default.setAttributes([.posixPermissions: 0o755], ofItemAtPath: original.path(percentEncoded: false)) }
+
+        await library.store.delete(photo.id)
+
+        #expect(library.store.lastError == .libraryDeleteFailed)
+        #expect(FileManager.default.fileExists(atPath: original.path(percentEncoded: false)))
+    }
+
     @Test func importNamesTheFileAfterWhatItIs() throws {
         let library = TestLibrary()
         #expect(try library.store.add(TestPhoto.jpeg).fileName.hasSuffix(".jpeg"))
@@ -93,6 +109,30 @@ struct PhotoStoreTests {
         #expect(reopened.photo(photo.id)?.adjustments == .defaults(for: photo.id))
     }
 
+    @Test func aBadRecordDoesNotDiscardOtherPhotosEdits() throws {
+        let library = TestLibrary()
+        let kept = try library.store.add(TestPhoto.jpeg, fileExtension: "jpg")
+        let damaged = try library.store.add(TestPhoto.jpeg, fileExtension: "jpg")
+        var edit = kept.adjustments
+        edit.exposure = 1.5
+        library.store.update(kept.id, adjustments: edit)
+        var records = try #require(JSONSerialization.jsonObject(with: Data(contentsOf: library.store.indexURL)) as? [[String: Any]])
+        let index = try #require(records.firstIndex { $0["id"] as? String == damaged.id.uuidString })
+        records[index]["id"] = "invalid UUID"
+        let corrupt = try JSONSerialization.data(withJSONObject: records)
+        try corrupt.write(to: library.store.indexURL)
+
+        let reopened = library.reopened()
+
+        #expect(reopened.lastError == .libraryUnreadable)
+        #expect(reopened.photo(kept.id)?.adjustments == edit)
+        #expect(Set(reopened.photos.map(\.id)) == Set([kept.id, damaged.id]))
+        let backup = try #require(
+            FileManager.default.contentsOfDirectory(at: library.folder, includingPropertiesForKeys: nil)
+                .first { $0.lastPathComponent.hasPrefix("library-unreadable-") })
+        #expect(try Data(contentsOf: backup) == corrupt)
+    }
+
     @Test func anUnreadableIndexIsKeptAndTheOriginalsStayListed() throws {
         let library = TestLibrary()
         let photo = try library.store.add(TestPhoto.jpeg, fileExtension: "jpg")
@@ -115,6 +155,57 @@ struct PhotoStoreTests {
         #expect(library.reopened().photo(photo.id)?.adjustments.exposure == 2)
     }
 
+    @Test func anIndexThatCantBeReadNowIsLeftAlone() throws {
+        let library = TestLibrary()
+        let photo = try library.store.add(TestPhoto.jpeg, fileExtension: "jpg")
+        let index = library.store.indexURL
+        let saved = try Data(contentsOf: index)
+        // As when file protection keeps the index locked at launch.
+        try FileManager.default.setAttributes([.posixPermissions: 0], ofItemAtPath: index.path(percentEncoded: false))
+        defer { try? FileManager.default.setAttributes([.posixPermissions: 0o644], ofItemAtPath: index.path(percentEncoded: false)) }
+
+        let reopened = library.reopened()
+        #expect(reopened.lastError == .libraryUnreadable)
+        #expect(reopened.photos.map(\.id) == [photo.id])
+        var edit = photo.adjustments
+        edit.exposure = 1
+        reopened.update(photo.id, adjustments: edit)
+
+        try FileManager.default.setAttributes([.posixPermissions: 0o644], ofItemAtPath: index.path(percentEncoded: false))
+        #expect(try Data(contentsOf: index) == saved, "never moved aside or overwritten")
+        #expect(library.reopened().photo(photo.id)?.adjustments == photo.adjustments)
+    }
+
+    @Test func anInaccessibleLibraryFolderIsNotTreatedAsAnEmptyLibrary() throws {
+        let library = TestLibrary()
+        let photo = try library.store.add(TestPhoto.jpeg, fileExtension: "jpg")
+        let saved = try Data(contentsOf: library.store.indexURL)
+        try FileManager.default.setAttributes([.posixPermissions: 0], ofItemAtPath: library.folder.path(percentEncoded: false))
+        defer {
+            try? FileManager.default.setAttributes([.posixPermissions: 0o755], ofItemAtPath: library.folder.path(percentEncoded: false))
+        }
+
+        let reopened = library.reopened()
+        try FileManager.default.setAttributes([.posixPermissions: 0o755], ofItemAtPath: library.folder.path(percentEncoded: false))
+
+        #expect(reopened.lastError == .libraryUnreadable)
+        #expect(throws: EmulsionError.librarySaveFailed) { try reopened.add(TestPhoto.jpeg, fileExtension: "jpg") }
+        #expect(try Data(contentsOf: library.store.indexURL) == saved)
+        #expect(library.reopened().photo(photo.id) != nil)
+    }
+
+    @Test func originalsAreRecoveredWhenTheIndexIsMissing() throws {
+        let library = TestLibrary()
+        let photo = try library.store.add(TestPhoto.jpeg, fileExtension: "jpg")
+        try FileManager.default.removeItem(at: library.store.indexURL)
+
+        let reopened = library.reopened()
+
+        #expect(reopened.photos.map(\.id) == [photo.id])
+        #expect(reopened.lastError == .libraryUnreadable)
+        #expect(library.reopened().photos.map(\.id) == [photo.id])
+    }
+
     @Test func aFailedSaveIsReportedAndNotShownAsSaved() throws {
         let library = TestLibrary()
         let photo = try library.store.add(TestPhoto.jpeg, fileExtension: "jpg")
@@ -128,6 +219,10 @@ struct PhotoStoreTests {
 
         #expect(library.store.lastError == .librarySaveFailed)
         #expect(library.store.photo(photo.id)?.adjustments == photo.adjustments)
+        library.store.lastError = nil
+        edit.exposure = 2
+        library.store.update(photo.id, adjustments: edit)
+        #expect(library.store.lastError == nil, "reported once, not on every slider rest")
         #expect(throws: EmulsionError.librarySaveFailed) { try library.store.add(TestPhoto.jpeg, fileExtension: "jpg") }
         #expect(library.store.photos.map(\.id) == [photo.id], "a failed import leaves no orphan behind")
         let originals = try FileManager.default.contentsOfDirectory(atPath: library.folder.path(percentEncoded: false))
