@@ -3,8 +3,19 @@ import Foundation
 public enum EmulsionError: LocalizedError {
     case unsupportedPhoto, unsupportedVideoFormat, renderFailed, kernelsMissing
     case libraryUnreadable, librarySaveFailed, libraryDeleteFailed
+    case invalidRecipe, recipeVersionUnsupported, recipeModelUnsupported, recipesUnreadable, recipeSaveFailed
     public var errorDescription: String? {
         switch self {
+        case .invalidRecipe: return String(localized: "This look file is invalid or contains unsupported adjustments.", bundle: .module)
+        case .recipeVersionUnsupported:
+            return String(localized: "This look uses an unsupported file version. Try updating Emulsion.", bundle: .module)
+        case .recipeModelUnsupported:
+            return String(localized: "This look needs a different film model and can't be applied here.", bundle: .module)
+        case .recipesUnreadable:
+            return String(
+                localized: "Your saved looks couldn't be read. The file was kept; saving looks is disabled until it can be read.",
+                bundle: .module)
+        case .recipeSaveFailed: return String(localized: "This look couldn't be saved. Your saved looks were kept.", bundle: .module)
         case .unsupportedPhoto: return String(localized: "This photo format isn't supported.", bundle: .module)
         case .unsupportedVideoFormat: return String(localized: "This video format isn't supported.", bundle: .module)
         case .renderFailed: return String(localized: "The photo couldn't be rendered.", bundle: .module)

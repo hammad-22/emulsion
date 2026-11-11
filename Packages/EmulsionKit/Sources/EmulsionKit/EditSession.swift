@@ -33,6 +33,11 @@ public final class EditSession {
         adjustments = .defaults(for: photo.id)
     }
 
+    /// Replaces adjustment values only. Originals and this photo's grain pattern stay intact.
+    public func apply(_ recipe: Recipe) {
+        adjustments = recipe.applying(to: adjustments)
+    }
+
     /// Writes any pending change now. Call when the editor goes away.
     public func close() {
         pendingSave?.cancel()

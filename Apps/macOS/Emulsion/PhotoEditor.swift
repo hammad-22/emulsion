@@ -34,6 +34,7 @@ struct PhotoEditor: View {
             .frame(minWidth: minimumPanelWidth, idealWidth: minimumPanelWidth, maxWidth: maximumPanelWidth)
         }
         .toolbar {
+            LooksButton(session: session).disabled(showsOriginal)
             Toggle("Compare", systemImage: "square.split.2x1", isOn: $showsOriginal)
             Button("Reset Edits", systemImage: "arrow.counterclockwise") { session.reset() }
         }

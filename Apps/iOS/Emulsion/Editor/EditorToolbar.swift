@@ -17,6 +17,8 @@ struct EditorToolbar: ToolbarContent {
     @State private var isConfirmingDelete = false
 
     var body: some ToolbarContent {
+        ToolbarItem(placement: .bottomBar) { LooksButton(session: session).disabled(isComparing) }
+        ToolbarSpacer(.flexible, placement: .bottomBar)
         ToolbarItem(placement: .bottomBar) {
             Button {
                 showsAdjustments.toggle()

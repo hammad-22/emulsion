@@ -1,8 +1,8 @@
 # EmulsionKit
 
-Shared app logic for the iOS and Mac apps: the photo library (`PhotoStore`, `PhotoRecord`), rendering off the main actor (`RenderService`), the editor's controls and edit session (`AdjustmentGroup`, `EditSession`), settings and export (`AppSettings`, `PhotoLibrarySaver`), bundled sample photos. Later: look presets, import/export, metadata, CloudKit sync (MOV-120).
+Shared app logic for the iOS and Mac apps: the photo library (`PhotoStore`, `PhotoRecord`), rendering off the main actor (`RenderService`), the editor's controls and edit session (`AdjustmentGroup`, `EditSession`), settings and export (`AppSettings`, `PhotoLibrarySaver`), bundled sample photos. Recipes use `RecipeStore` for persistence and bounded JSON import; metadata and CloudKit sync remain later work (MOV-120).
 
-- **No UI.** No SwiftUI views here; shared views live in `EmulsionUI`. Only non-UI Apple frameworks (Foundation, Observation, Photos, ImageIO, UniformTypeIdentifiers) and `EmulsionCore`.
+- **No UI.** No SwiftUI views here; shared views live in `EmulsionUI`. Only non-UI Apple frameworks (Foundation, Observation, Photos, ImageIO, UniformTypeIdentifiers, CoreTransferable) and `EmulsionCore`.
 - **Both platforms.** Everything must build for iOS and macOS. If an API differs, put a small adapter behind `#if os(...)` here, never in the apps.
 - **Feature logic lands here or in EmulsionCore**, so the iOS app (curated subset) and the Mac app (everything) never duplicate it.
 - **Public API is what the apps need, nothing more.** Test-only accessors stay internal and are reached with `@testable import`.

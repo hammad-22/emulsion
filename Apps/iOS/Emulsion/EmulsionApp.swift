@@ -5,6 +5,7 @@ import SwiftUI
 @main
 struct EmulsionApp: App {
     @State private var store = PhotoStore()
+    @State private var recipes = RecipeStore()
     @State private var settings = AppSettings()
 
     var body: some Scene {
@@ -12,6 +13,7 @@ struct EmulsionApp: App {
             content
                 .libraryErrorAlert(store)
                 .environment(store)
+                .environment(recipes)
                 .environment(settings)
         }
     }

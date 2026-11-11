@@ -1,0 +1,85 @@
+import Foundation
+import Testing
+
+@testable import EmulsionCore
+
+struct RecipeTests {
+    @Test func roundTripExcludesPhotoSeed() throws {
+        var settings = Adjustments()
+        settings.warmth = 0.4
+        settings.tint = -0.2
+        settings.exposure = 1.2
+        settings.seed = 999
+        let recipe = try Recipe(name: "Evening", adjustments: settings)
+        let data = try recipe.encoded()
+        #expect(try Recipe.decode(data) == recipe)
+        #expect(!String(decoding: data, as: UTF8.self).contains("seed"))
+        #expect(recipe.applying(to: settings) == settings)
+        settings.seed = 123
+        #expect(recipe.applying(to: settings).seed == 123)
+    }
+
+    @Test(arguments: [Double.nan, .infinity, -.infinity, 3.01, -3.01])
+    func rejectsInvalidExposure(_ value: Double) {
+        var settings = Adjustments()
+        settings.exposure = value
+        #expect(throws: EmulsionError.invalidRecipe) { try Recipe(name: "Invalid", adjustments: settings) }
+    }
+
+    @Test func rejectsInvalidNamesAndEveryAdjustmentRange() throws {
+        #expect(throws: EmulsionError.invalidRecipe) { try Recipe(name: "  ", adjustments: Adjustments()) }
+        #expect(throws: EmulsionError.invalidRecipe) { try Recipe(name: "Bad\nName", adjustments: Adjustments()) }
+        #expect(throws: EmulsionError.invalidRecipe) { try Recipe(name: String(repeating: "a", count: 81), adjustments: Adjustments()) }
+        let paths: [WritableKeyPath<Adjustments, Double>] = [\.warmth, \.tint, \.color, \.highlights, \.shadows, \.grain, \.halation]
+        for path in paths {
+            for value in [Double.nan, .infinity, -.infinity, -1.01, 1.01] {
+                var settings = Adjustments()
+                settings[keyPath: path] = value
+                #expect(throws: EmulsionError.invalidRecipe) { try Recipe(name: "Bad", adjustments: settings) }
+            }
+        }
+        for path in [\Adjustments.grain, \.halation] {
+            var settings = Adjustments()
+            settings[keyPath: path] = -0.01
+            #expect(throws: EmulsionError.invalidRecipe) { try Recipe(name: "Bad", adjustments: settings) }
+        }
+    }
+
+    @Test func savedMetadataAlwaysFitsTheShareableFormat() {
+        let oversizedGrapheme = "a" + String(repeating: "\u{0301}", count: Recipe.maximumFileSize)
+        #expect(oversizedGrapheme.count == 1)
+        #expect(throws: EmulsionError.invalidRecipe) { try Recipe(name: oversizedGrapheme, adjustments: Adjustments()) }
+        #expect(throws: EmulsionError.invalidRecipe) { try Recipe(name: "Test", summary: oversizedGrapheme, adjustments: Adjustments()) }
+    }
+
+    @Test func curatedLooksAreValidDistinctAndSeedIndependent() throws {
+        #expect(CuratedLooks.recipes.count == 4)
+        #expect(Set(CuratedLooks.recipes.map(\.id)).count == 4)
+        for recipe in CuratedLooks.recipes {
+            #expect(try Recipe.decode(recipe.encoded()) == recipe)
+            var settings = Adjustments()
+            settings.seed = 817
+            #expect(recipe.applying(to: settings).seed == 817)
+        }
+    }
+
+    @Test func compatibilityAndCorruptionAreExplicit() throws {
+        let data = try Recipe(name: "Test", adjustments: Adjustments()).encoded()
+        let json = String(decoding: data, as: UTF8.self)
+        for version in [0, 2] {
+            let changed = Data(json.replacingOccurrences(of: "\"formatVersion\" : 1", with: "\"formatVersion\" : \(version)").utf8)
+            #expect(throws: EmulsionError.recipeVersionUnsupported) { try Recipe.decode(changed) }
+            #expect(throws: EmulsionError.recipeVersionUnsupported) { try JSONDecoder().decode(Recipe.self, from: changed) }
+        }
+        #expect(throws: EmulsionError.recipeModelUnsupported) {
+            try Recipe.decode(Data(json.replacingOccurrences(of: Recipe.engineModel, with: "future-model").utf8))
+        }
+        for invalid in [
+            "{}", "[]", "not json", json.replacingOccurrences(of: "\"grain\" : 0.35,", with: ""),
+            json.replacingOccurrences(of: "\"grain\" : 0.35", with: "\"grain\" : -1"),
+        ] {
+            #expect(throws: EmulsionError.invalidRecipe) { try Recipe.decode(Data(invalid.utf8)) }
+        }
+        #expect(throws: EmulsionError.invalidRecipe) { try Recipe.decode(Data(repeating: 32, count: Recipe.maximumFileSize + 1)) }
+    }
+}
