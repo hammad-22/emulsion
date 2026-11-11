@@ -1,4 +1,5 @@
 import CoreImage
+import EmulsionCore
 import EmulsionFixtures
 import Foundation
 
@@ -17,12 +18,18 @@ enum TestPhoto {
 /// so tests can run in parallel.
 @MainActor
 final class TestLibrary {
+    /// One renderer (GPU context and kernels) for every test's service, as the app has one.
+    /// MOV-127: both CI crashes came as parallel tests each started their own context.
+    /// `Renderer` holds only immutable state and a `CIContext`, which is thread-safe.
+    /// Nil if the kernels fail to load; each service then reports that itself.
+    private static let renderer = try? Renderer()
+
     let folder = URL.temporaryDirectory.appending(path: "EmulsionKitTests-\(UUID().uuidString)", directoryHint: .isDirectory)
-    let renderService = RenderService()
+    let renderService = RenderService(renderer: TestLibrary.renderer)
     lazy var store = PhotoStore(folder: folder, renderService: renderService)
 
     /// The same folder opened again, as on the next launch.
-    func reopened() -> PhotoStore { PhotoStore(folder: folder, renderService: RenderService()) }
+    func reopened() -> PhotoStore { PhotoStore(folder: folder, renderService: RenderService(renderer: Self.renderer)) }
 
     isolated deinit { try? FileManager.default.removeItem(at: folder) }
 }
