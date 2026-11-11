@@ -49,18 +49,20 @@ extension FilmModel {
     /// print matches the soft-ended display value.
     func sceneEstimate(fromDisplay display: SIMD3<Double>) -> SIMD3<Double> {
         let ends = softEnds
-        let layerExposure = SIMD3(
-            (0..<3).map { c -> Double in
-                let target = ends.compress(min(1, max(0, display[c])))
-                var lo = FilmLook.displayFloorStops - FilmLook.displaySearchMarginStops
-                var hi = FilmLook.displayCeilingStops + FilmLook.displaySearchMarginStops
-                for _ in 0..<Self.referenceSearchSteps {
-                    let mid = (lo + hi) / 2
-                    if neutralPrint(0.18 * pow(2, mid)) < target { lo = mid } else { hi = mid }
-                }
-                return 0.18 * pow(2, (lo + hi) / 2)
-            })
-        return sensitivity.inverse * layerExposure
+        return sensitivity.inverse * SIMD3((0..<3).map { layerExposure(fromDisplay: display[$0], ends: ends) })
+    }
+
+    /// One layer's exposure for a display-linear value: the neutral light whose print matches
+    /// it after the soft ends, found by bisection.
+    func layerExposure(fromDisplay value: Double, ends: SoftEnds) -> Double {
+        let target = ends.compress(min(1, max(0, value)))
+        var lo = FilmLook.displayFloorStops - FilmLook.displaySearchMarginStops
+        var hi = FilmLook.displayCeilingStops + FilmLook.displaySearchMarginStops
+        for _ in 0..<Self.referenceSearchSteps {
+            let mid = (lo + hi) / 2
+            if neutralPrint(0.18 * pow(2, mid)) < target { lo = mid } else { hi = mid }
+        }
+        return 0.18 * pow(2, (lo + hi) / 2)
     }
 
     /// The inverse of `sceneEstimate`, in closed form. The neutral print is clamped to what the

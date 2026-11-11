@@ -27,6 +27,10 @@ final class PerformanceProbe: XCTestCase {
             // A JPEG/HEIC: developed and materialized once (not timed), then rendered.
             let picture = upscaled(DisplayFixtures.displayP3) { x, y in SIMD3(Float(x) / 63, Float(y) / 47, 0.5) }
             try time(r, try r.materialize(try r.developer.sceneFromDisplay(picture)), "display-referred ", full: a, w, h)
+            // A viewfinder frame: estimated every frame, by the preview inverse or the per-pixel solve.
+            try time(r, r.developer.viewfinderNegative(from: picture), "viewfinder ", full: a, w, h)
+            let solved = try r.developer.sceneFromDisplay(picture).image
+            try time(r, Negative(image: solved, contract: .previewEstimate), "viewfinder via per-pixel solve ", full: a, w, h)
         }
     }
 
