@@ -17,7 +17,8 @@ public actor RenderService {
     private let previewSizeStep: CGFloat = 256
     private nonisolated let thumbnails = ThumbnailCache()
 
-    init() {}
+    /// Tests pass one renderer to every service so they don't each start a GPU context (MOV-127).
+    init(renderer: Renderer? = nil) { self.renderer = renderer }
 
     private func engine() throws -> Renderer {
         if let renderer { return renderer }
