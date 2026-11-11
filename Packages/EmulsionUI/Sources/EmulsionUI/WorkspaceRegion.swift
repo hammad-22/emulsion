@@ -6,7 +6,7 @@ public enum WorkspaceRegion {
         let candidates = obstacles.reduce([bounds]) { candidates, obstacle in
             candidates.flatMap { available -> [CGRect] in
                 let intersection = available.intersection(obstacle)
-                guard !intersection.isNull, !intersection.isEmpty else { return [available] }
+                guard !intersection.isEmpty else { return [available] }
                 return [
                     CGRect(x: available.minX, y: available.minY, width: intersection.minX - available.minX, height: available.height),
                     CGRect(x: intersection.maxX, y: available.minY, width: available.maxX - intersection.maxX, height: available.height),

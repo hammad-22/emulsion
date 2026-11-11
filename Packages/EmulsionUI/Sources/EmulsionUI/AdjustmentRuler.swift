@@ -57,36 +57,50 @@ struct AdjustmentRuler: View {
     }
 
     private var scale: some View {
-        GeometryReader { geometry in
-            let position = (value - control.range.lowerBound) / control.increment
-            ZStack {
-                ForEach(0...tickCount, id: \.self) { tick in
-                    Rectangle()
-                        .fill(tick.isMultiple(of: 5) ? .primary : .secondary)
-                        .frame(width: 1, height: tick.isMultiple(of: 5) ? 24 : 12)
-                        .position(x: geometry.size.width / 2 + (Double(tick) - position) * tickSpacing, y: scaleHeight / 2)
-                }
-                Capsule().fill(.primary).frame(width: 2, height: 36)
-            }
-            .frame(maxWidth: .infinity, maxHeight: .infinity)
-            .mask {
-                LinearGradient(colors: [.clear, .black, .black, .clear], startPoint: .leading, endPoint: .trailing)
-            }
-            .contentShape(.rect)
-            .horizontalScrub { translation in
-                let next = drag.update(
-                    value: value, translation: translation.width, verticalTranslation: translation.height,
-                    pointsPerUnit: tickSpacing / control.increment, range: control.range,
-                    neutral: neutral, detent: control.increment * 0.3
-                )
-                set(next)
-            } onEnded: {
-                drag.end()
-            }
-            .onTapGesture(count: 2) { set(neutral) }
+        ZStack {
+            ticks
+            Capsule().fill(.primary).frame(width: 2, height: 36)
         }
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
+        .mask {
+            LinearGradient(colors: [.clear, .black, .black, .clear], startPoint: .leading, endPoint: .trailing)
+        }
+        .contentShape(.rect)
+        .horizontalScrub { translation in
+            let next = drag.update(
+                value: value, translation: translation.width, verticalTranslation: translation.height,
+                pointsPerUnit: tickSpacing / control.increment, range: control.range,
+                neutral: neutral, detent: control.increment * 0.3
+            )
+            set(next)
+        } onEnded: {
+            drag.end()
+        }
+        .onTapGesture(count: 2) { set(neutral) }
         .frame(height: scaleHeight)
         .clipped()
+    }
+
+    /// One drawing for the whole scale, so a drag redraws the visible ticks instead of
+    /// re-laying out a view per tick. `.style` resolves the hierarchical colors in the
+    /// environment, keeping light/dark and Increase Contrast.
+    private var ticks: some View {
+        let position = (value - control.range.lowerBound) / control.increment
+        let tickCount = self.tickCount
+        let tickSpacing = self.tickSpacing
+        return Canvas { context, size in
+            let halfSpan = Double(size.width) / 2 / tickSpacing
+            let first = max(0, Int((position - halfSpan).rounded(.down)))
+            let last = min(tickCount, Int((position + halfSpan).rounded(.up)))
+            guard first <= last else { return }
+            for tick in first...last {
+                let isMajor = tick.isMultiple(of: 5)
+                let height: CGFloat = isMajor ? 24 : 12
+                let x = size.width / 2 + (Double(tick) - position) * tickSpacing
+                let mark = CGRect(x: x - 0.5, y: (size.height - height) / 2, width: 1, height: height)
+                context.fill(Path(mark), with: isMajor ? .style(.primary) : .style(.secondary))
+            }
+        }
     }
 
     private func set(_ value: Double) {

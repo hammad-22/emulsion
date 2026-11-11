@@ -54,20 +54,13 @@ struct EditorToolbar: ToolbarContent {
         }
     }
 
-    @ViewBuilder private var adjustmentButton: some View {
-        if #available(iOS 27.1, *) {
-            adjustmentAction
-        } else {
-            adjustmentAction.labelStyle(.titleAndIcon)
-        }
-    }
-
-    private var adjustmentAction: some View {
+    private var adjustmentButton: some View {
         Button {
             showsAdjustments.toggle()
         } label: {
             Label(showsAdjustments ? "Hide Adjustments" : "Adjust", systemImage: "dial.low")
         }
+        .titleInHorizontalToolbar()
     }
 
     private func export() async {

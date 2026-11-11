@@ -10,7 +10,7 @@ struct PhotoGrid: View {
     /// A fixed number of columns, or nil for as many 110 pt cells as fit.
     var columnCount: Int? = nil
     var previewID: PhotoRecord.ID? = nil
-    var edit: ((PhotoRecord.ID) -> Void)? = nil
+    let edit: (PhotoRecord.ID) -> Void
     let open: (PhotoRecord.ID) -> Void
 
     @Environment(PhotoStore.self) private var store
@@ -27,7 +27,7 @@ struct PhotoGrid: View {
         ScrollView {
             LazyVGrid(columns: columns, spacing: FilmLabLayout.gridSpacing) {
                 ForEach(store.photos) { photo in
-                    PhotoCell(photo: photo, selection: $selection, open: open, isPreviewed: previewID == photo.id, edit: edit ?? open)
+                    PhotoCell(photo: photo, selection: $selection, open: open, isPreviewed: previewID == photo.id, edit: edit)
                         .matchedTransitionSource(id: photo.id, in: transition)
                 }
             }

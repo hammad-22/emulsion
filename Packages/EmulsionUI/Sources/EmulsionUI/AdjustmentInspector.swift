@@ -45,7 +45,7 @@ public struct AdjustmentInspector: View {
             section.controls.filter { old[keyPath: $0.keyPath] != new[keyPath: $0.keyPath] }.map { (section, $0.id) }
         }
         guard changed.count == 1, let (section, control) = changed.first else { return }
-        group = section
-        selectedControls[section] = control
+        if group != section { group = section }
+        if selectedControls[section] != control { selectedControls[section] = control }
     }
 }

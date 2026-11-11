@@ -43,9 +43,6 @@ struct LibraryScreen: View {
             } message: {
                 Text($0)
             }
-            .onChange(of: store.photos.map(\.id)) { _, ids in
-                if let previewID, !ids.contains(previewID) { self.previewID = nil }
-            }
             .onChange(of: store.photos.isEmpty) { _, isEmpty in
                 if isEmpty { selection = LibrarySelection() }
             }
@@ -54,13 +51,10 @@ struct LibraryScreen: View {
 
     private var libraryContent: some View {
         GeometryReader { geometry in
-            if #available(iOS 27.1, *),
-                horizontalSizeClass == .regular
-                    || !geometry.reservedRegions(kind: .division, options: .includeInactive).isEmpty
-            {
+            if #available(iOS 27.1, *), geometry.isExpandedCanvas(horizontalSizeClass: horizontalSizeClass) {
                 expandedLibrary
             } else {
-                PhotoGrid(selection: $selection, transition: editorTransition) { id in
+                PhotoGrid(selection: $selection, transition: editorTransition, edit: openEditor) { id in
                     previewID = id
                     openEditor(id)
                 }
@@ -73,19 +67,25 @@ struct LibraryScreen: View {
         ArrangementView {
             PhotoGrid(
                 selection: $selection, transition: editorTransition, columnCount: expandedColumnCount,
-                previewID: previewID ?? store.photos.first?.id, edit: openEditor
+                previewID: shownPreviewID, edit: openEditor
             ) {
                 previewID = $0
             }
         } secondary: {
             UnobscuredContent {
-                LibraryPreview(photoID: previewID ?? store.photos.first?.id, edit: openEditor)
+                LibraryPreview(photoID: shownPreviewID, edit: openEditor)
             }
         }
         .arrangementViewStyle(.split)
     }
 
     private func openEditor(_ id: PhotoRecord.ID) { path.append(id) }
+
+    /// The photo picked for preview while it still exists, otherwise the newest.
+    private var shownPreviewID: PhotoRecord.ID? {
+        if let previewID, store.photo(previewID) != nil { return previewID }
+        return store.photos.first?.id
+    }
 
     private var photoCount: Text {
         store.photos.isEmpty ? Text("") : Text("^[\(store.photos.count) photo](inflect: true)")

@@ -16,6 +16,7 @@ public actor RenderService {
     /// windows) reuse a cached develop instead of decoding the RAW again for every size.
     private let previewSizeStep: CGFloat = 256
     private nonisolated let thumbnails = ThumbnailCache()
+    private nonisolated let latestRenders = LatestRenderCache()
 
     init() {}
 
@@ -49,12 +50,22 @@ public actor RenderService {
     /// A rendered preview. Throws `CancellationError` if the caller moved on while it waited
     /// its turn, so slider drags don't queue up stale renders.
     public func image(_ url: URL, _ adjustments: Adjustments, maxDimension: CGFloat) throws -> CGImage {
-        if let cached = cachedThumbnail(url, adjustments, maxDimension: maxDimension) { return cached }
+        if let cached = cachedThumbnail(url, adjustments, maxDimension: maxDimension) {
+            latestRenders.keep(cached, url, maxDimension: maxDimension)
+            return cached
+        }
         try Task.checkCancellation()
         let renderer = try engine()
         let image = try renderer.cgImage(renderer.render(negative(url, maxDimension: maxDimension), adjustments))
         thumbnails.keep(image, url, adjustments, maxDimension: maxDimension)
+        latestRenders.keep(image, url, maxDimension: maxDimension)
         return image
+    }
+
+    /// The last editor-sized film render of this photo, whatever its edit or size: a stand-in
+    /// while a rebuilt view renders again. Never an original. Safe to call from the main actor.
+    public nonisolated func latestRender(_ url: URL) -> CGImage? {
+        latestRenders.image(url)
     }
 
     /// A thumbnail already rendered with exactly this edit, if it's still cached. Safe to
@@ -93,6 +104,7 @@ public actor RenderService {
         for key in previews.keys where key.hasPrefix(prefix) { previews[key] = nil }
         lruKeys.removeAll { $0.hasPrefix(prefix) }
         thumbnails.removeAll()
+        latestRenders.remove(url)
     }
 
     /// Cache keys, least recently developed first; for tests.

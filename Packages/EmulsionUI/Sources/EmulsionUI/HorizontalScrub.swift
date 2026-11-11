@@ -37,7 +37,8 @@ extension View {
         func handleUIGestureRecognizerAction(_ recognizer: UIPanGestureRecognizer, context: Context) {
             switch recognizer.state {
             case .began, .changed:
-                onChanged(CGSize(width: recognizer.translation(in: recognizer.view).x, height: 0))
+                let translation = recognizer.translation(in: recognizer.view)
+                onChanged(CGSize(width: translation.x, height: translation.y))
             case .ended, .cancelled, .failed:
                 onEnded()
             default:

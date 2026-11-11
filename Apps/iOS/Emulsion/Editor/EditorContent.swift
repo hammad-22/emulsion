@@ -14,8 +14,6 @@ struct EditorContent: View {
     @State private var isHolding = false
     /// Nil until the user taps Adjust: the inspector then follows the canvas, shown when expanded.
     @State private var adjustmentsPreference: Bool?
-    /// The last edited render, shown while a rebuilt photo renders again after a fold.
-    @State private var lastEdit: CGImage?
     /// Gives the ruler useful travel beside the photo in landscape.
     private let sidePanelWidth: CGFloat = 360
     /// Stacked, the photo keeps at least half the height; at accessibility text sizes the
@@ -26,7 +24,7 @@ struct EditorContent: View {
 
     var body: some View {
         GeometryReader { geometry in
-            let isExpanded = isExpandedCanvas(geometry)
+            let isExpanded = geometry.isExpandedCanvas(horizontalSizeClass: horizontalSizeClass)
             let showsAdjustments = adjustmentsVisibility(isExpanded: isExpanded)
             workspace(geometry, isExpanded: isExpanded, showsAdjustments: showsAdjustments.wrappedValue)
                 .toolbar { EditorToolbar(session: session, isComparing: $isComparing, showsAdjustments: showsAdjustments) }
@@ -44,13 +42,6 @@ struct EditorContent: View {
         Binding(get: { adjustmentsPreference ?? isExpanded }, set: { adjustmentsPreference = $0 })
     }
 
-    /// Regular width, or a fold present: the system split arrangement owns the canvas.
-    private func isExpandedCanvas(_ geometry: GeometryProxy) -> Bool {
-        guard #available(iOS 27.1, *) else { return false }
-        return horizontalSizeClass == .regular
-            || !geometry.reservedRegions(kind: .division, options: .includeInactive).isEmpty
-    }
-
     @ViewBuilder
     private func workspace(_ geometry: GeometryProxy, isExpanded: Bool, showsAdjustments: Bool) -> some View {
         if #available(iOS 27.1, *), isExpanded {
@@ -60,18 +51,21 @@ struct EditorContent: View {
                 AdjustmentInspector(adjustments: $session.adjustments, group: $group, selection: $selection)
                     .disabled(showsOriginal)
             }
-        } else if #available(iOS 27.1, *), !geometry.reservedRegions(kind: .occlusion).isEmpty {
-            UnobscuredContent { compactLayout(height: geometry.size.height, showsAdjustments: showsAdjustments) }
+        } else if #available(iOS 27.1, *) {
+            // Always wrapped, so an occlusion appearing doesn't rebuild the photo; the panel's
+            // height cap is measured in the unobscured rectangle.
+            UnobscuredContent {
+                GeometryReader { unobscured in
+                    compactLayout(height: unobscured.size.height, showsAdjustments: showsAdjustments)
+                }
+            }
         } else {
             compactLayout(height: geometry.size.height, showsAdjustments: showsAdjustments)
         }
     }
 
     private var photo: some View {
-        ComparablePhoto(
-            url: session.url, adjustments: session.adjustments, isComparing: isComparing, isHolding: $isHolding,
-            lastEdit: lastEdit
-        ) { lastEdit = $0 }
+        ComparablePhoto(url: session.url, adjustments: session.adjustments, isComparing: isComparing, isHolding: $isHolding)
     }
 
     private func compactLayout(height: CGFloat, showsAdjustments: Bool) -> some View {
