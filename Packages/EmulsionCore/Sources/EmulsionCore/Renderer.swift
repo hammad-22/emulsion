@@ -25,7 +25,8 @@ public final class Renderer: @unchecked Sendable {
         ])
     }
 
-    /// Scene light → display light (in the working space), look applied.
+    /// Scene light → display light (in the working space), look applied. Display-referred
+    /// negatives are printed relative to the photo they were developed from.
     public func render(_ negative: Negative, _ adjustments: Adjustments) throws -> CIImage {
         let a = adjustments.clamped()
         var image = negative.image
@@ -44,13 +45,15 @@ public final class Renderer: @unchecked Sendable {
             image = try kernels.run(kernels.halationAdd, extent, [image, skirt.cropped(to: extent), a.halation * (1 - coreShare)])
         }
 
-        // Printer lights, lab convention: more light in a channel prints more of its
-        // complementary dye, so Warmth adds blue light and removes red; Tint adds green.
-        let point = FilmLook.printerPoint
-        let lights = SIMD3(-point * a.warmth, point * a.tint, point * a.warmth)
-        let saturation = 1 + a.color * (a.color >= 0 ? FilmLook.colorBoost : FilmLook.colorCut)
-        let args: [Any] = [image] + FilmLook.stock.kernelArguments(lights: lights, exposure: a.exposure, saturation: saturation)
-        image = try kernels.run(kernels.filmSystem, extent, args)
+        if negative.contract == .displayReferred {
+            // A finished picture is printed relative to itself: zero edits reproduce it up to the
+            // output gamut fit (chroma above 85% of the P3 boundary is compressed).
+            let film = FilmLook.stock.relativeKernelArguments(lights: a.printerLights, exposure: a.exposure, saturation: a.printSaturation)
+            image = try kernels.run(kernels.filmSystemRelative, extent, [image, negative.image] + film)
+        } else {
+            let film = FilmLook.stock.kernelArguments(lights: a.printerLights, exposure: a.exposure, saturation: a.printSaturation)
+            image = try kernels.run(kernels.filmSystem, extent, [image] + film)
+        }
 
         if a.highlights != 0 || a.shadows != 0 {
             image = try kernels.applyLocalTone(image, shadows: a.shadows, highlights: a.highlights)
