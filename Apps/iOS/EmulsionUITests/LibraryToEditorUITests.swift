@@ -61,6 +61,10 @@ final class LibraryToEditorUITests: XCTestCase {
         scrollStart.press(forDuration: 0.05, thenDragTo: scrollEnd)
         XCTAssertFalse(reset.isEnabled, "A mostly vertical scroll must not adjust exposure")
         dragRuler(exposure)
+        XCTAssertTrue(reset.isEnabled)
+        exposure.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.75)).doubleTap()
+        XCTAssertFalse(reset.isEnabled, "A double tap on the scale returns it to neutral")
+        dragRuler(exposure)
         let editedExposure = exposure.value as? String
         app.buttons["Hide Adjustments"].tap()
         XCTAssertFalse(exposure.isHittable)
