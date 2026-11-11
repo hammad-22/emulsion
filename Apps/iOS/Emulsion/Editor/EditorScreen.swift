@@ -24,19 +24,19 @@ struct EditorScreen: View {
     }
 }
 
-/// The easy editor: the photo as large as possible on a neutral black surround, with one
-/// group of sliders on a floating glass panel. The panel sits beside the photo when there's
-/// width to spare (landscape, iPhone Duo unfolded) and below it otherwise, never over it.
-/// One `AnyLayout` for both, so the photo and panel keep their state when the shape changes.
+/// One selected adjustment, revealed beside the photo in the current landscape fallback
+/// or below it in portrait. Duo's reserved-region layout remains MOV-119.
 private struct EditorContent: View {
     @Bindable var session: EditSession
 
     @Environment(\.horizontalSizeClass) private var horizontalSizeClass
     @Environment(\.verticalSizeClass) private var verticalSizeClass
     @State private var group = AdjustmentGroup.light
+    @State private var selection: [AdjustmentGroup: String] = [:]
     @State private var isComparing = false
     @State private var isHolding = false
-    /// Fits the longest slider row at the largest standard text size beside the photo.
+    @State private var showsAdjustments = false
+    /// Gives the ruler useful travel beside the photo in landscape.
     private let sidePanelWidth: CGFloat = 360
     /// Stacked, the photo keeps at least half the height; at accessibility text sizes the
     /// panel scrolls instead of shrinking the photo further.
@@ -49,11 +49,11 @@ private struct EditorContent: View {
             layout {
                 ComparablePhoto(url: session.url, adjustments: session.adjustments, isComparing: isComparing, isHolding: $isHolding)
                     .padding(isWide ? FilmLabLayout.inset : 0)
-                panel
+                controls
                     .disabled(showsOriginal)
                     .frame(
-                        maxWidth: isWide ? sidePanelWidth : .infinity,
-                        maxHeight: isWide ? .infinity : geometry.size.height * maximumPanelFraction
+                        maxWidth: isWide ? (showsAdjustments ? sidePanelWidth : 0) : .infinity,
+                        maxHeight: showsAdjustments ? (isWide ? .infinity : geometry.size.height * maximumPanelFraction) : 0
                     )
                     .fixedSize(horizontal: false, vertical: !isWide)
                     .layoutPriority(1)
@@ -65,21 +65,24 @@ private struct EditorContent: View {
         .tint(.white)
         .navigationTitle(showsOriginal ? Text("Original") : Text(""))
         .navigationBarTitleDisplayMode(.inline)
-        .toolbar { EditorToolbar(session: session, isComparing: $isComparing) }
+        .toolbar { EditorToolbar(session: session, isComparing: $isComparing, showsAdjustments: $showsAdjustments) }
     }
 
-    /// The panel at its own height when that fits, scrolling when it doesn't.
-    private var panel: some View {
+    private var controls: some View {
         ViewThatFits(in: .vertical) {
-            adjustmentPanel
-            ScrollView { adjustmentPanel }
+            panel
+            ScrollView { panel }
         }
+        .frame(height: showsAdjustments ? nil : 0)
+        .clipped()
+        .opacity(showsAdjustments ? 1 : 0)
+        .allowsHitTesting(showsAdjustments)
+        .accessibilityHidden(!showsAdjustments)
     }
 
-    private var adjustmentPanel: some View {
-        AdjustmentPanel(adjustments: $session.adjustments, group: $group)
+    private var panel: some View {
+        AdjustmentPanel(adjustments: $session.adjustments, group: $group, selection: $selection)
             .padding(.horizontal, FilmLabLayout.inset)
-            .padding(.vertical, FilmLabLayout.compact)
     }
 
     private var isWide: Bool { horizontalSizeClass == .regular || verticalSizeClass == .compact }

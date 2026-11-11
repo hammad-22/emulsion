@@ -28,6 +28,7 @@ export DEVELOPER_DIR=/Applications/Xcode.app/Contents/Developer
 sh Tools/build-kernels.sh                                    # after any .metal change
 (cd Packages/EmulsionCore && swift test)                     # must stay green
 (cd Packages/EmulsionKit && swift test)                      # app logic; also on iOS, see its AGENTS.md
+(cd Packages/EmulsionUI && swift test)                       # shared control interaction tests
 .venv/bin/python -I Tools/color-references/generate_input_references.py  # after changing reference samples (pip install -r Tools/color-references/requirements.txt)
 (cd Packages/EmulsionCore && EMULSION_PERF=1 swift test --filter PerformanceProbe)  # Mac timings
 swift format lint --recursive Packages Apps Tools            # style (config: .swift-format)
@@ -57,6 +58,7 @@ swift format lint --recursive Packages Apps Tools            # style (config: .s
   - UI changes: before/after screenshots or a short screen recording from the iOS Simulator (`xcrun simctl io booted screenshot|recordVideo`), and from a device when it matters;
   - engine changes: before/after renders of a reference fixture, plus the measured numbers;
   - docs-only changes: say "no visual change".
+- **CI test crashes:** inspect the `test-diagnostics-<run>-<attempt>` artifact for the test log and macOS crash reports (MOV-127). Keep the failing exit status; don't mask crashes with retries.
 - **Run the app in the Simulator** for any app change; don't stop at "it compiles". Use the iPhone 17 Pro simulator, plus iPhone Duo once the Xcode 27.1 SDK is installed.
 - **PR descriptions** cover what, why, proof, testing and the Linear issue. No tool-attribution footers.
 - **Review before the PR, then open it as a draft:**

@@ -12,7 +12,8 @@ let package = Package(
         .package(path: "../EmulsionKit"),
     ],
     targets: [
-        .target(name: "EmulsionUI", dependencies: ["EmulsionCore", "EmulsionKit"])
+        .target(name: "EmulsionUI", dependencies: ["EmulsionCore", "EmulsionKit"]),
+        .testTarget(name: "EmulsionUITests", dependencies: ["EmulsionUI"]),
     ],
     swiftLanguageModes: [.v6]
 )

@@ -41,6 +41,11 @@ jobs:
 
       - name: App logic tests (EmulsionKit)
         working-directory: Packages/EmulsionKit
+        shell: bash
+        run: swift test 2>&1 | tee "$RUNNER_TEMP/emulsionkit-macos-tests.log"
+
+      - name: Shared UI interaction tests (EmulsionUI)
+        working-directory: Packages/EmulsionUI
         run: swift test
 
       - name: App logic tests on iOS (EmulsionKit)
@@ -51,3 +56,16 @@ jobs:
 
       - name: Mac app builds
         run: xcodebuild -project Apps/macOS/Emulsion.xcodeproj -scheme Emulsion -destination 'platform=macOS' CODE_SIGNING_ALLOWED=NO build
+
+      # MOV-127: retain the crashing frame if the Swift Testing process exits with signal 11 again.
+      - name: Upload failed-test diagnostics
+        if: failure()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02  # v4, MIT
+        with:
+          name: test-diagnostics-${{ github.run_id }}-${{ github.run_attempt }}
+          path: |
+            ${{ runner.temp }}/emulsionkit-macos-tests.log
+            ~/Library/Logs/DiagnosticReports/*.ips
+            ~/Library/Logs/DiagnosticReports/*.crash
+          if-no-files-found: warn
+          retention-days: 14

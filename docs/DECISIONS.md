@@ -1,5 +1,9 @@
 # Decisions
 
+## 10 November 2026: minimal glass editing (owner)
+
+The owner chose an ultra-minimal editor with an immersive photo, generous native Apple Liquid Glass and controls revealed on demand. Use Photos-style adjustment rulers: one active adjustment, a horizontal tick-mark scale, fixed indicator, value readout and neutral detent. Ordinary stacked sliders are not the final design. Keep full-image aspect fitting and a neutral surround for judging the edit; do not add an ambient blurred-photo background. Rulers must support accessible increments and reset, and retain the selected control and edit through hiding and rotation. Look recipes remain MOV-65. Duo uses its own expanded composition and reserved-region APIs; show regular, folded and unfolded concepts to the owner before implementing that layout (MOV-119).
+
 ## 7 November 2026: native visual quality (owner)
 
 The working prototype is not the final visual design. The iOS app should be beautiful and unmistakably native, with more transparency and Liquid Glass, while feeling fast and lightweight. MOV-54 owns the reusable visual system; MOV-55, MOV-56 and MOV-119 apply it to the library, editor and Duo layouts. Keep the photograph central and its color trustworthy, use system typography and controls, and avoid redundant effects or continuous decorative animation. Accessibility and measured device performance remain acceptance criteria.
