@@ -1,6 +1,6 @@
 # Emulsion engine
 
-Emulsion is a film lab for colorists. It takes camera RAW, log and HDR video, and ordinary JPEG/HEIC/MP4, develops RAW and log into **scene light** (ordinary JPEG/HEIC only approximately: the phone's processing can't be undone), and prints it through a physically modeled photochemical system. The look comes from a negative → print chain behaving like one. It is not a stack of filters or a LUT.
+Emulsion is a film lab for colorists. It takes camera RAW, log and HDR video, and ordinary JPEG/HEIC/MP4. RAW and log are decoded into **scene light**; HLG is decoded as nominal scene light; ordinary JPEG/HEIC only gets an estimate of scene light, because the phone's rendering can't be undone (see [Input contracts](#input-contracts)). The result is printed through a modeled photochemical system. The look comes from a negative → print chain behaving like one. It is not a stack of filters or a LUT.
 
 The UI should stay simple, while the engine underneath is something a colorist can trust: it's measured, its stages are documented, and the GPU output is verified against a reference model.
 
@@ -17,13 +17,25 @@ source ──▶ input transform ──▶ scene light (linear, 0.18 = mid-gray)
 | --- | --- | --- |
 | RAW develop | `Developer.swift` | Apple `CIRAWFilter`, with Apple's look switched off (no boost, no local tone map, no extra contrast): demosaiced, white-balanced, linear scene light |
 | Input transforms | `ColorSpaces.swift`, `VideoSignal.swift`, `inputTransform` / `ycbcrInputTransform` kernels | Apple Log, S-Log3/S-Gamut3.Cine, ARRI LogC3/LogC4, V-Log, DaVinci Intermediate/DWG, ACEScct (Bradford from ACES white), HLG (BT.2408 scaling), Rec.709 and Display P3 display encodings. Code values become the BT.2100 signal E′ using the declared range (legal or full); 10-bit Y′CbCr frames use their tagged matrix (BT.709 or BT.2020). S-Log3, LogC3 and V-Log formulas take 10-bit legal-range code values, the rest take E′ |
-| Display-referred sources | `displayToScene` kernel | JPEG/HEIC/Rec.709 are inverted through the film system's own neutral response, so they are re-printed rather than having film stacked on top of Apple's rendering. Approximate: low-saturation colors round-trip well, strongly saturated colors darken |
+| Display-referred sources | `displayToScene` kernel | JPEG/HEIC/Rec.709/Display P3 are inverted through the film system's own neutral response, so they are re-printed rather than having film stacked on top of Apple's rendering. The result is an estimate of scene light, not a recovery: low-saturation colors round-trip well, strongly saturated colors darken (see Input contracts) |
 | Film system | `FilmModel.swift`, `filmSystem` kernel | Layer sensitivities (crosstalk) → negative H&D curves → printer lights → print H&D curves (Richards toe) → print dye cross-absorption → 10^−density relative to paper white. Mid-gray is calibrated neutral, like a timing lab |
 | Highlight chroma retention | same | The one non-physical step. Bright saturated light (neon) blends toward a ratio-preserving render above +1.5 stops, so it doesn't band. Midtones are unaffected; timed (warm/cool) neutrals above +1.5 stops lose part of their timing, and very bright saturated colors stay tinted instead of reaching white (artistic choice under review) |
 | Halation | `Renderer.swift` | Scene highlights above about +3.5 stops add red-orange glow (core + skirt) back into exposure, before the negative. Blurred at reduced scale with energy-preserving box halving |
 | Local tone | `LocalTone.swift` | Halo-free Highlights/Shadows: a box-averaged base layer with edge-preserving upsampling (carried over from the GradingCore study; the current test allows ≤3 codes of halo) |
 | Grain | `grain` kernel | Density noise on perceptual lightness, peaking in the midtones. The cell size is relative to the image, and sub-pixel cells are attenuated, so preview and export carry matching grain statistics |
 | Interactive speed | `Renderer.materialize` | The developed preview is rendered once into a half-float buffer, so slider moves never re-run the RAW develop or the JPEG inversion |
+
+## Input contracts
+
+Not every input can tell us what the scene looked like. Each source has a contract: what its decoded values mean, and what the engine may say about them. In code the contract is `InputContract`, declared by each input on `InputColorSpace.contract` and carried by every developed image on `Negative.contract`.
+
+| Source | Contract | What the engine does | What it may claim |
+| --- | --- | --- | --- |
+| RAW (Bayer DNG, ProRAW) | Scene-referred | Apple `CIRAWFilter` with Apple's look switched off | Linear scene light from Apple's develop. ProRAW is already computational photography, so "scene light" means Apple's linear develop, not a sensor measurement. Highlight headroom is MOV-79 |
+| Camera log (Apple Log, S-Log3, LogC3/LogC4, V-Log, DaVinci Intermediate, ACEScct) and linear P3 | Scene-referred | The manufacturer's published curve and gamut matrix | Scene light; the decode is verified against colour-science references |
+| HLG (Rec.2100) | Nominal scene | BT.2100 inverse OETF with BT.2408 scaling | Decoded as scene light by the standard, but phone HLG is rendered by the camera before encoding, so it is not claimed to be the scene |
+| JPEG, HEIC, Rec.709, Display P3 | Display-referred | Inverted through the film system's neutral response, then re-printed | An approximate re-render, not the scene. Measured round trip today: OKLab ΔE×100 mean 0.85 at 25% saturation, 3.3 at 50%, 14.5 at 100%, mostly darkening; top codes 253, 254 and 255 map to +6.6, +7.8 and +12 stops. MOV-82 replaces this inversion |
+| HDR stills (gain-map HEIC/JPEG, PQ/HLG HEIF) | Display-referred | Read as their SDR rendition (the gain map is ignored; PQ/HLG are tone-mapped by Core Image), then as above | Same as display-referred; HDR headroom is discarded until MOV-49 |
 
 **Sub-black policy.** Decoding keeps sub-black signals (legal-range footroom, compression undershoot) as negative light; clipping is the film model's job. Where a specification defines values below its range, the engine follows it: Apple Log holds at R₀, and the log curves' toes and sRGB's linear segment extend linearly. Where it doesn't (BT.2100 HLG, BT.1886 gamma 2.4), the curve is extended oddly (mirrored), so every decode stays monotonic through black. colour-science mirrors HLG the same way; for BT.1886, which colour-science clamps, the reference generator applies the engine's convention.
 
@@ -38,6 +50,7 @@ Tests, all passing:
 - halation is local, red-biased and resolution-independent;
 - grain is zero-mean, strongest in the midtones, deterministic per seed, and matches between preview and export;
 - display-referred tone survives the inverse/forward round trip;
+- every input declares its contract, and the developed negative keeps it (log, HLG and Display P3 code values, a JPEG, and through materialize and resize);
 - local tone doesn't halo;
 - the materialized negative keeps highlight headroom;
 - exports are Display P3, with HEIC at 10-bit;

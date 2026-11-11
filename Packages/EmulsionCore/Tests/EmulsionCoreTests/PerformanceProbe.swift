@@ -21,7 +21,7 @@ final class PerformanceProbe: XCTestCase {
             }
             .samplingLinear().transformed(by: CGAffineTransform(scaleX: CGFloat(w) / 64, y: CGFloat(h) / 48))
             .cropped(to: CGRect(x: 0, y: 0, width: w, height: h))
-            let neg = Negative(image: scene, source: .raw)
+            let neg = Negative(image: scene, contract: .sceneReferred)
             for (label, adj) in [("look only", Adjustments.neutral), ("full", a)] {
                 var times = [Double]()
                 for _ in 0..<5 {

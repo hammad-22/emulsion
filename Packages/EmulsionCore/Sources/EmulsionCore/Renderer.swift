@@ -90,7 +90,7 @@ public final class Renderer: @unchecked Sendable {
         }
         context.render(negative.image, to: buffer, bounds: negative.image.extent, colorSpace: Self.workingSpace)
         let image = CIImage(cvPixelBuffer: buffer, options: [.colorSpace: Self.workingSpace])
-        return Negative(image: image, source: negative.source)
+        return Negative(image: image, contract: negative.contract)
     }
 
     public func resized(_ negative: Negative, longestEdge: CGFloat) -> Negative {
@@ -98,7 +98,7 @@ public final class Renderer: @unchecked Sendable {
         guard scale < 1 else { return negative }
         let image = negative.image.lanczosScaled(by: scale)
         let e = CGRect(x: 0, y: 0, width: floor(negative.size.width * scale), height: floor(negative.size.height * scale))
-        return Negative(image: image.cropped(to: e), source: negative.source)
+        return Negative(image: image.cropped(to: e), contract: negative.contract)
     }
 
     public func cgImage(_ image: CIImage) throws -> CGImage {

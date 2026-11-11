@@ -13,7 +13,7 @@ class EmulsionTestCase: XCTestCase {
     let p3 = Renderer.outputSpace
 
     func render(_ scene: CIImage, _ a: Adjustments = .neutral) throws -> CIImage {
-        try renderer.render(Negative(image: scene, source: .raw), a)
+        try renderer.render(Negative(image: scene, contract: .sceneReferred), a)
     }
     /// Encoded Display P3 values ×255, before 8-bit rounding.
     func codes(_ image: CIImage) -> [SIMD3<Double>] { Fixtures.encodedFloats(image, space: p3).map { $0 * 255 } }
