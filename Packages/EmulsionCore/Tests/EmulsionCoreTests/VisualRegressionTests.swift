@@ -12,12 +12,11 @@ import simd
 struct VisualRegressionTests {
     @Test func rendersMatchGoldens() throws {
         let items = RegressionCase.all.map { c in
-            VisualRegression.Item(name: c.name) { try VisualRegression.render(c.scene(), c.adjustments, contract: c.contract) }
+            VisualRegression.Item(name: c.name) { try VisualRegression.render(c.scene(), c.goldenAdjustments, contract: c.contract) }
         }
         try VisualRegression.run(
             "goldens", items, store: .repository, reportDirectory: VisualRegression.reportDirectory,
-            regenerate:
-                "EMULSION_UPDATE_GOLDENS=1 swift test --filter VisualRegression, review the summary, commit the goldens with the change.")
+            regenerate: VisualRegression.regenerateCommand)
     }
 
     // MARK: The suite is not vacuous
@@ -56,7 +55,8 @@ struct VisualRegressionTests {
 
     // MARK: Noise floor
 
-    /// What the comparison sees when nothing changed must sit well inside the thresholds.
+    /// What the comparison sees when nothing changed must sit well inside the thresholds. Grain
+    /// cases render with grain here: on one machine the seeded pattern is identical.
     @Test func noiseFloorIsInsideTheThresholds() throws {
         var floors: [(String, ColorDifference.Summary)] = []
         for name in ["chart24.neutral", "gradient.default-look", "gradient.grain", "iphone12pro-proraw.graded"] {

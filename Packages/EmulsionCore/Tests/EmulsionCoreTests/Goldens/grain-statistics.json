@@ -1,0 +1,32 @@
+{
+  "gradient.default-look" : {
+    "mean" : -0.002146,
+    "neighbourCorrelation" : 0.325852,
+    "sd" : 0.096333
+  },
+  "gradient.grain" : {
+    "mean" : -0.001825,
+    "neighbourCorrelation" : 0.326207,
+    "sd" : 0.274673
+  },
+  "iphone12pro-proraw.default-look" : {
+    "mean" : -0.002701,
+    "neighbourCorrelation" : 0.324883,
+    "sd" : 0.121934
+  },
+  "iphone12pro-proraw.graded" : {
+    "mean" : 0.000784,
+    "neighbourCorrelation" : 0.322581,
+    "sd" : 0.213594
+  },
+  "pixel8pro-dng.default-look" : {
+    "mean" : -0.002851,
+    "neighbourCorrelation" : 0.323407,
+    "sd" : 0.113131
+  },
+  "pixel8pro-dng.graded" : {
+    "mean" : 0.000159,
+    "neighbourCorrelation" : 0.324662,
+    "sd" : 0.210859
+  }
+}
