@@ -1,8 +1,8 @@
 import CoreGraphics
 
 /// Chooses a contiguous canvas, preserving image aspect fitting rather than masking pixels.
-enum WorkspaceRegion {
-    static func largestRectangle(in bounds: CGRect, avoiding obstacles: [CGRect]) -> CGRect {
+public enum WorkspaceRegion {
+    public static func largestRectangle(in bounds: CGRect, avoiding obstacles: [CGRect]) -> CGRect {
         let candidates = obstacles.reduce([bounds]) { candidates, obstacle in
             candidates.flatMap { available -> [CGRect] in
                 let intersection = available.intersection(obstacle)

@@ -1,3 +1,4 @@
+import EmulsionUI
 import SwiftUI
 
 /// Keep the whole photograph and its controls in a usable rectangle, without cropping.
@@ -8,17 +9,13 @@ struct UnobscuredContent<Content: View>: View {
 
     var body: some View {
         GeometryReader { geometry in
+            // Frames include safety margins; use physical coordinates for explicit positioning.
             let regions =
-                geometry.reservedRegions(kind: .occlusion)
-                + (avoidsDivision ? geometry.reservedRegions(kind: .division) : [])
+                geometry.reservedRegions(kind: .occlusion, layoutDirectionBehavior: .fixed)
+                + (avoidsDivision ? geometry.reservedRegions(kind: .division, layoutDirectionBehavior: .fixed) : [])
             let frame = WorkspaceRegion.largestRectangle(
                 in: CGRect(origin: .zero, size: geometry.size),
-                avoiding: regions.map { region in
-                    region.frame.inset(
-                        by: UIEdgeInsets(
-                            top: -region.margins.top, left: -region.margins.leading,
-                            bottom: -region.margins.bottom, right: -region.margins.trailing))
-                })
+                avoiding: regions.map(\.frame))
             content()
                 .frame(width: frame.width, height: frame.height)
                 .position(x: frame.midX, y: frame.midY)

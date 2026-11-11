@@ -122,7 +122,7 @@ final class LibraryToEditorUITests: XCTestCase {
             // XCTest calls interruption handlers on the main thread.
             MainActor.assumeIsolated {
                 for label in ["Allow Full Access", "Allow", "OK"] where alert.buttons[label].exists {
-                    alert.buttons[label].tap()
+                    alert.buttons[label].firstMatch.tap()
                     return true
                 }
                 return false
