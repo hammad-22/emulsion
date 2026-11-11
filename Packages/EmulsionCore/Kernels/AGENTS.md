@@ -1,6 +1,6 @@
 # Metal / Core Image kernels
 
-- `Emulsion.ci.metal` holds Core Image color kernels (`extern "C"`, `coreimage::sample_t`). The Swift mirrors are in `FilmModel.swift` and `ColorSpaces.swift`: change both together, using the same names for constants.
+- `Emulsion.ci.metal` holds Core Image color kernels (`extern "C"`, `coreimage::sample_t`). The Swift mirrors are in `FilmModel.swift`, `FilmModel+Display.swift` and `ColorSpaces.swift`: change both together, using the same names for constants.
 - Rebuild with `sh Tools/build-kernels.sh` and commit all three metallibs (macOS, iOS, simulator) together with the source. The deployment target in the script must match `Package.swift`.
 - Each kernel gets a comment stating its input and output: scene or display light, working or P3 primaries, premultiplied or not.
 - The kernel-argument layout (`kernelArguments`, `misc`/`neg` vectors) is an ABI: when it changes, update the comment block above `filmRender` and the Swift packing together.

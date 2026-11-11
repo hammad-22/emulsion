@@ -5,8 +5,8 @@ import ImageIO
 import UniformTypeIdentifiers
 
 /// A developed photo in linear working-space light, ready for the look. `contract` says what
-/// that light is: scene light, nominal scene light, or (for display-referred sources) an
-/// estimate of scene light.
+/// that light is: scene light, nominal scene light, or (for display-referred sources) a scene
+/// estimate that the renderer prints relative to the photo, so zero edits reproduce it.
 public struct Negative: @unchecked Sendable {
     public let image: CIImage
     public let contract: InputContract
@@ -15,8 +15,8 @@ public struct Negative: @unchecked Sendable {
 
 /// Turns camera data into linear light for the film system. RAW (ProRAW or Bayer DNG) goes
 /// through Apple's CIRAWFilter with its look processing switched off. Display-referred photos
-/// only get an estimate of scene light from the inverse of the neutral film curve: the camera's
-/// rendering can't be undone.
+/// only get an estimate of scene light from the neutral film curve: the camera's rendering
+/// can't be undone.
 public struct Developer {
     private let kernels: Kernels
     init(kernels: Kernels) { self.kernels = kernels }
@@ -63,10 +63,11 @@ public struct Developer {
         return try sceneFromDisplay(normalized(image))
     }
 
-    /// Display-referred linear image → an estimate of scene light (neutral inverse film curve).
-    /// The camera's rendering can't be undone, so this is a re-render, not a recovery.
+    /// Display-referred linear image → a scene estimate: per channel, the neutral exposure whose
+    /// print matches the display value, with white and black held at a finite ceiling and floor
+    /// (`FilmModel.sceneEstimate(fromDisplay:)`). Not a recovery of the scene.
     public func sceneFromDisplay(_ image: CIImage) throws -> Negative {
-        let args: [Any] = [image] + FilmLook.stock.kernelArguments()
+        let args: [Any] = [image] + FilmLook.stock.displayToSceneArguments()
         return Negative(image: try kernels.run(kernels.displayToScene, image.extent, args), contract: .displayReferred)
     }
 
@@ -92,7 +93,7 @@ public struct Developer {
     }
 
     /// The input transform alone (curve and gamut matrix): working-space light before display
-    /// encodings go through the inverse film curve.
+    /// encodings get their scene estimate.
     func workingLight(fromEncoded image: CIImage, as space: InputColorSpace, range: SignalRange) throws -> CIImage {
         let transform = CurveInputTransform(rgbIn: range, sampleUnitsPerCode: 1 / 1023, for: space)
         return try workingLight(kernels.inputTransform, image.extent, [image], transform, as: space)

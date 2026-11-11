@@ -5,7 +5,7 @@ import Foundation
 /// scripts/build-kernels.sh).
 struct Kernels {
     // Named exactly like the Metal functions in Emulsion.ci.metal.
-    let filmSystem, displayToScene, inputTransform, ycbcrInputTransform: CIColorKernel
+    let filmSystem, filmSystemRelative, displayToScene, inputTransform, ycbcrInputTransform: CIColorKernel
     let halationSource, halationAdd, grain, lightnessGuide, localTone: CIColorKernel
 
     init() throws {
@@ -22,6 +22,7 @@ struct Kernels {
         let data = try Data(contentsOf: url)
         func load(_ name: String) throws -> CIColorKernel { try CIColorKernel(functionName: name, fromMetalLibraryData: data) }
         filmSystem = try load("filmSystem")
+        filmSystemRelative = try load("filmSystemRelative")
         displayToScene = try load("displayToScene")
         inputTransform = try load("inputTransform")
         ycbcrInputTransform = try load("ycbcrInputTransform")

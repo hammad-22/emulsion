@@ -25,7 +25,8 @@ public final class Renderer: @unchecked Sendable {
         ])
     }
 
-    /// Scene light → display light (in the working space), look applied.
+    /// Scene light → display light (in the working space), look applied. Display-referred
+    /// negatives are printed relative to the photo they were developed from.
     public func render(_ negative: Negative, _ adjustments: Adjustments) throws -> CIImage {
         let a = adjustments.clamped()
         var image = negative.image
@@ -49,8 +50,14 @@ public final class Renderer: @unchecked Sendable {
         let point = FilmLook.printerPoint
         let lights = SIMD3(-point * a.warmth, point * a.tint, point * a.warmth)
         let saturation = 1 + a.color * (a.color >= 0 ? FilmLook.colorBoost : FilmLook.colorCut)
-        let args: [Any] = [image] + FilmLook.stock.kernelArguments(lights: lights, exposure: a.exposure, saturation: saturation)
-        image = try kernels.run(kernels.filmSystem, extent, args)
+        if negative.contract == .displayReferred {
+            // A finished picture is printed relative to itself: zero edits reproduce it.
+            let film = FilmLook.stock.relativeKernelArguments(lights: lights, exposure: a.exposure, saturation: saturation)
+            image = try kernels.run(kernels.filmSystemRelative, extent, [image, negative.image] + film)
+        } else {
+            let film = FilmLook.stock.kernelArguments(lights: lights, exposure: a.exposure, saturation: saturation)
+            image = try kernels.run(kernels.filmSystem, extent, [image] + film)
+        }
 
         if a.highlights != 0 || a.shadows != 0 {
             image = try kernels.applyLocalTone(image, shadows: a.shadows, highlights: a.highlights)

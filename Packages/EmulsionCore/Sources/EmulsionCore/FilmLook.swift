@@ -18,4 +18,15 @@ public enum FilmLook {
     public static let printerPoint = 0.05
     /// Saturation gain per unit of the Color control, above and below zero.
     public static let colorBoost = 0.5, colorCut = 0.8
+
+    /// Display-referred sources (JPEG/HEIC): display white is estimated as a scene this many
+    /// stops over mid-gray, and display black this many below. Engineering choices, not
+    /// measurements: the film prints neither pure white nor pure black, so a finite estimate
+    /// is picked that keeps edits smooth (see `FilmModel.SoftEnds`).
+    static let displayCeilingStops = 4.0
+    static let displayFloorStops = -9.0
+    /// Display-linear values between these knees are estimated exactly; above and below, the
+    /// soft ends bend them into the print's reachable range. Engineering choices, not measurements.
+    static let displayShoulderKnee = 0.75
+    static let displayToeKnee = 0.006
 }

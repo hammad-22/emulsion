@@ -26,7 +26,7 @@ public enum InputColorSpace: String, CaseIterable, Identifiable, Codable, Sendab
         }
     }
 
-    /// Display-referred sources are inverted through the film system's neutral response;
+    /// Display-referred sources get a scene estimate and are printed relative to themselves;
     /// everything else is decoded as scene light by its curve.
     public var contract: InputContract {
         switch self {

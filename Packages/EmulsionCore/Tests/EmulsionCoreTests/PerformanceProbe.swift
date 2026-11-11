@@ -21,17 +21,27 @@ final class PerformanceProbe: XCTestCase {
             }
             .samplingLinear().transformed(by: CGAffineTransform(scaleX: CGFloat(w) / 64, y: CGFloat(h) / 48))
             .cropped(to: CGRect(x: 0, y: 0, width: w, height: h))
-            let neg = Negative(image: scene, contract: .sceneReferred)
-            for (label, adj) in [("look only", Adjustments.neutral), ("full", a)] {
-                var times = [Double]()
-                for _ in 0..<5 {
-                    let t = Date()
-                    let cg = try r.cgImage(try r.render(neg, adj))
-                    _ = cg.dataProvider?.data
-                    times.append(Date().timeIntervalSince(t) * 1000)
-                }
-                print(String(format: "%dx%d %@: median %.1f ms (first %.1f)", w, h, label, times.dropFirst().sorted()[2], times[0]))
+            try time(r, Negative(image: scene, contract: .sceneReferred), "", full: a, w, h)
+            // A JPEG/HEIC: developed and materialized once (not timed), then rendered.
+            let picture = Fixtures.image(width: 64, height: 48, space: DisplayFixtures.displayP3) { x, y in
+                SIMD3(Float(x) / 63, Float(y) / 47, 0.5)
             }
+            .samplingLinear().transformed(by: CGAffineTransform(scaleX: CGFloat(w) / 64, y: CGFloat(h) / 48))
+            .cropped(to: CGRect(x: 0, y: 0, width: w, height: h))
+            try time(r, try r.materialize(try r.developer.sceneFromDisplay(picture)), "display-referred ", full: a, w, h)
+        }
+    }
+
+    private func time(_ r: Renderer, _ neg: Negative, _ kind: String, full a: Adjustments, _ w: Int, _ h: Int) throws {
+        for (label, adj) in [("look only", Adjustments.neutral), ("full", a)] {
+            var times = [Double]()
+            for _ in 0..<5 {
+                let t = Date()
+                let cg = try r.cgImage(try r.render(neg, adj))
+                _ = cg.dataProvider?.data
+                times.append(Date().timeIntervalSince(t) * 1000)
+            }
+            print(String(format: "%dx%d %@%@: median %.1f ms (first %.1f)", w, h, kind, label, times.dropFirst().sorted()[2], times[0]))
         }
     }
 }
