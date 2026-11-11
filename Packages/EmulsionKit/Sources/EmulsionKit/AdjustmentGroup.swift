@@ -2,7 +2,7 @@ import EmulsionCore
 
 /// The editor's controls, grouped the way the film process is: exposure and local tone,
 /// printer lights and color density, then texture. Shared so iOS and Mac show the same
-/// controls with the same ranges; the iOS app shows one group at a time.
+/// controls with the same ranges; the iPhone panel shows one group at a time.
 public enum AdjustmentGroup: String, CaseIterable, Identifiable, Sendable {
     case light, color, texture
 

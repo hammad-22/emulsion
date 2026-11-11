@@ -45,7 +45,7 @@ The contrast with Dehancer iOS: free versus subscription, open versus closed, an
 
 ## 10 Nov 2026 — Duo layouts retain the iOS 26 minimum (MOV-62/119/63)
 
-Under the owner's delegated continuation, use an immersive aspect-fit photo on a neutral surround. Adjust reveals a persistent, collapsible side inspector on expanded canvases; the expanded library is a grid beside a full-photo preview with an explicit Edit action. Camera and Look recipes remain separate work.
+Under the owner's delegated continuation, use an immersive aspect-fit photo on a neutral surround. On expanded canvases the editor shows every adjustment group in a persistent side inspector by default, dismissible with Adjust (an explicit choice survives folding); compact canvases keep the single ruler revealed by Adjust. The expanded library is a four-column grid beside a preview pane (photo, date, RAW/Edited) with an explicit Edit action, in the system appearance. Camera and Look recipes remain separate work.
 
 The Xcode 27.2 SDK declares ArrangementView, ReservedRegion, split layout sizing and toolbar axis behavior available from 27.1. Keep the iOS 26 deployment minimum and ordinary-iPhone layout behind justified availability guards, an exception to the general no-back-deployment-fallback rule. Use size classes and reserved regions, never model-name/size detection or hinge angles. Keep edit sessions, group/ruler selection and library preview selection above layout branches. Native folded/unfolded proof is required before calling MOV-62/63 acceptance complete.
 

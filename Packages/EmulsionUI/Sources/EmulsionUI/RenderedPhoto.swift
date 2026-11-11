@@ -4,7 +4,9 @@ import SwiftUI
 
 /// A photo developed and printed with its adjustments, or the untouched original for
 /// before/after, rendered off the main actor at the size it's shown.
-/// A filled frame (a thumbnail) waits as a quiet placeholder; a fitted one shows progress.
+/// Until the first render, it shows the caller's `placeholder` (an earlier frame of the same
+/// variant), then a cached thumbnail; failing those, a filled frame (a thumbnail) waits as a
+/// quiet placeholder and a fitted one shows progress.
 /// Re-renders when the edit or size changes, keeping the last image so slider drags don't flash
 /// and showing each render that finishes during a drag (`RenderOrder`).
 public struct RenderedPhoto: View {
@@ -12,6 +14,8 @@ public struct RenderedPhoto: View {
     private let adjustments: Adjustments
     private let contentMode: ContentMode
     private let showsOriginal: Bool
+    private let placeholder: CGImage?
+    private let onRender: ((CGImage) -> Void)?
 
     @Environment(\.renderService) private var renderService
     @Environment(\.displayScale) private var displayScale
@@ -19,11 +23,18 @@ public struct RenderedPhoto: View {
     @State private var failed = false
     @State private var order = RenderOrder()
 
-    public init(url: URL, adjustments: Adjustments, contentMode: ContentMode = .fit, showsOriginal: Bool = false) {
+    /// `onRender` receives each render as it is shown, so a caller can pass it back as
+    /// `placeholder` when this view is rebuilt in another layout.
+    public init(
+        url: URL, adjustments: Adjustments, contentMode: ContentMode = .fit, showsOriginal: Bool = false,
+        placeholder: CGImage? = nil, onRender: ((CGImage) -> Void)? = nil
+    ) {
         self.url = url
         self.adjustments = adjustments
         self.contentMode = contentMode
         self.showsOriginal = showsOriginal
+        self.placeholder = placeholder
+        self.onRender = onRender
     }
 
     public var body: some View {
@@ -36,10 +47,11 @@ public struct RenderedPhoto: View {
         .clipped()
     }
 
-    /// The last render, or until there is one, the cached thumbnail for this exact request:
-    /// a photo scrolled back into the library grid appears without a placeholder frame.
+    /// The last render, or until there is one, the caller's placeholder or the cached thumbnail
+    /// for this exact request: a photo scrolled back into the library grid appears without a
+    /// placeholder frame.
     @ViewBuilder private func content(_ request: Request) -> some View {
-        if let image = image ?? cachedThumbnail(request) {
+        if let image = image ?? placeholder ?? cachedThumbnail(request) {
             Image(decorative: image, scale: 1)
                 .resizable()
                 .aspectRatio(contentMode: contentMode)
@@ -74,6 +86,7 @@ public struct RenderedPhoto: View {
             guard order.shouldShow(ticket) else { return }
             image = rendered
             failed = false
+            onRender?(rendered)
         } catch is CancellationError {
         } catch {
             failed = image == nil

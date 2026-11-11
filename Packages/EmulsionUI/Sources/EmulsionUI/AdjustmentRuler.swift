@@ -6,6 +6,8 @@ import SwiftUI
 struct AdjustmentRuler: View {
     let control: AdjustmentControl
     @Binding var adjustments: Adjustments
+    /// Distinguishes rulers for UI tests when several are on screen.
+    var identifier = "adjustment-ruler"
     @State private var drag = RulerDrag()
 
     private let tickSpacing: CGFloat = 10
@@ -33,7 +35,7 @@ struct AdjustmentRuler: View {
         .accessibilityElement(children: .ignore)
         .accessibilityLabel(control.title)
         .accessibilityValue(control.formatted(value))
-        .accessibilityIdentifier("adjustment-ruler")
+        .accessibilityIdentifier(identifier)
         .accessibilityAdjustableAction { direction in
             switch direction {
             case .increment: set(value + control.increment)

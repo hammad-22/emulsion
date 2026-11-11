@@ -4,11 +4,15 @@ import SwiftUI
 
 /// The photo being edited, with nothing drawn over it. Touch and hold to see the original;
 /// `isHolding` tells the editor, which names what's on screen in its title.
+/// `lastEdit` and `onRenderEdit` only ever carry the edited render, never the original, so a
+/// rebuilt photo never flashes the wrong variant.
 struct ComparablePhoto: View {
     let url: URL
     let adjustments: Adjustments
     let isComparing: Bool
     @Binding var isHolding: Bool
+    var lastEdit: CGImage? = nil
+    var onRenderEdit: ((CGImage) -> Void)? = nil
 
     @GestureState private var isPressed = false
     /// Long enough that taps and slider reaches don't flash the original.
@@ -17,12 +21,15 @@ struct ComparablePhoto: View {
     private var showsOriginal: Bool { isComparing || isPressed }
 
     var body: some View {
-        RenderedPhoto(url: url, adjustments: adjustments, showsOriginal: showsOriginal)
-            .accessibilityLabel(showsOriginal ? "Original photo" : "Edited photo")
-            .accessibilityAddTraits(.isImage)
-            .gesture(hold)
-            .onChange(of: isPressed) { _, isPressed in isHolding = isPressed }
-            .sensoryFeedback(.impact(weight: .light), trigger: isPressed) { _, isPressed in isPressed }
+        RenderedPhoto(
+            url: url, adjustments: adjustments, showsOriginal: showsOriginal,
+            placeholder: showsOriginal ? nil : lastEdit, onRender: showsOriginal ? nil : onRenderEdit
+        )
+        .accessibilityLabel(showsOriginal ? "Original photo" : "Edited photo")
+        .accessibilityAddTraits(.isImage)
+        .gesture(hold)
+        .onChange(of: isPressed) { _, isPressed in isHolding = isPressed }
+        .sensoryFeedback(.impact(weight: .light), trigger: isPressed) { _, isPressed in isPressed }
     }
 
     /// True from the moment the hold is recognized until the finger lifts.
