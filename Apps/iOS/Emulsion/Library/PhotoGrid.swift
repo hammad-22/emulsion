@@ -2,11 +2,13 @@ import EmulsionKit
 import EmulsionUI
 import SwiftUI
 
-/// Square thumbnails edge to edge, like a contact sheet: three across on iPhone, more on
-/// wider canvases. A tap previews or opens an edit, or picks the photo while selecting.
+/// Square thumbnails edge to edge, like a contact sheet: three across on iPhone, or a fixed
+/// count beside the expanded library's preview. A tap previews or opens an edit, or picks the photo while selecting.
 struct PhotoGrid: View {
     @Binding var selection: LibrarySelection
     let transition: Namespace.ID
+    /// A fixed number of columns, or nil for as many 110 pt cells as fit.
+    var columnCount: Int? = nil
     var previewID: PhotoRecord.ID? = nil
     var edit: ((PhotoRecord.ID) -> Void)? = nil
     let open: (PhotoRecord.ID) -> Void
@@ -14,7 +16,12 @@ struct PhotoGrid: View {
     @Environment(PhotoStore.self) private var store
 
     /// Three columns on a 402 pt wide iPhone; more as the canvas widens.
-    private let columns = [GridItem(.adaptive(minimum: 110), spacing: FilmLabLayout.gridSpacing)]
+    private let adaptiveColumn = GridItem(.adaptive(minimum: 110), spacing: FilmLabLayout.gridSpacing)
+
+    private var columns: [GridItem] {
+        guard let columnCount else { return [adaptiveColumn] }
+        return Array(repeating: GridItem(.flexible(), spacing: FilmLabLayout.gridSpacing), count: columnCount)
+    }
 
     var body: some View {
         ScrollView {
@@ -47,7 +54,7 @@ private struct PhotoCell: View {
             PhotoThumbnail(url: store.url(for: photo), adjustments: photo.adjustments)
                 .overlay {
                     if isPreviewed && !selection.isActive {
-                        Rectangle().strokeBorder(.white, lineWidth: FilmLabLayout.hairline)
+                        Rectangle().strokeBorder(Color.primary, lineWidth: FilmLabLayout.hairline)
                     }
                 }
                 .overlay { if isSelected { Color.white.opacity(selectedWash) } }
