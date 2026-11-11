@@ -27,11 +27,15 @@ final class TestLibrary {
     private static let renderer = try? Renderer()
 
     let folder = URL.temporaryDirectory.appending(path: "EmulsionKitTests-\(UUID().uuidString)", directoryHint: .isDirectory)
-    let renderService = RenderService(renderer: TestLibrary.renderer)
+    let renderService = RenderService(renderer: TestLibrary.renderer, thumbnails: ThumbnailCache(purgesUnderMemoryPressure: false))
     lazy var store = PhotoStore(folder: folder, renderService: renderService)
 
     /// The same folder opened again, as on the next launch.
-    func reopened() -> PhotoStore { PhotoStore(folder: folder, renderService: RenderService(renderer: TestLibrary.renderer)) }
+    func reopened() -> PhotoStore {
+        PhotoStore(
+            folder: folder,
+            renderService: RenderService(renderer: TestLibrary.renderer, thumbnails: ThumbnailCache(purgesUnderMemoryPressure: false)))
+    }
 
     isolated deinit { try? FileManager.default.removeItem(at: folder) }
 }
