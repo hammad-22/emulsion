@@ -26,27 +26,26 @@ public struct AdjustmentInspector: View {
                             .foregroundStyle(.secondary)
                             .accessibilityAddTraits(.isHeader)
                         ForEach(section.controls) { control in
-                            InspectorRow(control: control, adjustments: $adjustments) {
-                                group = section
-                                selectedControls[section] = control.id
-                            }
+                            AdjustmentRuler(
+                                control: control, adjustments: $adjustments, identifier: "adjustment-ruler-\(control.id)", isCompact: true)
                         }
                     }
                 }
             }
             .padding(FilmLabLayout.inset)
-            .glassEffect(.regular, in: .rect(cornerRadius: FilmLabLayout.panelCorner))
         }
+        .clipShape(.rect(cornerRadius: FilmLabLayout.panelCorner))
+        .glassEffect(.regular, in: .rect(cornerRadius: FilmLabLayout.panelCorner))
+        .onChange(of: adjustments) { old, new in select(changedFrom: old, to: new) }
     }
-}
 
-private struct InspectorRow: View {
-    let control: AdjustmentControl
-    @Binding var adjustments: Adjustments
-    let onChange: () -> Void
-
-    var body: some View {
-        AdjustmentRuler(control: control, adjustments: $adjustments, identifier: "adjustment-ruler-\(control.id)")
-            .onChange(of: adjustments[keyPath: control.keyPath]) { onChange() }
+    /// A ruler move changes one control; Reset Edits changes several and keeps the selection.
+    private func select(changedFrom old: Adjustments, to new: Adjustments) {
+        let changed = AdjustmentGroup.allCases.flatMap { section in
+            section.controls.filter { old[keyPath: $0.keyPath] != new[keyPath: $0.keyPath] }.map { (section, $0.id) }
+        }
+        guard changed.count == 1, let (section, control) = changed.first else { return }
+        group = section
+        selectedControls[section] = control
     }
 }

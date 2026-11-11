@@ -8,10 +8,12 @@ struct AdjustmentRuler: View {
     @Binding var adjustments: Adjustments
     /// Distinguishes rulers for UI tests when several are on screen.
     var identifier = "adjustment-ruler"
+    /// One of several rulers in the inspector: a smaller readout over the minimum touch height.
+    var isCompact = false
     @State private var drag = RulerDrag()
 
     private let tickSpacing: CGFloat = 10
-    private let scaleHeight: CGFloat = 56
+    private var scaleHeight: CGFloat { isCompact ? FilmLabLayout.minimumControlHeight : 56 }
     private var value: Double { adjustments[keyPath: control.keyPath] }
     private var neutral: Double { Adjustments()[keyPath: control.keyPath] }
     private var tickCount: Int { Int(((control.range.upperBound - control.range.lowerBound) / control.increment).rounded()) }
@@ -51,7 +53,7 @@ struct AdjustmentRuler: View {
     private var title: some View { Text(control.title).font(.subheadline.weight(.medium)) }
 
     private var readout: some View {
-        Text(control.formatted(value)).font(.title2.weight(.medium)).monospacedDigit()
+        Text(control.formatted(value)).font((isCompact ? Font.body : .title2).weight(.medium)).monospacedDigit()
     }
 
     private var scale: some View {
