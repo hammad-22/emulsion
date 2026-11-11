@@ -57,7 +57,7 @@ Tests, all passing:
 - every camera log decodes its published 18% code to 0.18;
 - gamut matrices keep neutrals neutral;
 - the GPU input transform matches colour-science on every input, including display negatives and superwhite, in legal and full range;
-- visual regression (MOV-37): fixed renders (synthetic patch rows and spatial scenes, a display-referred chart, two frozen CC0 photos) stay within mean 0.2, p95 0.5, max 1.0 ΔE00 (CIEDE2000 on the 16-bit Display P3 output) of goldens the engine itself produced. It detects change, it does not prove correctness; +0.1 stop of exposure or warmth 0.2 on the chart already fails it;
+- visual regression (MOV-37): fixed renders (synthetic patch rows and spatial scenes, a display-referred chart, two frozen CC0 photos) stay within mean 0.2, p95 0.5, max 1.0 ΔE00 (CIEDE2000 on the 16-bit Display P3 output) of goldens the engine itself produced (local tone on the two photos: p99.9 in place of max, because a few isolated pixels differ between GPUs). It detects change, it does not prove correctness; +0.1 stop of exposure or warmth 0.2 on the chart already fails it;
 - 10-bit HEVC (legal and full range) and ProRes 422 HQ (legal) frames of S-Log3, LogC3, V-Log, Apple Log and HLG decode their gray, white and a chromatic patch to colour-science within the reference tolerance (2e-4 relative); a wrong range or matrix assumption fails, and the Y′CbCr conversion agrees with Core Image's own (within 1e-5 legal; full-range chroma differs by ~0.1%, Emulsion follows BT.2100).
 
 Tone scale of the stock, in output codes:

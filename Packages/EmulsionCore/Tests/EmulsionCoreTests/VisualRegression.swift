@@ -11,8 +11,12 @@ enum VisualRegression {
         let mean: Double
         let p95: Double
         let max: Double
+        /// Judge `max` on the 99.9th percentile: up to one pixel in a thousand may exceed it.
+        var allowsIsolatedOutliers = false
 
-        func accepts(_ s: ColorDifference.Summary) -> Bool { s.mean <= mean && s.p95 <= p95 && s.max <= max }
+        func accepts(_ s: ColorDifference.Summary) -> Bool {
+            s.mean <= mean && s.p95 <= p95 && (allowsIsolatedOutliers ? s.p999 : s.max) <= max
+        }
     }
 
     /// CIEDE2000 limits for every case. ΔE00 ≈ 1 is about one just-noticeable difference, so no
@@ -20,9 +24,19 @@ enum VisualRegression {
     /// (mean, p95). Measured noise (Apple M4 Max, `noiseFloorIsInsideTheThresholds`) is far below:
     /// the same case rendered twice is identical (0, grain included); a lazy vs materialized
     /// negative (gradient.default-look) differs by mean 0.008, p95 0.021, max 0.043; 16-bit
-    /// quantisation of chart24.neutral by mean 0.0009, max 0.0023. Exposure +0.1 stop moves
-    /// chart24.neutral by mean 1.27, max 1.85 and fails.
+    /// quantisation of chart24.neutral by mean 0.0009, max 0.0023. Across machines, GitHub's
+    /// runner (Apple Paravirtual device, macOS 26.7) differs from these M4 Max goldens by at most
+    /// max 0.26 (halation), seeded grain included; the one exception is local tone on photographs
+    /// (`photoLocalToneThresholds`). Exposure +0.1 stop moves chart24.neutral by mean 1.27,
+    /// max 1.85 and fails.
     static let thresholds = Thresholds(mean: 0.2, p95: 0.5, max: 1.0)
+    /// Local tone on real photographs only. GitHub's runner (Apple Paravirtual device, macOS 26.7)
+    /// renders 10–16 isolated pixels of 43,200 (0.04%) up to 4.67 ΔE00 away from an M4 Max on
+    /// macOS 27.2, with mean 0.005 and p95 0.019, grain on or off; synthetic local-tone cases
+    /// agree within 0.04. The suspect is Core Image's edge-preserving upsample of the local-tone
+    /// base (not proven). These cases keep mean and p95 and apply the per-pixel limit to the
+    /// 99.9th percentile.
+    static let photoLocalToneThresholds = Thresholds(mean: 0.2, p95: 0.5, max: 1.0, allowsIsolatedOutliers: true)
     /// ΔE00 shown as white in diff heat maps: twice the per-pixel limit.
     static let heatMapFullScale = 2.0
     /// Patch rows (one pixel high) are enlarged to cells this size in report images.
@@ -113,6 +127,7 @@ enum VisualRegression {
 
     struct Item {
         let name: String
+        var thresholds = VisualRegression.thresholds
         let render: () throws -> RegressionImage
     }
 
@@ -129,6 +144,8 @@ enum VisualRegression {
         let name: String
         let summary: ColorDifference.Summary?
         let status: Status
+        /// Judged with `Thresholds.allowsIsolatedOutliers`.
+        var allowsIsolatedOutliers = false
         /// The update wrote this case's golden, whether or not its pixels changed.
         var rewritten = false
     }
@@ -188,7 +205,7 @@ enum VisualRegression {
         let stored = store.golden(item.name)
         let golden = try? stored?.get()
         let comparison = golden.flatMap { compare($0, actual) }
-        let passes = comparison.map { thresholds.accepts($0.summary) } ?? false
+        let passes = comparison.map { item.thresholds.accepts($0.summary) } ?? false
         var outcome: Outcome
         switch mode {
         case .none:
@@ -198,7 +215,7 @@ enum VisualRegression {
                 let unreadable = stored != nil && golden == nil
                 Issue.record(
                     Comment(
-                        rawValue: failureMessage(item.name, status, comparison?.summary, unreadable: unreadable, regenerate: regenerate)))
+                        rawValue: failureMessage(item, status, comparison?.summary, unreadable: unreadable, regenerate: regenerate)))
             }
         case .failing, .all:
             let rewrite = mode == .all || !passes
@@ -207,6 +224,7 @@ enum VisualRegression {
             outcome = Outcome(name: item.name, summary: comparison?.summary, status: status)
             outcome.rewritten = rewrite
         }
+        outcome.allowsIsolatedOutliers = item.thresholds.allowsIsolatedOutliers
         if !outcome.status.isClean || writesAllImages {
             try files.writeImages(item.name, actual: actual, golden: golden, deltaE: comparison?.deltaE)
         }
@@ -214,14 +232,16 @@ enum VisualRegression {
     }
 
     private static func failureMessage(
-        _ name: String, _ status: Outcome.Status, _ summary: ColorDifference.Summary?, unreadable: Bool, regenerate: String
+        _ item: Item, _ status: Outcome.Status, _ summary: ColorDifference.Summary?, unreadable: Bool, regenerate: String
     ) -> String {
+        let (name, t) = (item.name, item.thresholds)
         let hint = "If the change is intended: \(regenerate)"
         if status == .missing { return "\(name): missing golden. \(hint)" }
         if unreadable { return "\(name): unreadable golden (not a 16-bit RGB PNG). \(hint)" }
         guard let s = summary else { return "\(name): golden and render differ in size. \(hint)" }
-        let measured = String(format: "mean %.3f, p95 %.3f, max %.3f", s.mean, s.p95, s.max)
-        return "\(name): ΔE00 \(measured) exceeds mean \(thresholds.mean), p95 \(thresholds.p95), max \(thresholds.max). \(hint)"
+        let measured = String(format: "mean %.3f, p95 %.3f, p99.9 %.3f, max %.3f", s.mean, s.p95, s.p999, s.max)
+        let limit = t.allowsIsolatedOutliers ? "p99.9" : "max"
+        return "\(name): ΔE00 \(measured) exceeds mean \(t.mean), p95 \(t.p95), \(limit) \(t.max). \(hint)"
     }
 
     static func write(_ image: RegressionImage, to url: URL) throws {

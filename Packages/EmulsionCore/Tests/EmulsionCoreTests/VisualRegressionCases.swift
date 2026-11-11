@@ -12,6 +12,7 @@ struct RegressionCase: Sendable {
     let adjustments: Adjustments
     /// `.displayReferred` cases give a finished picture; it is re-rendered from a scene estimate.
     var contract: InputContract = .sceneReferred
+    var thresholds = VisualRegression.thresholds
 }
 
 extension RegressionCase {
@@ -79,7 +80,7 @@ extension RegressionCase {
     }
 
     private static let graded = adjust {
-        ($0.exposure, $0.warmth, $0.color, $0.highlights, $0.shadows) = (0.7, 0.3, 0.4, 0.5, 0.4)
+        ($0.exposure, $0.warmth, $0.color) = (0.7, 0.3, 0.4)
         ($0.grain, $0.halation, $0.seed) = (0.6, 0.6, 11)
     }
 
@@ -87,6 +88,9 @@ extension RegressionCase {
         [
             RegressionCase(name: "\(scene.rawValue).default-look", scene: { try scene.image() }, adjustments: defaultLook),
             RegressionCase(name: "\(scene.rawValue).graded", scene: { try scene.image() }, adjustments: graded),
+            RegressionCase(
+                name: "\(scene.rawValue).localtone", scene: { try scene.image() },
+                adjustments: adjust { ($0.highlights, $0.shadows) = (0.5, 0.4) }, thresholds: VisualRegression.photoLocalToneThresholds),
         ]
     }
 }

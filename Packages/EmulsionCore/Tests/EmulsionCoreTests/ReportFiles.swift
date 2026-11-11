@@ -54,7 +54,7 @@ struct ReportFiles {
         let t = report.thresholds
         let header = [
             "### Visual regression: \(report.title)", "",
-            "Thresholds (ΔE00): mean ≤ \(t.mean), p95 ≤ \(t.p95), max ≤ \(t.max). "
+            "Thresholds (ΔE00): mean ≤ \(t.mean), p95 ≤ \(t.p95), max ≤ \(t.max); cases marked * use p99.9 ≤ \(t.max). "
                 + "Host \(report.host), GPU \(report.gpu), \(report.os). "
                 + String(format: "%d cases in %.1f s.", report.cases.count, report.seconds),
         ]
@@ -74,12 +74,12 @@ struct ReportFiles {
     }
 
     private static func table(_ outcomes: [VisualRegression.Outcome]) -> [String] {
-        ["", "| Case | Mean | p95 | Max | Status |", "| --- | ---: | ---: | ---: | --- |"]
-            + outcomes.map { "| \($0.name) | \(columns($0.summary)) | \($0.status.rawValue) |" }
+        ["", "| Case | Mean | p95 | p99.9 | Max | Status |", "| --- | ---: | ---: | ---: | ---: | --- |"]
+            + outcomes.map { "| \($0.name)\($0.allowsIsolatedOutliers ? " *" : "") | \(columns($0.summary)) | \($0.status.rawValue) |" }
     }
 
     private static func columns(_ summary: ColorDifference.Summary?) -> String {
-        guard let s = summary else { return "– | – | –" }
-        return String(format: "%.4f | %.4f | %.4f", s.mean, s.p95, s.max)
+        guard let s = summary else { return "– | – | – | –" }
+        return String(format: "%.4f | %.4f | %.4f | %.4f", s.mean, s.p95, s.p999, s.max)
     }
 }

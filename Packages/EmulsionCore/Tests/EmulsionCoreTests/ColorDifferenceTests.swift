@@ -38,6 +38,9 @@ struct ColorDifferenceTests {
         #expect(ColorDifference.Summary([0.3]).p95 == 0.3)
         #expect(ColorDifference.Summary((1...100).map(Double.init)).p95 == 95)
         #expect(ColorDifference.Summary((1...21).map(Double.init)).p95 == 20)
+        #expect(summary.p999 == 20)
+        #expect(ColorDifference.Summary((1...1000).map(Double.init)).p999 == 999)
+        #expect(ColorDifference.Summary((1...2001).map(Double.init)).p999 == 1999)
     }
 
     @Test func chartFixtureMatchesColourScience() throws {

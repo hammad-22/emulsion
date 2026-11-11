@@ -12,7 +12,9 @@ import simd
 struct VisualRegressionTests {
     @Test func rendersMatchGoldens() throws {
         let items = RegressionCase.all.map { c in
-            VisualRegression.Item(name: c.name) { try VisualRegression.render(c.scene(), c.adjustments, contract: c.contract) }
+            VisualRegression.Item(name: c.name, thresholds: c.thresholds) {
+                try VisualRegression.render(c.scene(), c.adjustments, contract: c.contract)
+            }
         }
         try VisualRegression.run(
             "goldens", items, store: .repository, reportDirectory: VisualRegression.reportDirectory,
@@ -52,6 +54,19 @@ struct VisualRegressionTests {
                 names.contains(name),
                 "\(name).png belongs to no case: delete \(VisualRegression.sourceGoldens.appending(path: file.lastPathComponent).path)")
         }
+    }
+
+    /// The CI failure (hammad-22/emulsion#31): 15 isolated pixels of 43,200 up to 4.67 ΔE00 off
+    /// fail the strict thresholds and pass the photo local-tone ones; two pixels in a thousand fail both.
+    @Test func isolatedOutliersPassOnlyThePhotoLocalToneThresholds() {
+        let pixelCount = 43_200
+        func summary(outliers: Int) -> ColorDifference.Summary {
+            ColorDifference.Summary((0..<pixelCount).map { $0 < outliers ? 4.67 : 0.005 })
+        }
+        let seenOnCI = summary(outliers: 15)
+        #expect(!VisualRegression.thresholds.accepts(seenOnCI))
+        #expect(VisualRegression.photoLocalToneThresholds.accepts(seenOnCI))
+        #expect(!VisualRegression.photoLocalToneThresholds.accepts(summary(outliers: pixelCount / 500)))
     }
 
     // MARK: Noise floor

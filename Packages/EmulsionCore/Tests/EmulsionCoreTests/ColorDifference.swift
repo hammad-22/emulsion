@@ -95,22 +95,25 @@ enum ColorDifference {
         let mean: Double
         /// Nearest-rank 95th percentile: sorted[⌈0.95·n⌉ − 1].
         let p95: Double
+        /// Nearest-rank 99.9th percentile: what is left after ignoring the worst pixel in a thousand.
+        let p999: Double
         let max: Double
         let count: Int
 
         init(_ values: [Double]) {
             count = values.count
             guard !values.isEmpty else {
-                (mean, p95, max) = (0, 0, 0)
+                (mean, p95, p999, max) = (0, 0, 0, 0)
                 return
             }
             let sorted = values.sorted()
             mean = values.reduce(0, +) / Double(values.count)
-            p95 = sorted[Self.nearestRank(percent: 95, count: values.count) - 1]
+            p95 = sorted[Self.nearestRank(perMille: 950, count: values.count) - 1]
+            p999 = sorted[Self.nearestRank(perMille: 999, count: values.count) - 1]
             max = sorted[sorted.count - 1]
         }
 
-        /// ⌈percent · count / 100⌉ in integers, so no rounding error can move the rank.
-        private static func nearestRank(percent: Int, count: Int) -> Int { (percent * count + 99) / 100 }
+        /// ⌈perMille · count / 1000⌉ in integers, so no rounding error can move the rank.
+        private static func nearestRank(perMille: Int, count: Int) -> Int { (perMille * count + 999) / 1000 }
     }
 }
