@@ -113,6 +113,9 @@ public final class Renderer: @unchecked Sendable {
     /// Display P3 file with the look baked in; source metadata (GPS etc.) is not carried over.
     public func export(_ image: CIImage, format: ExportFormat, quality: Double = 0.95) throws -> Data {
         let options = [CIImageRepresentationOption(rawValue: kCGImageDestinationLossyCompressionQuality as String): quality]
+        // Core Image writes an image's properties into the file, and they survive the film
+        // render, so the source's metadata (GPS included) is cleared first (MOV-126).
+        let image = image.settingProperties([:])
         let data: Data?
         switch format {
         case .jpeg: data = context.jpegRepresentation(of: image, colorSpace: Self.outputSpace, options: options)
