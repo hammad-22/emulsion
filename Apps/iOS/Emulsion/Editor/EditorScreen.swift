@@ -24,8 +24,7 @@ struct EditorScreen: View {
     }
 }
 
-/// One selected adjustment, revealed beside the photo in the current landscape fallback
-/// or below it in portrait. Duo's reserved-region layout remains MOV-119.
+/// Owns edit and control selection independently of the current display arrangement.
 private struct EditorContent: View {
     @Bindable var session: EditSession
 
@@ -46,17 +45,19 @@ private struct EditorContent: View {
 
     var body: some View {
         GeometryReader { geometry in
-            layout {
-                ComparablePhoto(url: session.url, adjustments: session.adjustments, isComparing: isComparing, isHolding: $isHolding)
-                    .padding(isWide ? FilmLabLayout.inset : 0)
-                controls
-                    .disabled(showsOriginal)
-                    .frame(
-                        maxWidth: isWide ? (showsAdjustments ? sidePanelWidth : 0) : .infinity,
-                        maxHeight: showsAdjustments ? (isWide ? .infinity : geometry.size.height * maximumPanelFraction) : 0
-                    )
-                    .fixedSize(horizontal: false, vertical: !isWide)
-                    .layoutPriority(1)
+            if #available(iOS 27.1, *),
+                horizontalSizeClass == .regular
+                    || !geometry.reservedRegions(kind: .division, options: .includeInactive).isEmpty
+            {
+                ArrangementWorkspace(showsControls: showsAdjustments) {
+                    photo.padding(FilmLabLayout.inset)
+                } controls: {
+                    controls.disabled(showsOriginal)
+                }
+            } else if #available(iOS 27.1, *), !geometry.reservedRegions(kind: .occlusion).isEmpty {
+                UnobscuredContent { compactLayout(height: geometry.size.height) }
+            } else {
+                compactLayout(height: geometry.size.height)
             }
         }
         .background(.black)
@@ -66,6 +67,24 @@ private struct EditorContent: View {
         .navigationTitle(showsOriginal ? Text("Original") : Text(""))
         .navigationBarTitleDisplayMode(.inline)
         .toolbar { EditorToolbar(session: session, isComparing: $isComparing, showsAdjustments: $showsAdjustments) }
+    }
+
+    private var photo: some View {
+        ComparablePhoto(url: session.url, adjustments: session.adjustments, isComparing: isComparing, isHolding: $isHolding)
+    }
+
+    private func compactLayout(height: CGFloat) -> some View {
+        layout {
+            photo.padding(isWide ? FilmLabLayout.inset : 0)
+            controls
+                .disabled(showsOriginal)
+                .frame(
+                    maxWidth: isWide ? (showsAdjustments ? sidePanelWidth : 0) : .infinity,
+                    maxHeight: showsAdjustments ? (isWide ? .infinity : height * maximumPanelFraction) : 0
+                )
+                .fixedSize(horizontal: false, vertical: !isWide)
+                .layoutPriority(1)
+        }
     }
 
     private var controls: some View {

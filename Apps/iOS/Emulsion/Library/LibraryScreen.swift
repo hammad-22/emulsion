@@ -8,6 +8,8 @@ struct LibraryScreen: View {
     @Environment(PhotoStore.self) private var store
     @State private var path: [PhotoRecord.ID] = []
     @State private var selection = LibrarySelection()
+    @State private var previewID: PhotoRecord.ID?
+    @Environment(\.horizontalSizeClass) private var horizontalSizeClass
     @State private var importError: String?
     @Namespace private var editorTransition
 
@@ -17,7 +19,7 @@ struct LibraryScreen: View {
                 if store.photos.isEmpty {
                     LibraryEmptyState(error: $importError)
                 } else {
-                    PhotoGrid(selection: $selection, transition: editorTransition) { path.append($0) }
+                    libraryContent
                 }
             }
             .navigationTitle(selection.isActive ? selection.title : Text("Library"))
@@ -39,11 +41,47 @@ struct LibraryScreen: View {
             } message: {
                 Text($0)
             }
+            .onChange(of: store.photos.map(\.id)) { _, ids in
+                if let previewID, !ids.contains(previewID) { self.previewID = nil }
+            }
             .onChange(of: store.photos.isEmpty) { _, isEmpty in
                 if isEmpty { selection = LibrarySelection() }
             }
         }
     }
+
+    private var libraryContent: some View {
+        GeometryReader { geometry in
+            if #available(iOS 27.1, *),
+                horizontalSizeClass == .regular
+                    || !geometry.reservedRegions(kind: .division, options: .includeInactive).isEmpty
+            {
+                expandedLibrary
+            } else {
+                PhotoGrid(selection: $selection, transition: editorTransition) { id in
+                    previewID = id
+                    openEditor(id)
+                }
+            }
+        }
+    }
+
+    @available(iOS 27.1, *)
+    private var expandedLibrary: some View {
+        ArrangementView {
+            PhotoGrid(selection: $selection, transition: editorTransition, previewID: previewID ?? store.photos.first?.id, edit: openEditor)
+            {
+                previewID = $0
+            }
+        } secondary: {
+            UnobscuredContent {
+                LibraryPreview(photoID: previewID ?? store.photos.first?.id, edit: openEditor)
+            }
+        }
+        .arrangementViewStyle(.split)
+    }
+
+    private func openEditor(_ id: PhotoRecord.ID) { path.append(id) }
 
     private var photoCount: Text {
         store.photos.isEmpty ? Text("") : Text("^[\(store.photos.count) photo](inflect: true)")

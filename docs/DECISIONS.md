@@ -42,3 +42,11 @@ The contrast with Dehancer iOS: free versus subscription, open versus closed, an
 | iPhone Duo | Equal priority with regular iPhones; unfolded layouts use the whole landscape canvas (MOV-119). |
 | Repo layout | One monorepo: `Packages/` (EmulsionCore engine, EmulsionKit, EmulsionUI), `Apps/` (iOS, macOS), `Tools/`, `docs/`. Revisit as it grows (MOV-120). |
 | Agent rules | `AGENTS.md` is the single source for Codex and Claude; Linear issues are living documents with a "For agents" section. |
+
+## 10 Nov 2026 — Duo layouts retain the iOS 26 minimum (MOV-62/119/63)
+
+Under the owner's delegated continuation, use an immersive aspect-fit photo on a neutral surround. Adjust reveals a persistent, collapsible side inspector on expanded canvases; the expanded library is a grid beside a full-photo preview with an explicit Edit action. Camera and Look recipes remain separate work.
+
+The Xcode 27.2 SDK declares ArrangementView, ReservedRegion, split layout sizing and toolbar axis behavior available from 27.1. Keep the iOS 26 deployment minimum and ordinary-iPhone layout behind justified availability guards, an exception to the general no-back-deployment-fallback rule. Use size classes and reserved regions, never model-name/size detection or hinge angles. Keep edit sessions, group/ruler selection and library preview selection above layout branches. Native folded/unfolded proof is required before calling MOV-62/63 acceptance complete.
+
+Sources: [ArrangementView](https://developer.apple.com/documentation/swiftui/arrangementview), [ReservedRegion](https://developer.apple.com/documentation/swiftui/reservedregion), [adaptive layouts](https://developer.apple.com/videos/play/tech-talks/111463/), [system vertical bars](https://developer.apple.com/videos/play/tech-talks/111462/). Checked against installed arm64 Simulator and device Swift interfaces, Xcode 27.2 (27B52).

@@ -18,12 +18,7 @@ struct EditorToolbar: ToolbarContent {
 
     var body: some ToolbarContent {
         ToolbarItem(placement: .bottomBar) {
-            Button {
-                showsAdjustments.toggle()
-            } label: {
-                Label(showsAdjustments ? "Hide Adjustments" : "Adjust", systemImage: "dial.low")
-            }
-            .labelStyle(.titleAndIcon)
+            adjustmentButton
         }
         ToolbarItemGroup(placement: .topBarTrailing) {
             // Neutral like the rest of the editor: no accent color beside the photograph.
@@ -56,6 +51,22 @@ struct EditorToolbar: ToolbarContent {
                 } message: {
                     Text("The original file and its edits are removed from Emulsion.")
                 }
+        }
+    }
+
+    @ViewBuilder private var adjustmentButton: some View {
+        if #available(iOS 27.1, *) {
+            adjustmentAction
+        } else {
+            adjustmentAction.labelStyle(.titleAndIcon)
+        }
+    }
+
+    private var adjustmentAction: some View {
+        Button {
+            showsAdjustments.toggle()
+        } label: {
+            Label(showsAdjustments ? "Hide Adjustments" : "Adjust", systemImage: "dial.low")
         }
     }
 

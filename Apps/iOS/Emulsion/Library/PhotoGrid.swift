@@ -3,10 +3,12 @@ import EmulsionUI
 import SwiftUI
 
 /// Square thumbnails edge to edge, like a contact sheet: three across on iPhone, more on
-/// wider canvases. Each one zooms into the editor, or is picked while selecting.
+/// wider canvases. A tap previews or opens an edit, or picks the photo while selecting.
 struct PhotoGrid: View {
     @Binding var selection: LibrarySelection
     let transition: Namespace.ID
+    var previewID: PhotoRecord.ID? = nil
+    var edit: ((PhotoRecord.ID) -> Void)? = nil
     let open: (PhotoRecord.ID) -> Void
 
     @Environment(PhotoStore.self) private var store
@@ -18,7 +20,7 @@ struct PhotoGrid: View {
         ScrollView {
             LazyVGrid(columns: columns, spacing: FilmLabLayout.gridSpacing) {
                 ForEach(store.photos) { photo in
-                    PhotoCell(photo: photo, selection: $selection, open: open)
+                    PhotoCell(photo: photo, selection: $selection, open: open, isPreviewed: previewID == photo.id, edit: edit ?? open)
                         .matchedTransitionSource(id: photo.id, in: transition)
                 }
             }
@@ -31,6 +33,9 @@ private struct PhotoCell: View {
     @Binding var selection: LibrarySelection
     let open: (PhotoRecord.ID) -> Void
 
+    let isPreviewed: Bool
+    let edit: (PhotoRecord.ID) -> Void
+
     @Environment(PhotoStore.self) private var store
 
     private var isSelected: Bool { selection.photos.contains(photo.id) }
@@ -40,6 +45,11 @@ private struct PhotoCell: View {
             if selection.isActive { selection.toggle(photo.id) } else { open(photo.id) }
         } label: {
             PhotoThumbnail(url: store.url(for: photo), adjustments: photo.adjustments)
+                .overlay {
+                    if isPreviewed && !selection.isActive {
+                        Rectangle().strokeBorder(.white, lineWidth: FilmLabLayout.hairline)
+                    }
+                }
                 .overlay { if isSelected { Color.white.opacity(selectedWash) } }
                 .overlay(alignment: .bottomTrailing) {
                     if selection.isActive { SelectionBadge(isSelected: isSelected) }
@@ -48,10 +58,10 @@ private struct PhotoCell: View {
         .buttonStyle(.plain)
         .accessibilityLabel(Text("Photo from \(photo.created, format: .dateTime.day().month().year())"))
         .accessibilityValue(photo.isEdited ? Text("Edited") : Text(""))
-        .accessibilityAddTraits(isSelected ? .isSelected : [])
+        .accessibilityAddTraits(isSelected || (!selection.isActive && isPreviewed) ? .isSelected : [])
         .contextMenu {
             if !selection.isActive {
-                Button("Edit", systemImage: "slider.horizontal.3") { open(photo.id) }
+                Button("Edit", systemImage: "slider.horizontal.3") { edit(photo.id) }
                 Button("Select", systemImage: "checkmark.circle") { selection.begin(with: photo.id) }
                 Button("Delete", systemImage: "trash", role: .destructive) { selection.pendingDeletion = [photo.id] }
             }

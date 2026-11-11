@@ -17,6 +17,10 @@ struct LibraryToolbar: ToolbarContent {
             }
         }
         ToolbarSpacer(.flexible, placement: .bottomBar)
+        importOrDelete.preferVerticalAxis()
+    }
+
+    private var importOrDelete: some ToolbarContent {
         ToolbarItem(placement: .bottomBar) {
             if selection.isActive {
                 Button("Delete", systemImage: "trash", role: .destructive) { selection.pendingDeletion = selection.photos }
