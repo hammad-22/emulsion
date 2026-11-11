@@ -2,9 +2,17 @@ import Foundation
 import simd
 
 /// The stock Emulsion prints with, plus the texture and control constants the renderer uses.
-/// The color and tone system itself is `FilmModel`.
+/// The color and tone system itself is `FilmModel`; its parameters come from a stock file.
 public enum FilmLook {
-    public static let stock = FilmModel()
+    /// The default stock, `Resources/Stocks/emulsion-default.json`.
+    public static let stock: FilmModel = {
+        do throws(EmulsionError) {
+            return try FilmModel(stock: .bundled(named: "emulsion-default"))
+        } catch {
+            // The default ships inside the engine and is tested, so failing here is a build mistake, not user input.
+            fatalError("The bundled default stock is unusable: \(error.developerDescription)")
+        }
+    }()
     /// Halation threshold in scene-linear luminance (~+3.5 stops over mid-gray).
     public static let halationThreshold = 2.0
     /// Halation: a tight core plus a soft skirt, radii as fractions of the long edge.

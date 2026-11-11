@@ -12,7 +12,7 @@ iOS 26 / macOS 26 only, iPhone 17 Pro and iPhone Duo as targets. Swift 6.4 toolc
 
 ## Layout
 - `Packages/EmulsionCore/`: the engine package. Every look decision lives here.
-  - `Sources/EmulsionCore/`: film math (`FilmModel`), input transforms (`ColorSpaces`), develop (`Developer`), render graph and export (`Renderer`), stock and texture constants (`FilmLook`), kernel argument packing (`FilmModel+Kernel`).
+  - `Sources/EmulsionCore/`: film math (`FilmModel`), input transforms (`ColorSpaces`), develop (`Developer`), render graph and export (`Renderer`), stock files (`Resources/Stocks/*.json`, loaded through `FilmStock`; the default is `FilmLook.stock`), texture constants (`FilmLook`), kernel argument packing (`FilmModel+Kernel`).
   - `Kernels/Emulsion.ci.metal`: GPU kernels; must match the Swift mirror. Compiled `.metallib`s are checked in under `Resources/Kernels/`.
   - `Sources/EmulsionFixtures/`: synthetic test images. `Tests/`: the test suite, with visual regression goldens in `Tests/EmulsionCoreTests/Goldens/` and frozen CC0 photos in `Scenes/`.
   - `Sources/EmulsionFit/`: offline stock-data target: per-stock provenance manifests in `Resources/StockData/<stock>/`, the loader and checks. The traced curve CSVs are not in the repo (`docs/DECISIONS.md`, 12 Nov 2026): they stay in a local folder, pinned by SHA-256 in the manifests; never commit them. Not a library product, so no app can link it. The tracing tools are in `Tools/stock-digitizing/`.

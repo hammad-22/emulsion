@@ -1,0 +1,22 @@
+{
+  "formatVersion": 1,
+  "name": "Emulsion Default",
+  "provenance": {
+    "source": "Hand-tuned in the engine; not fitted to any datasheet.",
+    "notes": ["Artistic/approximated parameters, see docs/FILM-THEORY.md §7."]
+  },
+  "negative": {
+    "sensitivity": [[1.07, -0.05, -0.02], [-0.04, 1.08, -0.04], [-0.01, -0.07, 1.08]],
+    "gamma": [0.60, 0.62, 0.65],
+    "densityRange": 3.0,
+    "exposureOffset": [0.45, 0.45, 0.45]
+  },
+  "print": {
+    "gamma": [2.20, 2.15, 2.05],
+    "minimumDensity": 0.06,
+    "densityRange": 3.3,
+    "shape": 0.5,
+    "dyes": [[0.94, 0.05, 0.01], [0.04, 0.90, 0.06], [0.01, 0.07, 0.92]]
+  },
+  "rendering": { "highlightChromaRetention": 0.6, "middleGrayOut": 0.17 }
+}
