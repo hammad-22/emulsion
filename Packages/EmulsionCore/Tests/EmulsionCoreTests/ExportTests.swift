@@ -54,7 +54,6 @@ import UniformTypeIdentifiers
         // Exports are written upright: no orientation tag, or "up" (1).
         let orientation = properties[kCGImagePropertyOrientation] as? UInt32
         #expect(orientation == nil || orientation == CGImagePropertyOrientation.up.rawValue)
-        #expect(properties[kCGImagePropertyGPSDictionary] == nil, "source metadata isn't carried over")
 
         // The decoder, not just the metadata, must see Display P3 at the stated depth.
         let decoded = try #require(CGImageSourceCreateImageAtIndex(source, 0, nil))
@@ -69,5 +68,45 @@ import UniformTypeIdentifiers
             let worst = max(abs(error.x), abs(error.y), abs(error.z)) * 255
             #expect(worst <= expected.tolerance, "patch \(index): \(values[centre]) vs \(patch)")
         }
+    }
+
+    /// The app's path for a portrait photo with a location: file → develop → render → export.
+    /// The file is tagged Display P3, upright (the develop already rotated the pixels, so the
+    /// source's orientation tag must not rotate them again), and carries no location.
+    @Test(arguments: formats) func exportsOfACameraPhotoAreUprightWithoutLocation(_ expected: Expected) throws {
+        let renderer = EmulsionTestCase.sharedRenderer
+        let developed = try renderer.developer.develop(Self.cameraJPEG())
+        let data = try renderer.export(renderer.render(developed, .neutral), format: expected.format)
+        let source = try #require(CGImageSourceCreateWithData(data as CFData, nil))
+        let properties = try #require(CGImageSourceCopyPropertiesAtIndex(source, 0, nil) as? [CFString: Any])
+
+        #expect(properties[kCGImagePropertyProfileName] as? String == "Display P3")
+        #expect(properties[kCGImagePropertyDepth] as? Int == expected.bitDepth)
+        #expect(properties[kCGImagePropertyGPSDictionary] == nil)
+        let orientation = properties[kCGImagePropertyOrientation] as? UInt32
+        #expect(orientation == nil || orientation == CGImagePropertyOrientation.up.rawValue)
+        #expect(properties[kCGImagePropertyPixelWidth] as? Int == Self.height, "rotated to portrait once")
+        #expect(properties[kCGImagePropertyPixelHeight] as? Int == Self.width)
+    }
+
+    /// A camera-style JPEG of the patch scene, shot in portrait (stored landscape, tagged
+    /// "rotate 90° clockwise to view") with a GPS position.
+    static func cameraJPEG() throws -> Data {
+        let context = CIContext()
+        let scene = try #require(context.createCGImage(Self.image, from: Self.image.extent))
+        let data = NSMutableData()
+        let destination = try #require(CGImageDestinationCreateWithData(data, UTType.jpeg.identifier as CFString, 1, nil))
+        let location = [kCGImagePropertyGPSLatitude: 51.5, kCGImagePropertyGPSLatitudeRef: "N"] as CFDictionary
+        let metadata =
+            [
+                kCGImagePropertyGPSDictionary: location,
+                kCGImagePropertyOrientation: CGImagePropertyOrientation.right.rawValue,
+            ] as CFDictionary
+        CGImageDestinationAddImage(destination, scene, metadata)
+        #expect(CGImageDestinationFinalize(destination))
+        let written = try #require(CGImageSourceCreateWithData(data, nil))
+        let writtenProperties = CGImageSourceCopyPropertiesAtIndex(written, 0, nil) as? [CFString: Any]
+        #expect(writtenProperties?[kCGImagePropertyGPSDictionary] != nil, "the fixture must carry a location")
+        return data as Data
     }
 }
