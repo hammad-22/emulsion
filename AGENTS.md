@@ -14,7 +14,7 @@ iOS 26 / macOS 26 only, iPhone 17 Pro and iPhone Duo as targets. Swift 6.4 toolc
 - `Packages/EmulsionCore/`: the engine package. Every look decision lives here.
   - `Sources/EmulsionCore/`: film math (`FilmModel`), input transforms (`ColorSpaces`), develop (`Developer`), render graph and export (`Renderer`), stock and texture constants (`FilmLook`), kernel argument packing (`FilmModel+Kernel`).
   - `Kernels/Emulsion.ci.metal`: GPU kernels; must match the Swift mirror. Compiled `.metallib`s are checked in under `Resources/Kernels/`.
-  - `Sources/EmulsionFixtures/`: synthetic test images. `Tests/`: the test suite.
+  - `Sources/EmulsionFixtures/`: synthetic test images. `Tests/`: the test suite, with visual regression goldens in `Tests/EmulsionCoreTests/Goldens/` and frozen CC0 photos in `Scenes/`.
 - `Packages/EmulsionKit/`: shared app logic for iOS and Mac (library, `RenderService`, editor controls, settings, export, sample photos). No UI.
 - `Packages/EmulsionUI/`: shared SwiftUI components (rendered photo, sliders, photo import).
 - `Apps/iOS/`: the iOS app (`Emulsion.xcodeproj`, sources in `Emulsion/`, UI walkthrough in `EmulsionUITests/`). Library → editor today; the camera comes with MOV-60.
@@ -29,8 +29,10 @@ sh Tools/build-kernels.sh                                    # after any .metal 
 (cd Packages/EmulsionCore && swift test)                     # must stay green
 (cd Packages/EmulsionKit && swift test)                      # app logic; also on iOS, see its AGENTS.md
 (cd Packages/EmulsionUI && swift test)                       # shared control interaction tests
-.venv/bin/python -I Tools/color-references/generate_input_references.py  # after changing reference samples (pip install -r Tools/color-references/requirements.txt)
+.venv/bin/python -I Tools/color-references/generate_input_references.py    # after changing input reference samples
+.venv/bin/python -I Tools/color-references/generate_delta_e_references.py  # after changing ΔE / chart references (both: pip install -r Tools/color-references/requirements.txt)
 (cd Packages/EmulsionCore && EMULSION_PERF=1 swift test --filter PerformanceProbe)  # Mac timings
+(cd Packages/EmulsionCore && EMULSION_UPDATE_GOLDENS=1 swift test --filter VisualRegression)  # accept an intended look change (Tests/AGENTS.md)
 swift format lint --recursive Packages Apps Tools            # style (config: .swift-format)
 ```
 
