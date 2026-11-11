@@ -16,12 +16,17 @@ public actor RenderService {
     /// windows) reuse a cached develop instead of decoding the RAW again for every size.
     private let previewSizeStep: CGFloat = 256
     private nonisolated let thumbnails: ThumbnailCache
+    private nonisolated let latestRenders: LatestRenderCache
 
     /// Tests pass one renderer to every service so they don't each start a GPU context
-    /// (MOV-127), and thumbnails the system never purges so caching is checkable (MOV-130).
-    init(renderer: Renderer? = nil, thumbnails: ThumbnailCache = ThumbnailCache()) {
+    /// (MOV-127), and caches the system never purges so caching is checkable (MOV-130).
+    init(
+        renderer: Renderer? = nil, thumbnails: ThumbnailCache = ThumbnailCache(),
+        latestRenders: LatestRenderCache = LatestRenderCache()
+    ) {
         self.renderer = renderer
         self.thumbnails = thumbnails
+        self.latestRenders = latestRenders
     }
 
     private func engine() throws -> Renderer {
@@ -59,7 +64,14 @@ public actor RenderService {
         let renderer = try engine()
         let image = try renderer.cgImage(renderer.render(negative(url, maxDimension: maxDimension), adjustments))
         thumbnails.keep(image, url, adjustments, maxDimension: maxDimension)
+        latestRenders.keep(image, url, maxDimension: maxDimension)
         return image
+    }
+
+    /// The last editor-sized film render of this photo, whatever its edit or size: a stand-in
+    /// while a rebuilt view renders again. Never an original. Safe to call from the main actor.
+    public nonisolated func latestRender(_ url: URL) -> CGImage? {
+        latestRenders.image(url)
     }
 
     /// A thumbnail already rendered with exactly this edit, if it's still cached. Safe to
@@ -98,6 +110,7 @@ public actor RenderService {
         for key in previews.keys where key.hasPrefix(prefix) { previews[key] = nil }
         lruKeys.removeAll { $0.hasPrefix(prefix) }
         thumbnails.removeAll()
+        latestRenders.remove(url)
     }
 
     /// Cache keys, least recently developed first; for tests.

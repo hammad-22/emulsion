@@ -51,6 +51,22 @@ extension RenderServiceTests {
         #expect(service.cachedThumbnail(url, .init(), maxDimension: 300) == nil)
     }
 
+    @Test func latestEditorRenderIsKeptUntilThePhotoIsForgotten() async throws {
+        let library = TestLibrary()
+        let url = library.store.url(for: try library.store.add(TestPhoto.jpeg, fileExtension: "jpg"))
+        let service = library.renderService
+
+        _ = try await service.original(url, maxDimension: 900)
+        #expect(service.latestRender(url) == nil, "an original is never a stand-in for the edit")
+        let rendered = try await service.image(url, .init(), maxDimension: 900)
+        #expect(service.latestRender(url) === rendered)
+        _ = try await service.image(url, .init(), maxDimension: 300)
+        #expect(service.latestRender(url) === rendered, "thumbnails don't replace it")
+
+        await service.forget(url)
+        #expect(service.latestRender(url) == nil)
+    }
+
     @Test func sameNamedPhotosInDifferentFoldersHaveSeparateCaches() async throws {
         let library = TestLibrary()
         _ = library.store

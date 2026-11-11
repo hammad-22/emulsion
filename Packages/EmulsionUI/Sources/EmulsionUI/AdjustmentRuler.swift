@@ -6,10 +6,18 @@ import SwiftUI
 struct AdjustmentRuler: View {
     let control: AdjustmentControl
     @Binding var adjustments: Adjustments
+    /// One of several rulers in the inspector: a smaller readout over the minimum touch height.
+    var isCompact = false
     @State private var drag = RulerDrag()
 
     private let tickSpacing: CGFloat = 10
-    private let scaleHeight: CGFloat = 56
+    /// Every fifth tick is major: taller and a level brighter, like a printed scale.
+    private let majorTickHeight: CGFloat = 24
+    private let minorTickHeight: CGFloat = 12
+    private let tickWidth: CGFloat = 1
+    /// Taller and wider than any tick, so the fixed indicator reads first.
+    private let indicatorSize = CGSize(width: 2, height: 36)
+    private var scaleHeight: CGFloat { isCompact ? FilmLabLayout.minimumControlHeight : 56 }
     private var value: Double { adjustments[keyPath: control.keyPath] }
     private var neutral: Double { Adjustments()[keyPath: control.keyPath] }
     private var tickCount: Int { Int(((control.range.upperBound - control.range.lowerBound) / control.increment).rounded()) }
@@ -27,6 +35,7 @@ struct AdjustmentRuler: View {
                     title
                     readout
                 }
+                .frame(maxWidth: .infinity, alignment: .leading)
             }
             scale
         }
@@ -49,43 +58,57 @@ struct AdjustmentRuler: View {
     private var title: some View { Text(control.title).font(.subheadline.weight(.medium)) }
 
     private var readout: some View {
-        Text(control.formatted(value)).font(.title2.weight(.medium)).monospacedDigit()
+        Text(control.formatted(value)).font((isCompact ? Font.body : .title2).weight(.medium)).monospacedDigit()
     }
 
     private var scale: some View {
-        GeometryReader { geometry in
-            let position = (value - control.range.lowerBound) / control.increment
-            ZStack {
-                ForEach(0...tickCount, id: \.self) { tick in
-                    Rectangle()
-                        .fill(tick.isMultiple(of: 5) ? .primary : .secondary)
-                        .frame(width: 1, height: tick.isMultiple(of: 5) ? 24 : 12)
-                        .position(x: geometry.size.width / 2 + (Double(tick) - position) * tickSpacing, y: scaleHeight / 2)
-                }
-                Capsule().fill(.primary).frame(width: 2, height: 36)
-            }
+        ticks
             .frame(maxWidth: .infinity, maxHeight: .infinity)
             .mask {
                 LinearGradient(colors: [.clear, .black, .black, .clear], startPoint: .leading, endPoint: .trailing)
             }
             .contentShape(.rect)
-            .simultaneousGesture(
-                DragGesture(minimumDistance: 10)
-                    .onChanged { gesture in
-                        let next = drag.update(
-                            value: value, translation: gesture.translation.width,
-                            verticalTranslation: gesture.translation.height,
-                            pointsPerUnit: tickSpacing / control.increment, range: control.range,
-                            neutral: neutral, detent: control.increment * 0.3
-                        )
-                        set(next)
-                    }
-                    .onEnded { _ in drag.end() }
-            )
+            .horizontalScrub { translation in
+                let next = drag.update(
+                    value: value, translation: translation.width, verticalTranslation: translation.height,
+                    pointsPerUnit: tickSpacing / control.increment, range: control.range,
+                    neutral: neutral, detent: control.increment * 0.3
+                )
+                set(next)
+            } onEnded: {
+                drag.end()
+            }
             .onTapGesture(count: 2) { set(neutral) }
+            .frame(height: scaleHeight)
+            .clipped()
+    }
+
+    /// One drawing for the whole scale, so a drag redraws the visible ticks instead of
+    /// re-laying out a view per tick. `.style` resolves the hierarchical colors in the
+    /// environment, keeping light/dark and Increase Contrast. The fixed indicator is drawn
+    /// last and a level brighter than any tick, so it reads first.
+    private var ticks: some View {
+        let position = (value - control.range.lowerBound) / control.increment
+        let tickCount = self.tickCount
+        let tickSpacing = self.tickSpacing
+        let (major, minor, tickWidth, indicatorSize) = (majorTickHeight, minorTickHeight, self.tickWidth, self.indicatorSize)
+        return Canvas { context, size in
+            let halfSpan = Double(size.width) / 2 / tickSpacing
+            let first = max(0, Int((position - halfSpan).rounded(.down)))
+            let last = min(tickCount, Int((position + halfSpan).rounded(.up)))
+            guard first <= last else { return }
+            for tick in first...last {
+                let isMajor = tick.isMultiple(of: 5)
+                let height = isMajor ? major : minor
+                let x = size.width / 2 + (Double(tick) - position) * tickSpacing
+                let mark = CGRect(x: x - tickWidth / 2, y: (size.height - height) / 2, width: tickWidth, height: height)
+                context.fill(Path(mark), with: isMajor ? .style(.secondary) : .style(.tertiary))
+            }
+            let indicator = CGRect(
+                x: (size.width - indicatorSize.width) / 2, y: (size.height - indicatorSize.height) / 2,
+                width: indicatorSize.width, height: indicatorSize.height)
+            context.fill(Path(roundedRect: indicator, cornerRadius: indicatorSize.width / 2), with: .style(.primary))
         }
-        .frame(height: scaleHeight)
-        .clipped()
     }
 
     private func set(_ value: Double) {

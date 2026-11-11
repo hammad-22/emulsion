@@ -20,6 +20,14 @@ struct RulerDragTests {
         #expect(horizontal == 0.6)
     }
 
+    @Test func aStillFirstSampleDoesNotLockTheDirection() {
+        var drag = RulerDrag()
+        let still = drag.update(value: 0.5, translation: 0, pointsPerUnit: 100, range: -1...1, neutral: 0, detent: 0.03)
+        #expect(still == 0.5)
+        let moved = drag.update(value: still, translation: -20, pointsPerUnit: 100, range: -1...1, neutral: 0, detent: 0.03)
+        #expect(abs(moved - 0.7) < 0.000001)
+    }
+
     @Test func fineMovementsAccumulateAcrossNeutralDetent() {
         var drag = RulerDrag()
         var value = 0.0

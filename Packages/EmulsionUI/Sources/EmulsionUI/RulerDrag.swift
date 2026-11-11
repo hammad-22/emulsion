@@ -7,7 +7,10 @@ struct RulerDrag {
         value: Double, translation: Double, verticalTranslation: Double = 0, pointsPerUnit: Double,
         range: ClosedRange<Double>, neutral: Double, detent: Double
     ) -> Double {
-        if isHorizontal == nil { isHorizontal = abs(translation) > abs(verticalTranslation) }
+        // A sample without movement (a UIKit pan's first one) can't tell the direction yet.
+        if isHorizontal == nil, translation != 0 || verticalTranslation != 0 {
+            isHorizontal = abs(translation) > abs(verticalTranslation)
+        }
         guard isHorizontal == true else { return value }
         let delta = translation - previousTranslation
         previousTranslation = translation

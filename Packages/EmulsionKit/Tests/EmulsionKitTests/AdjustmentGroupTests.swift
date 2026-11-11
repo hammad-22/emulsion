@@ -42,4 +42,23 @@ struct AdjustmentGroupTests {
         let warmth = AdjustmentGroup.color.controls[0]
         #expect(warmth.formatted(-0.35) == "-35")
     }
+
+    /// The last control of each group, so the lookup can't just stop at a group's first.
+    @Test(arguments: AdjustmentGroup.allCases)
+    func oneMovedRulerIsTheChangedControl(group: AdjustmentGroup) throws {
+        let control = try #require(group.controls.last)
+        var moved = Adjustments()
+        moved[keyPath: control.keyPath] = control.range.upperBound
+        let changed = try #require(AdjustmentGroup.changedControl(from: Adjustments(), to: moved))
+        #expect(changed.group == group)
+        #expect(changed.control == control.id)
+    }
+
+    @Test func resetAndUnchangedEditsHaveNoSingleChangedControl() {
+        var edited = Adjustments()
+        edited.exposure = 1
+        edited.grain = 0.9
+        #expect(AdjustmentGroup.changedControl(from: edited, to: Adjustments()) == nil, "a reset changes several")
+        #expect(AdjustmentGroup.changedControl(from: edited, to: edited) == nil)
+    }
 }
