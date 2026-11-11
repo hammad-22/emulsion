@@ -7,6 +7,7 @@ import SwiftUI
 struct EditorToolbar: ToolbarContent {
     let session: EditSession
     @Binding var isComparing: Bool
+    @Binding var showsAdjustments: Bool
 
     @Environment(PhotoStore.self) private var store
     @Environment(AppSettings.self) private var settings
@@ -16,6 +17,14 @@ struct EditorToolbar: ToolbarContent {
     @State private var isConfirmingDelete = false
 
     var body: some ToolbarContent {
+        ToolbarItem(placement: .bottomBar) {
+            Button {
+                showsAdjustments.toggle()
+            } label: {
+                Label(showsAdjustments ? "Hide Adjustments" : "Adjust", systemImage: "dial.low")
+            }
+            .labelStyle(.titleAndIcon)
+        }
         ToolbarItemGroup(placement: .topBarTrailing) {
             // Neutral like the rest of the editor: no accent color beside the photograph.
             Toggle("Compare", systemImage: "square.split.2x1", isOn: $isComparing)

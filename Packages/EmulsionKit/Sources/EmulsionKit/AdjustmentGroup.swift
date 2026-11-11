@@ -44,7 +44,7 @@ public enum AdjustmentGroup: String, CaseIterable, Identifiable, Sendable {
     }
 }
 
-/// One slider: which part of the edit it changes, its range and how to show its value.
+/// One adjustment: its editable value, range and display units.
 public struct AdjustmentControl: Identifiable {
     enum Unit { case stops, amount }
 
@@ -61,6 +61,9 @@ public struct AdjustmentControl: Identifiable {
         self.range = range
         self.unit = unit
     }
+
+    /// A visible ruler tick and an accessible adjustment step.
+    public var increment: Double { unit == .stops ? 0.1 : 0.01 }
 
     /// The value with a sign, e.g. "+0.7 EV" or "-35".
     public func formatted(_ value: Double) -> String {

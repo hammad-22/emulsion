@@ -44,20 +44,34 @@ final class LibraryToEditorUITests: XCTestCase {
         XCTAssertEqual(photos.count, 1, "Confirm removes exactly the selected photos")
         firstPhoto.tap()
 
-        let exposure = app.sliders["Exposure"]
+        app.buttons["Adjust"].tap()
+        let exposure = app.otherElements["adjustment-ruler"]
         XCTAssertTrue(exposure.waitForExistence(timeout: 5))
         sleep(2)
         keepScreenshot(app, named: "3 Editor")
 
         let reset = app.buttons["Reset Edits"]
         XCTAssertFalse(reset.isEnabled, "Nothing to reset before the first edit")
-        exposure.adjust(toNormalizedSliderPosition: 0.6)
+        dragRuler(exposure)
         XCTAssertTrue(reset.isEnabled)
         reset.tap()
         XCTAssertFalse(reset.isEnabled)
-        exposure.adjust(toNormalizedSliderPosition: 0.6)
+        let scrollStart = exposure.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.6))
+        let scrollEnd = exposure.coordinate(withNormalizedOffset: CGVector(dx: 0.52, dy: 0.95))
+        scrollStart.press(forDuration: 0.05, thenDragTo: scrollEnd)
+        XCTAssertFalse(reset.isEnabled, "A mostly vertical scroll must not adjust exposure")
+        dragRuler(exposure)
+        let editedExposure = exposure.value as? String
+        app.buttons["Hide Adjustments"].tap()
+        XCTAssertFalse(exposure.isHittable)
+        app.buttons["Adjust"].tap()
+        XCTAssertEqual(exposure.value as? String, editedExposure, "Hiding controls preserves the edit")
+        app.buttons["Adjustment group"].tap()
         app.buttons["Color"].tap()
-        app.sliders["Warmth"].adjust(toNormalizedSliderPosition: 0.7)
+        let warmth = app.otherElements["adjustment-ruler"]
+        XCTAssertEqual(warmth.label, "Warmth")
+        dragRuler(warmth)
+        let editedWarmth = warmth.value as? String
         sleep(2)
         keepScreenshot(app, named: "4 Edited")
 
@@ -70,7 +84,8 @@ final class LibraryToEditorUITests: XCTestCase {
 
         XCUIDevice.shared.orientation = .landscapeLeft
         sleep(2)
-        XCTAssertTrue(app.sliders["Warmth"].exists, "The panel keeps its group when the layout changes")
+        XCTAssertEqual(warmth.label, "Warmth", "The panel keeps its group when the layout changes")
+        XCTAssertEqual(warmth.value as? String, editedWarmth, "The selected adjustment retains its value")
         keepScreenshot(app, named: "6 Landscape")
         XCUIDevice.shared.orientation = .portrait
         sleep(1)
@@ -85,6 +100,13 @@ final class LibraryToEditorUITests: XCTestCase {
         deleteCurrentPhoto(app)
         XCTAssertTrue(app.navigationBars["Library"].waitForExistence(timeout: 5))
         XCTAssertTrue(samples.waitForExistence(timeout: 5), "Deleting the remaining photo returns to the empty library")
+    }
+
+    @MainActor
+    private func dragRuler(_ ruler: XCUIElement) {
+        let start = ruler.coordinate(withNormalizedOffset: CGVector(dx: 0.7, dy: 0.7))
+        let end = ruler.coordinate(withNormalizedOffset: CGVector(dx: 0.3, dy: 0.7))
+        start.press(forDuration: 0.05, thenDragTo: end)
     }
 
     @MainActor

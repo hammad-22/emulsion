@@ -9,6 +9,7 @@
         @State private var adjustments = Adjustments()
         @State private var isComparing = false
         @State private var group = AdjustmentGroup.light
+        @State private var selection: [AdjustmentGroup: String] = [:]
 
         public init() {}
 
@@ -29,7 +30,7 @@
                             SelectionBadge(isSelected: true)
                         }
                         .background(.gray, in: .rect)
-                        AdjustmentPanel(adjustments: $adjustments, group: $group)
+                        AdjustmentPanel(adjustments: $adjustments, group: $group, selection: $selection)
                     }
                     .padding(FilmLabLayout.inset)
                 }

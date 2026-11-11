@@ -6,6 +6,7 @@ struct PhotoEditor: View {
     @State private var session: EditSession
     @State private var showsOriginal = false
     @State private var group = AdjustmentGroup.light
+    @State private var selection: [AdjustmentGroup: String] = [:]
     @Environment(\.scenePhase) private var scenePhase
 
     // Fits the same labels and controls as the iPhone panel, with room to resize.
@@ -27,7 +28,7 @@ struct PhotoEditor: View {
                 .padding()
                 .frame(minWidth: minimumPhotoSize, minHeight: minimumPhotoSize)
             ScrollView {
-                AdjustmentPanel(adjustments: $session.adjustments, group: $group)
+                AdjustmentPanel(adjustments: $session.adjustments, group: $group, selection: $selection)
                     .padding()
             }
             .frame(minWidth: minimumPanelWidth, idealWidth: minimumPanelWidth, maxWidth: maximumPanelWidth)
