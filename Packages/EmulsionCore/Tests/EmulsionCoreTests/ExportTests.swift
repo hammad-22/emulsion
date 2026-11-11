@@ -40,11 +40,9 @@ import UniformTypeIdentifiers
         Expected(format: .heic, type: .heic, bitDepth: 10, tolerance: 0.5),
     ]
 
-    let renderer: Renderer
-    init() throws { renderer = try Renderer() }
-
-    @Test(arguments: formats) func exportsAreTaggedDisplayP3(_ expected: Expected) throws {
-        let source = try readBack(renderer.export(Self.image, format: expected.format))
+    @Test(arguments: formats) func exportsAreDisplayP3AndKeepTheirValues(_ expected: Expected) throws {
+        let data = try EmulsionTestCase.sharedRenderer.export(Self.image, format: expected.format)
+        let source = try #require(CGImageSourceCreateWithData(data as CFData, nil))
 
         #expect(CGImageSourceGetType(source) as String? == expected.type.identifier)
         let properties = try #require(CGImageSourceCopyPropertiesAtIndex(source, 0, nil) as? [CFString: Any])
@@ -56,27 +54,20 @@ import UniformTypeIdentifiers
         // Exports are written upright: no orientation tag, or "up" (1).
         let orientation = properties[kCGImagePropertyOrientation] as? UInt32
         #expect(orientation == nil || orientation == CGImagePropertyOrientation.up.rawValue)
+        #expect(properties[kCGImagePropertyGPSDictionary] == nil, "source metadata isn't carried over")
 
+        // The decoder, not just the metadata, must see Display P3 at the stated depth.
         let decoded = try #require(CGImageSourceCreateImageAtIndex(source, 0, nil))
         #expect(decoded.colorSpace?.name == CGColorSpace.displayP3)
         #expect(decoded.bitsPerComponent == expected.bitDepth)
-    }
 
-    @Test(arguments: formats) func exportsKeepDisplayP3Values(_ expected: Expected) throws {
-        let source = try readBack(renderer.export(Self.image, format: expected.format))
-        let decoded = try #require(CGImageSourceCreateImageAtIndex(source, 0, nil))
         // Decoding honours the embedded profile; reading back in Display P3 gives the code values.
         let values = Fixtures.encodedFloats(CIImage(cgImage: decoded), space: Renderer.outputSpace)
-
         for (index, patch) in Self.patches.enumerated() {
             let centre = (Self.height / 2) * Self.width + index * Self.block + Self.block / 2
             let error = values[centre] - SIMD3<Double>(patch)
             let worst = max(abs(error.x), abs(error.y), abs(error.z)) * 255
             #expect(worst <= expected.tolerance, "patch \(index): \(values[centre]) vs \(patch)")
         }
-    }
-
-    private func readBack(_ data: Data) throws -> CGImageSource {
-        try #require(CGImageSourceCreateWithData(data as CFData, nil))
     }
 }
