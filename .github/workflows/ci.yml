@@ -43,6 +43,10 @@ jobs:
         working-directory: Packages/EmulsionKit
         run: swift test
 
+      - name: Shared UI interaction tests (EmulsionUI)
+        working-directory: Packages/EmulsionUI
+        run: swift test
+
       - name: App logic tests on iOS (EmulsionKit)
         working-directory: Packages/EmulsionKit
         run: |

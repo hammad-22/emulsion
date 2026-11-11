@@ -28,6 +28,7 @@ export DEVELOPER_DIR=/Applications/Xcode.app/Contents/Developer
 sh Tools/build-kernels.sh                                    # after any .metal change
 (cd Packages/EmulsionCore && swift test)                     # must stay green
 (cd Packages/EmulsionKit && swift test)                      # app logic; also on iOS, see its AGENTS.md
+(cd Packages/EmulsionUI && swift test)                       # shared control interaction tests
 .venv/bin/python -I Tools/color-references/generate_input_references.py  # after changing reference samples (pip install -r Tools/color-references/requirements.txt)
 (cd Packages/EmulsionCore && EMULSION_PERF=1 swift test --filter PerformanceProbe)  # Mac timings
 swift format lint --recursive Packages Apps Tools            # style (config: .swift-format)

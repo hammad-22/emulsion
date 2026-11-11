@@ -8,4 +8,4 @@ Shared SwiftUI components for the iOS and Mac apps: the rendered photo, adjustme
 - **Glass rules (MOV-55/56, from Apple's "Adopting Liquid Glass" and HIG Materials):** glass is for the control layer only, never thumbnails or the photo. One glass surface per control group (`AdjustmentPanel` is a single sheet; controls on it use system fills, not more glass). Use `glassEffect` and system styles only, so Reduce Transparency, Increase Contrast and Reduce Motion are handled by the system.
 - Follow `Apps/iOS/AGENTS.md` for SwiftUI rules (Observation, small views, `.task(id:)`, accessibility).
 - **Rendering** always goes through the `RenderService` in the environment (`\.renderService`); never render on the main actor.
-- Check it builds for both: `(cd Packages/EmulsionUI && swift build)` (macOS) plus the iOS app build.
+- Run `(cd Packages/EmulsionUI && swift test)` for the shared control interaction tests and macOS build, plus the iOS app build. CI runs these tests too.
