@@ -1,0 +1,35 @@
+Display-referred proof (chart 256 px wide; codes are encoded Display P3 x255, before 8-bit rounding)
+gray round trip, zero edits, 256 codes x 3 channels: max error 0.057 codes, mean 0.017
+gray ends at zero edits (green): 0→0.0 1→1.0 2→2.0 3→3.0 4→4.0 250→250.0 251→251.0 252→252.0 253→253.0 254→254.0 255→255.0
+-3 EV gray: max step 2.22 codes (at 250→251), min step 0.183; codes 248…255 → 155.1 157.3 159.4 161.6 163.8 166.0 168.1 170.3
++2 EV gray: max step 2.94 codes (at 18→19), min step 0.000; codes 248…255 → 255.0 255.0 255.0 255.0 255.0 255.0 255.0 255.0
+sky gradient zero edits: max adjacent OKLab ΔE×100 0.11
+sky gradient -3 EV: max adjacent OKLab ΔE×100 0.21
+patch          ΔL       Δhue°   chroma ratio  ΔE×100   (zero edits, OKLab)
+red           -0.0000    0.00   0.943         1.70
+green         -0.0001    0.00   0.943         2.09
+blue          +0.0000    0.00   0.943         1.83
+cyan          -0.0001    0.00   0.943         1.17
+magenta       -0.0000    0.00   0.943         2.04
+yellow        -0.0001    0.00   0.943         1.39
+azure         -0.0001    0.01   0.943         1.18
+coral         -0.0000    0.00   1.000         0.00
+sky           -0.0001    0.01   0.944         1.25
+skin          -0.0001    0.02   1.000         0.01
+red 50%       -0.0001    0.00   1.000         0.01
+green 50%     -0.0000    0.00   1.000         0.00
+blue 50%      -0.0000    0.01   1.000         0.01
+yellow 50%    -0.0000    0.00   1.000         0.00
+magenta 50%   -0.0001    0.00   1.000         0.01
+cyan 50%      -0.0000    0.02   1.000         0.00
+scene estimate (linear P3): max 2.879; display white → (2.879, 2.879, 2.879)
+scene estimate of display black → (0.0003514, 0.0003514, 0.0003514)
+scene estimate red → (2.696, 0.1014, 0.03184)
+scene estimate green → (0.1285, 2.676, 0.1749)
+scene estimate blue → (0.05507, 0.1013, 2.672)
+scene estimate cyan → (0.1833, 2.778, 2.847)
+scene estimate magenta → (2.751, 0.2024, 2.705)
+scene estimate yellow → (2.824, 2.777, 0.2064)
+scene estimate azure → (0.06914, 0.3947, 2.692)
+scene estimate coral → (1.377, 0.1422, 0.07175)
+scene estimate sky → (0.1147, 0.3054, 2.686)
