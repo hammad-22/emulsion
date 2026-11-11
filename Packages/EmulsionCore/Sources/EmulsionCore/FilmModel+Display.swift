@@ -9,8 +9,6 @@ import simd
 /// and black). At render time the print's change under the user's edits is applied to the photo
 /// itself, so zero edits reproduce it.
 extension FilmModel {
-    /// The bisection in `sceneEstimate` searches this far beyond the floor and ceiling.
-    static let displaySearchMarginStops = 0.5
     /// Bisection steps of the Swift reference; the kernel takes 22 (3e-6 stops, below float precision).
     private static let referenceSearchSteps = 60
 
@@ -20,7 +18,7 @@ extension FilmModel {
     /// K, per channel: identity between the knees; above `kneeHigh` display values bend down so
     /// display white lands on F_n(ceiling), below `kneeLow` they bend up so black lands on
     /// F_n(floor). Smooth at the knees, with a closed-form inverse (`expand`).
-    struct SoftEnds: Equatable {
+    struct SoftEnds {
         let kneeHigh, a, kneeLow, b: Double
 
         init(_ model: FilmModel) {
@@ -54,8 +52,8 @@ extension FilmModel {
         let layerExposure = SIMD3(
             (0..<3).map { c -> Double in
                 let target = ends.compress(min(1, max(0, display[c])))
-                var lo = FilmLook.displayFloorStops - Self.displaySearchMarginStops
-                var hi = FilmLook.displayCeilingStops + Self.displaySearchMarginStops
+                var lo = FilmLook.displayFloorStops - FilmLook.displaySearchMarginStops
+                var hi = FilmLook.displayCeilingStops + FilmLook.displaySearchMarginStops
                 for _ in 0..<Self.referenceSearchSteps {
                     let mid = (lo + hi) / 2
                     if neutralPrint(0.18 * pow(2, mid)) < target { lo = mid } else { hi = mid }

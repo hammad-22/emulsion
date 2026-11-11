@@ -2,7 +2,7 @@ import CoreImage
 import Foundation
 
 /// Precompiled Core Image Metal kernels (see EmulsionCore/Kernels/Emulsion.ci.metal and
-/// scripts/build-kernels.sh).
+/// Tools/build-kernels.sh).
 struct Kernels {
     // Named exactly like the Metal functions in Emulsion.ci.metal.
     let filmSystem, filmSystemRelative, displayToScene, inputTransform, ycbcrInputTransform: CIColorKernel

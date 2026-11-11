@@ -25,6 +25,8 @@ public enum FilmLook {
     /// is picked that keeps edits smooth (see `FilmModel.SoftEnds`).
     static let displayCeilingStops = 4.0
     static let displayFloorStops = -9.0
+    /// The scene-estimate bisection searches this far beyond the floor and ceiling.
+    static let displaySearchMarginStops = 0.5
     /// Display-linear values between these knees are estimated exactly; above and below, the
     /// soft ends bend them into the print's reachable range. Engineering choices, not measurements.
     static let displayShoulderKnee = 0.75

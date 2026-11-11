@@ -132,6 +132,13 @@ float neutralPrint(float linear, float3 m0, float3 m1, float3 m2, float4 neg, fl
                    float4 prt, float4 misc, float3 lights, float3 d0, float3 d1, float3 d2) {
     return filmRender(float3(linear),m0,m1,m2,neg,float4(negOff.xyz,0.0),prt,float4(misc.x,misc.y,1.0,0.0),lights,d0,d1,d2).y;
 }
+// F_n of each component: three neutral scenes, one per channel.
+float3 neutralPrint3(float3 v, float3 m0, float3 m1, float3 m2, float4 neg, float4 negOff,
+                     float4 prt, float4 misc, float3 lights, float3 d0, float3 d1, float3 d2) {
+    return float3(neutralPrint(v.x,m0,m1,m2,neg,negOff,prt,misc,lights,d0,d1,d2),
+                  neutralPrint(v.y,m0,m1,m2,neg,negOff,prt,misc,lights,d0,d1,d2),
+                  neutralPrint(v.z,m0,m1,m2,neg,negOff,prt,misc,lights,d0,d1,d2));
+}
 // Soft ends K: identity between the knees, compressing display values toward the print's
 // reachable range [F_n(floor), F_n(ceiling)]; `expand` is the closed-form inverse on that range.
 float compressEnds(float y, float4 ends) {
@@ -144,6 +151,8 @@ float expandEnds(float v, float4 ends) {
     if(v<ends.z) { float u=ends.z-v; return ends.z-u/(1.0-ends.w*u); }
     return v;
 }
+float3 compressEnds3(float3 y, float4 ends) { return float3(compressEnds(y.x,ends),compressEnds(y.y,ends),compressEnds(y.z,ends)); }
+float3 expandEnds3(float3 v, float4 ends) { return float3(expandEnds(v.x,ends),expandEnds(v.y,ends),expandEnds(v.z,ends)); }
 
 // Display-referred photo (display-linear, working space, premultiplied) → scene estimate (linear,
 // working space, premultiplied). Per channel, bisection finds the neutral exposure v whose print
@@ -153,13 +162,11 @@ extern "C" float4 displayToScene(coreimage::sample_t sample, float4 m0, float4 m
                                  float4 d0, float4 d1, float4 d2, float4 ends, float4 i0, float4 i1, float4 i2) {
     float a=sample.a;
     float3 x=clamp(toP3(sample.rgb/max(a,1e-6)),0.0,1.0);
-    float3 target=float3(compressEnds(x.x,ends),compressEnds(x.y,ends),compressEnds(x.z,ends));
+    float3 target=compressEnds3(x,ends);
     float3 lo=float3(displayFloorStops-displaySearchMarginStops), hi=float3(displayCeilingStops+displaySearchMarginStops);
     for(int i=0;i<displaySearchSteps;i++) {
         float3 mid=(lo+hi)*.5;
-        float3 o=float3(neutralPrint(0.18*exp2(mid.x),m0.xyz,m1.xyz,m2.xyz,neg,negOff,prt,misc,lights.xyz,d0.xyz,d1.xyz,d2.xyz),
-                        neutralPrint(0.18*exp2(mid.y),m0.xyz,m1.xyz,m2.xyz,neg,negOff,prt,misc,lights.xyz,d0.xyz,d1.xyz,d2.xyz),
-                        neutralPrint(0.18*exp2(mid.z),m0.xyz,m1.xyz,m2.xyz,neg,negOff,prt,misc,lights.xyz,d0.xyz,d1.xyz,d2.xyz));
+        float3 o=neutralPrint3(0.18*exp2(mid),m0.xyz,m1.xyz,m2.xyz,neg,negOff,prt,misc,lights.xyz,d0.xyz,d1.xyz,d2.xyz);
         lo=select(lo,mid,o<target); hi=select(mid,hi,o<target);
     }
     float3 v=0.18*exp2((lo+hi)*.5);
@@ -184,9 +191,7 @@ extern "C" float4 filmSystemRelative(coreimage::sample_t edited, coreimage::samp
     float3 E=max(float3(dot(m0.xyz,s0),dot(m1.xyz,s0),dot(m2.xyz,s0)),float3(1e-7));
     // Clamped to what the soft ends produce for display 0…1, so the inverse stays in 0…1.
     float lo=compressEnds(0.0,ends), hi=compressEnds(1.0,ends);
-    float3 x=float3(expandEnds(clamp(neutralPrint(E.x,m0.xyz,m1.xyz,m2.xyz,neg,negOff,prt,misc,baseLights.xyz,d0.xyz,d1.xyz,d2.xyz),lo,hi),ends),
-                    expandEnds(clamp(neutralPrint(E.y,m0.xyz,m1.xyz,m2.xyz,neg,negOff,prt,misc,baseLights.xyz,d0.xyz,d1.xyz,d2.xyz),lo,hi),ends),
-                    expandEnds(clamp(neutralPrint(E.z,m0.xyz,m1.xyz,m2.xyz,neg,negOff,prt,misc,baseLights.xyz,d0.xyz,d1.xyz,d2.xyz),lo,hi),ends));
+    float3 x=expandEnds3(clamp(neutralPrint3(E,m0.xyz,m1.xyz,m2.xyz,neg,negOff,prt,misc,baseLights.xyz,d0.xyz,d1.xyz,d2.xyz),lo,hi),ends);
     float3 g=x/max(b,float3(1e-6));
     float3 out=select(e-(b-x),e*g,g>=1.0 || e<=b);
     return float4(fitP3(fromP3(out))*a,a);

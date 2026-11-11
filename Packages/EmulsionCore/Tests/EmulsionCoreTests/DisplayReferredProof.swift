@@ -33,8 +33,8 @@ struct DisplayReferredProof {
         }
 
         var lines = ["Display-referred proof (chart \(width) px wide; codes are encoded Display P3 x255, before 8-bit rounding)"]
-        let zeroCodes = codes(zero)
-        let grayRow = DisplayFixtures.grayRow * width
+        let zeroCodes = EmulsionTestCase.codes(zero)
+        let grayRow = EmulsionTestCase.pixel(x: 0, y: DisplayFixtures.grayRow, width: width)
         var errors = [Double]()
         for code in 0..<256 { for c in 0..<3 { errors.append(abs(zeroCodes[grayRow + code][c] - Double(code))) } }
         lines.append(
@@ -47,7 +47,7 @@ struct DisplayReferredProof {
         lines.append("gray ends at zero edits (green): " + ends.joined(separator: " "))
 
         for (label, image) in [("-3 EV", down3), ("+2 EV", up2)] {
-            let green = codes(image)[grayRow..<grayRow + 256].map(\.y)
+            let green = EmulsionTestCase.codes(image)[grayRow..<grayRow + 256].map(\.y)
             let steps = zip(green.dropFirst(), green).map { $0 - $1 }
             let maxStep = steps.max() ?? 0
             let at = steps.firstIndex(of: maxStep) ?? 0
@@ -58,7 +58,7 @@ struct DisplayReferredProof {
                     steps.min() ?? 0, top))
         }
 
-        let skyRow = DisplayFixtures.skyRow * width
+        let skyRow = EmulsionTestCase.pixel(x: 0, y: DisplayFixtures.skyRow, width: width)
         for (label, image) in [("zero edits", zero), ("-3 EV", down3)] {
             let lab = Fixtures.oklab(image)
             let steps = (1..<width).map { Fixtures.deltaE(lab[skyRow + $0], lab[skyRow + $0 - 1]) }
@@ -70,8 +70,9 @@ struct DisplayReferredProof {
         let outLab = Fixtures.oklab(zero)
         for (i, patch) in DisplayFixtures.patches.enumerated() {
             let (x, y) = DisplayFixtures.patchCenter(i)
-            let a = sourceLab[y * width + x]
-            let b = outLab[y * width + x]
+            let i = EmulsionTestCase.pixel(x: x, y: y, width: width)
+            let a = sourceLab[i]
+            let b = outLab[i]
             lines.append(
                 String(
                     format: "%@ %+.4f  %6.2f   %.3f         %.2f", patch.name.padding(toLength: 13, withPad: " ", startingAt: 0), b.x - a.x,
@@ -87,17 +88,13 @@ struct DisplayReferredProof {
         lines.append(String(format: "scene estimate of display black → (%.4g, %.4g, %.4g)", black.x, black.y, black.z))
         for (i, patch) in DisplayFixtures.patches.prefix(9).enumerated() {
             let (x, y) = DisplayFixtures.patchCenter(i)
-            let s = scene[y * width + x]
+            let s = scene[EmulsionTestCase.pixel(x: x, y: y, width: width)]
             lines.append(String(format: "scene estimate %@ → (%.4g, %.4g, %.4g)", patch.name, s.x, s.y, s.z))
         }
 
         let table = lines.joined(separator: "\n")
         print(table)
         try table.write(to: directory.appendingPathComponent("numbers.txt"), atomically: true, encoding: .utf8)
-    }
-
-    private func codes(_ image: CIImage) -> [SIMD3<Double>] {
-        Fixtures.encodedFloats(image, space: Renderer.outputSpace).map { $0 * 255 }
     }
 
     private func writePNG(_ image: CIImage, to url: URL) throws {

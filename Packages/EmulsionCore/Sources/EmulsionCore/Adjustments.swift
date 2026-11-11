@@ -57,3 +57,12 @@ extension Adjustments {
         try decode(.seed, into: &seed)
     }
 }
+
+extension Adjustments {
+    /// User printer lights (log10 print exposure), added to the calibrated ones. Lab convention:
+    /// more light in a channel prints more of its complementary dye, so Warmth adds blue light
+    /// and removes red; Tint adds green.
+    var printerLights: SIMD3<Double> { SIMD3(-warmth, tint, warmth) * FilmLook.printerPoint }
+    /// Saturation the film system applies to the scene, from the Color control.
+    var printSaturation: Double { 1 + color * (color >= 0 ? FilmLook.colorBoost : FilmLook.colorCut) }
+}

@@ -45,17 +45,12 @@ public final class Renderer: @unchecked Sendable {
             image = try kernels.run(kernels.halationAdd, extent, [image, skirt.cropped(to: extent), a.halation * (1 - coreShare)])
         }
 
-        // Printer lights, lab convention: more light in a channel prints more of its
-        // complementary dye, so Warmth adds blue light and removes red; Tint adds green.
-        let point = FilmLook.printerPoint
-        let lights = SIMD3(-point * a.warmth, point * a.tint, point * a.warmth)
-        let saturation = 1 + a.color * (a.color >= 0 ? FilmLook.colorBoost : FilmLook.colorCut)
         if negative.contract == .displayReferred {
             // A finished picture is printed relative to itself: zero edits reproduce it.
-            let film = FilmLook.stock.relativeKernelArguments(lights: lights, exposure: a.exposure, saturation: saturation)
+            let film = FilmLook.stock.relativeKernelArguments(lights: a.printerLights, exposure: a.exposure, saturation: a.printSaturation)
             image = try kernels.run(kernels.filmSystemRelative, extent, [image, negative.image] + film)
         } else {
-            let film = FilmLook.stock.kernelArguments(lights: lights, exposure: a.exposure, saturation: saturation)
+            let film = FilmLook.stock.kernelArguments(lights: a.printerLights, exposure: a.exposure, saturation: a.printSaturation)
             image = try kernels.run(kernels.filmSystem, extent, [image] + film)
         }
 

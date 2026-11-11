@@ -112,12 +112,10 @@ struct DisplayReferredTests {
         let colors = randomColors(count: 200, lowest: 0.35, span: 0.3)
         let a = edit.adjustments
         let gpu = try renderedCodes(Fixtures.row(colors, space: DisplayFixtures.displayP3), a, materialized: false)
-        let lights = SIMD3(-a.warmth, a.tint, a.warmth) * FilmLook.printerPoint
-        let saturation = 1 + a.color * (a.color >= 0 ? FilmLook.colorBoost : FilmLook.colorCut)
         for (i, color) in colors.enumerated() {
             let estimate = model.sceneEstimate(fromDisplay: linear(color))
             let reference = model.renderRelative(
-                estimate: estimate, edited: estimate * pow(2, a.exposure), lights: lights, saturation: saturation)
+                estimate: estimate, edited: estimate * pow(2, a.exposure), lights: a.printerLights, saturation: a.printSaturation)
             for c in 0..<3 {
                 let code = Double(Fixtures.encode(Float(min(1, max(0, reference[c]))))) * 255
                 #expect(abs(gpu[i][c] - code) <= 0.6, "\(edit) color \(i) channel \(c)")
@@ -168,8 +166,8 @@ struct DisplayReferredTests {
             SIMD3(0.3 + 0.4 * Float(x) / 63, 0.3 + 0.4 * Float(y) / 47, 0.6 - 0.25 * Float(x + y) / 110)
         }
         let jpeg = try renderer.export(picture, format: .jpeg)
-        let reference = codes(try #require(CIImage(data: jpeg)))
-        let out = codes(try renderer.render(try renderer.materialize(try renderer.developer.develop(jpeg)), .neutral))
+        let reference = EmulsionTestCase.codes(try #require(CIImage(data: jpeg)))
+        let out = EmulsionTestCase.codes(try renderer.render(try renderer.materialize(try renderer.developer.develop(jpeg)), .neutral))
         for (o, r) in zip(out, reference) { #expect(simd_reduce_max(simd_abs(o - r)) <= 0.25, "\(o) vs \(r)") }
     }
 
@@ -198,24 +196,16 @@ struct DisplayReferredTests {
     }
 
     private func renderedCodes(_ picture: CIImage, _ a: Adjustments = .neutral, materialized: Bool = true) throws -> [SIMD3<Double>] {
-        codes(try renderer.render(try developed(picture, materialized: materialized), a))
+        EmulsionTestCase.codes(try renderer.render(try developed(picture, materialized: materialized), a))
     }
 
     private func sceneEstimate(_ picture: CIImage) throws -> [SIMD3<Double>] {
         Fixtures.encodedFloats(try developed(picture, materialized: false).image, space: SceneFixtures.linearP3)
     }
 
-    private func codes(_ image: CIImage) -> [SIMD3<Double>] {
-        Fixtures.encodedFloats(image, space: Renderer.outputSpace).map { $0 * 255 }
-    }
-
     /// Display P3 code → display-linear P3.
     private func linear(_ code: SIMD3<Float>) -> SIMD3<Double> {
-        SIMD3(
-            (0..<3).map { c -> Double in
-                let v = Double(code[c])
-                return v <= 0.04045 ? v / 12.92 : pow((v + 0.055) / 1.055, 2.4)
-            })
+        SIMD3((0..<3).map { ColorMath.decode(Double(code[$0]), curve: InputColorSpace.displayP3.curve) })
     }
 
     /// Deterministic P3 codes in `lowest…lowest + span` per channel.
