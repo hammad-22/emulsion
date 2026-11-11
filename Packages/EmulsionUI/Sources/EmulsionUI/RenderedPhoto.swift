@@ -5,7 +5,8 @@ import SwiftUI
 /// A photo developed and printed with its adjustments, or the untouched original for
 /// before/after, rendered off the main actor at the size it's shown.
 /// A filled frame (a thumbnail) waits as a quiet placeholder; a fitted one shows progress.
-/// Re-renders when the edit or size changes, keeping the last image so slider drags don't flash.
+/// Re-renders when the edit or size changes, keeping the last image so slider drags don't flash
+/// and showing each render that finishes during a drag (`RenderOrder`).
 public struct RenderedPhoto: View {
     private let url: URL
     private let adjustments: Adjustments
@@ -16,6 +17,7 @@ public struct RenderedPhoto: View {
     @Environment(\.displayScale) private var displayScale
     @State private var image: CGImage?
     @State private var failed = false
+    @State private var order = RenderOrder()
 
     public init(url: URL, adjustments: Adjustments, contentMode: ContentMode = .fit, showsOriginal: Bool = false) {
         self.url = url
@@ -63,13 +65,13 @@ public struct RenderedPhoto: View {
 
     private func render(_ request: Request) async {
         guard request.pixels > 0 else { return }
+        let ticket = order.begin()
         do {
             let rendered =
                 request.showsOriginal
                 ? try await renderService.original(request.url, maxDimension: request.pixels)
                 : try await renderService.image(request.url, request.adjustments, maxDimension: request.pixels)
-            // A newer request replaced this one while it rendered; its result is stale.
-            guard !Task.isCancelled else { return }
+            guard order.shouldShow(ticket) else { return }
             image = rendered
             failed = false
         } catch is CancellationError {
