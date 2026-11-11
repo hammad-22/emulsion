@@ -45,9 +45,8 @@ jobs:
       - name: Visual regression summary
         if: always()
         run: |
-          for REPORT in report.md grain-statistics.md; do
-            if [ -f "$RUNNER_TEMP/visual-regression/$REPORT" ]; then cat "$RUNNER_TEMP/visual-regression/$REPORT" >> "$GITHUB_STEP_SUMMARY"; fi
-          done
+          REPORT="$RUNNER_TEMP/visual-regression/report.md"
+          if [ -f "$REPORT" ]; then cat "$REPORT" >> "$GITHUB_STEP_SUMMARY"; fi
 
       - name: Upload visual regression report
         if: always()

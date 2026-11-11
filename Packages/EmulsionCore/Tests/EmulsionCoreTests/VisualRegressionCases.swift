@@ -12,30 +12,13 @@ struct RegressionCase: Sendable {
     let adjustments: Adjustments
     /// `.displayReferred` cases give a finished picture; it is re-rendered from a scene estimate.
     var contract: InputContract = .sceneReferred
-
-    /// What the golden is rendered with: the case's adjustments without grain. Seeded grain is
-    /// reproducible on one GPU but lands a few isolated pixels differently on another, so grain
-    /// is checked statistically instead (`GrainStatistics`).
-    var goldenAdjustments: Adjustments {
-        var a = adjustments
-        a.grain = 0
-        return a
-    }
 }
 
 extension RegressionCase {
     static let all: [RegressionCase] = pointCases + spatialCases + displayCases + realSceneCases
 
-    /// Cases whose grain is checked statistically: every case with grain, plus full grain on the
-    /// neutral gradient.
-    static let grainCases: [RegressionCase] =
-        all.filter { $0.adjustments.grain > 0 } + [
-            RegressionCase(name: "gradient.grain", scene: gradient, adjustments: adjust { ($0.grain, $0.seed) = (1, 3) })
-        ]
-
-    /// A golden or grain case.
     static func named(_ name: String) throws -> RegressionCase {
-        try #require((all + grainCases).first { $0.name == name }, "no regression case named \(name)")
+        try #require(all.first { $0.name == name }, "no regression case named \(name)")
     }
 
     private static func adjust(_ base: Adjustments = .neutral, _ change: (inout Adjustments) -> Void) -> Adjustments {
@@ -69,10 +52,9 @@ extension RegressionCase {
     /// The suite's default look: `Adjustments()` (grain and halation 0.35) with a fixed seed.
     static let defaultLook = adjust(Adjustments()) { $0.seed = 7 }
 
-    private static let gradient: @Sendable () -> CIImage = { SceneFixtures.gradientScene() }
-
     private static let spatialCases: [RegressionCase] = {
         let highlight: @Sendable () -> CIImage = { SceneFixtures.highlightPoint(size: 200) }
+        let gradient: @Sendable () -> CIImage = { SceneFixtures.gradientScene() }
         return [
             RegressionCase(name: "highlight-point.halation", scene: highlight, adjustments: adjust { $0.halation = 1 }),
             RegressionCase(
@@ -83,7 +65,7 @@ extension RegressionCase {
             RegressionCase(
                 name: "gradient.localtone-contrast", scene: gradient, adjustments: adjust { ($0.highlights, $0.shadows) = (-0.8, -0.8) }),
             RegressionCase(name: "gradient.default-look", scene: gradient, adjustments: defaultLook),
-            RegressionCase(name: "gradient.neutral", scene: gradient, adjustments: .neutral),
+            RegressionCase(name: "gradient.grain", scene: gradient, adjustments: adjust { ($0.grain, $0.seed) = (1, 3) }),
         ]
     }()
 

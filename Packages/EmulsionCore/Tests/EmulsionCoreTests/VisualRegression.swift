@@ -15,16 +15,13 @@ enum VisualRegression {
         func accepts(_ s: ColorDifference.Summary) -> Bool { s.mean <= mean && s.p95 <= p95 && s.max <= max }
     }
 
-    /// CIEDE2000 limits for every case, compared without grain (`RegressionCase.goldenAdjustments`).
-    /// ΔE00 ≈ 1 is about one just-noticeable difference, so no pixel may move by a visible step
-    /// (max) and the image as a whole must stay well under it (mean, p95). Measured noise (Apple
-    /// M4 Max, `noiseFloorIsInsideTheThresholds`) is far below: the same case rendered twice on
-    /// one machine is identical (0); a lazy vs materialized negative (gradient.default-look)
-    /// differs by mean 0.008, p95 0.021, max 0.043; 16-bit quantisation of chart24.neutral by
-    /// mean 0.0009, max 0.0023. Across GPUs, GitHub's runner (Apple Paravirtual device) differs
-    /// from M4 Max goldens by at most max 0.26 (halation), all other cases ≤ 0.11; with grain on,
-    /// about 15 isolated pixels of 43,200 moved by up to 4.67, which is why grain is not compared
-    /// pixel for pixel. Exposure +0.1 stop moves chart24.neutral by mean 1.27, max 1.85 and fails.
+    /// CIEDE2000 limits for every case. ΔE00 ≈ 1 is about one just-noticeable difference, so no
+    /// pixel may move by a visible step (max) and the image as a whole must stay well under it
+    /// (mean, p95). Measured noise (Apple M4 Max, `noiseFloorIsInsideTheThresholds`) is far below:
+    /// the same case rendered twice is identical (0, grain included); a lazy vs materialized
+    /// negative (gradient.default-look) differs by mean 0.008, p95 0.021, max 0.043; 16-bit
+    /// quantisation of chart24.neutral by mean 0.0009, max 0.0023. Exposure +0.1 stop moves
+    /// chart24.neutral by mean 1.27, max 1.85 and fails.
     static let thresholds = Thresholds(mean: 0.2, p95: 0.5, max: 1.0)
     /// ΔE00 shown as white in diff heat maps: twice the per-pixel limit.
     static let heatMapFullScale = 2.0
@@ -32,9 +29,6 @@ enum VisualRegression {
     static let patchCellSize = 16
 
     static let renderer = EmulsionTestCase.sharedRenderer
-    /// How to accept an intended change to the committed goldens and grain statistics.
-    static let regenerateCommand =
-        "EMULSION_UPDATE_GOLDENS=1 swift test --filter VisualRegression, review the summary, commit the references with the change."
 
     static func render(_ scene: CIImage, _ adjustments: Adjustments, contract: InputContract = .sceneReferred) throws -> RegressionImage {
         let negative =
@@ -58,11 +52,10 @@ enum VisualRegression {
     // MARK: Environment
 
     /// Every switch the suite reads:
-    /// - `EMULSION_UPDATE_GOLDENS`: `1` rewrites missing or failing goldens and grain statistics,
-    ///   `all` every one.
+    /// - `EMULSION_UPDATE_GOLDENS`: `1` rewrites missing or failing goldens, `all` every golden.
     /// - `EMULSION_REGRESSION_IMAGES=all`: report images for every case, not only failures and updates.
     /// - `EMULSION_REGRESSION_REPORT`: report directory (default `.build/visual-regression`).
-    /// - `CI`: any value; goldens and grain statistics are never accepted on CI.
+    /// - `CI`: any value; goldens are never accepted on CI.
     /// - `EMULSION_REGENERATE_SCENES`: folder with the CC0 sources; develops them into `Scenes/`.
     /// - `EMULSION_REFERENCE_SAMPLES`: folder of DNGs for the local tier.
     private static var environment: [String: String] { ProcessInfo.processInfo.environment }
@@ -159,7 +152,10 @@ enum VisualRegression {
         mode: UpdateMode = VisualRegression.updateMode, isCI: Bool = VisualRegression.isCI,
         writesAllImages: Bool = VisualRegression.writesAllImages
     ) throws {
-        guard !refusesUpdate(mode: mode, isCI: isCI) else { return }
+        if mode != .none && isCI {
+            Issue.record("EMULSION_UPDATE_GOLDENS is set on CI: goldens are never accepted on CI. Regenerate locally and commit them.")
+            return
+        }
         let files = ReportFiles(directory: reportDirectory)
         try files.prepare()
         let clock = ContinuousClock()
@@ -183,13 +179,6 @@ enum VisualRegression {
             print(summary)
             try files.write(summary, to: "update-summary.md")
         }
-    }
-
-    /// Records an issue and returns `true` for an update on CI, where references are never accepted.
-    static func refusesUpdate(mode: UpdateMode, isCI: Bool) -> Bool {
-        guard mode != .none && isCI else { return false }
-        Issue.record("EMULSION_UPDATE_GOLDENS is set on CI: references are never accepted on CI. Regenerate locally and commit them.")
-        return true
     }
 
     private static func check(
