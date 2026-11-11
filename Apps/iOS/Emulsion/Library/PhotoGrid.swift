@@ -11,7 +11,8 @@ struct PhotoGrid: View {
     var columnCount: Int? = nil
     var previewID: PhotoRecord.ID? = nil
     let edit: (PhotoRecord.ID) -> Void
-    let open: (PhotoRecord.ID) -> Void
+    /// A tap outside Select: opens the editor on iPhone, previews in the expanded library.
+    let activate: (PhotoRecord.ID) -> Void
 
     @Environment(PhotoStore.self) private var store
 
@@ -27,7 +28,7 @@ struct PhotoGrid: View {
         ScrollView {
             LazyVGrid(columns: columns, spacing: FilmLabLayout.gridSpacing) {
                 ForEach(store.photos) { photo in
-                    PhotoCell(photo: photo, selection: $selection, open: open, isPreviewed: previewID == photo.id, edit: edit)
+                    PhotoCell(photo: photo, isPreviewed: previewID == photo.id, selection: $selection, edit: edit, activate: activate)
                         .matchedTransitionSource(id: photo.id, in: transition)
                 }
             }
@@ -37,11 +38,10 @@ struct PhotoGrid: View {
 
 private struct PhotoCell: View {
     let photo: PhotoRecord
-    @Binding var selection: LibrarySelection
-    let open: (PhotoRecord.ID) -> Void
-
     let isPreviewed: Bool
+    @Binding var selection: LibrarySelection
     let edit: (PhotoRecord.ID) -> Void
+    let activate: (PhotoRecord.ID) -> Void
 
     @Environment(PhotoStore.self) private var store
 
@@ -49,7 +49,7 @@ private struct PhotoCell: View {
 
     var body: some View {
         Button {
-            if selection.isActive { selection.toggle(photo.id) } else { open(photo.id) }
+            if selection.isActive { selection.toggle(photo.id) } else { activate(photo.id) }
         } label: {
             PhotoThumbnail(url: store.url(for: photo), adjustments: photo.adjustments)
                 .overlay {

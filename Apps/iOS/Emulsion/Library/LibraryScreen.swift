@@ -10,6 +10,7 @@ struct LibraryScreen: View {
     @State private var selection = LibrarySelection()
     @State private var previewID: PhotoRecord.ID?
     @Environment(\.horizontalSizeClass) private var horizontalSizeClass
+    @Environment(\.verticalSizeClass) private var verticalSizeClass
     @State private var importError: String?
     @Namespace private var editorTransition
     /// An even column count for the grid beside the preview (HIG, iPhone Duo inner display).
@@ -51,7 +52,9 @@ struct LibraryScreen: View {
 
     private var libraryContent: some View {
         GeometryReader { geometry in
-            if #available(iOS 27.1, *), geometry.isExpandedCanvas(horizontalSizeClass: horizontalSizeClass) {
+            if #available(iOS 27.1, *),
+                geometry.isExpandedCanvas(horizontalSizeClass: horizontalSizeClass, verticalSizeClass: verticalSizeClass)
+            {
                 expandedLibrary
             } else {
                 PhotoGrid(selection: $selection, transition: editorTransition, edit: openEditor) { id in
@@ -73,7 +76,7 @@ struct LibraryScreen: View {
             }
         } secondary: {
             UnobscuredContent {
-                LibraryPreview(photoID: shownPreviewID, edit: openEditor)
+                LibraryPreview(photoID: shownPreviewID, isSelecting: selection.isActive, edit: openEditor)
             }
         }
         .arrangementViewStyle(.split)

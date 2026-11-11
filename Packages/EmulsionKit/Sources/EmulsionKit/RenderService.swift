@@ -50,10 +50,7 @@ public actor RenderService {
     /// A rendered preview. Throws `CancellationError` if the caller moved on while it waited
     /// its turn, so slider drags don't queue up stale renders.
     public func image(_ url: URL, _ adjustments: Adjustments, maxDimension: CGFloat) throws -> CGImage {
-        if let cached = cachedThumbnail(url, adjustments, maxDimension: maxDimension) {
-            latestRenders.keep(cached, url, maxDimension: maxDimension)
-            return cached
-        }
+        if let cached = cachedThumbnail(url, adjustments, maxDimension: maxDimension) { return cached }
         try Task.checkCancellation()
         let renderer = try engine()
         let image = try renderer.cgImage(renderer.render(negative(url, maxDimension: maxDimension), adjustments))

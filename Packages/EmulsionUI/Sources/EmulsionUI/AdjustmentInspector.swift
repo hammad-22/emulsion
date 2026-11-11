@@ -26,8 +26,7 @@ public struct AdjustmentInspector: View {
                             .foregroundStyle(.secondary)
                             .accessibilityAddTraits(.isHeader)
                         ForEach(section.controls) { control in
-                            AdjustmentRuler(
-                                control: control, adjustments: $adjustments, identifier: "adjustment-ruler-\(control.id)", isCompact: true)
+                            AdjustmentRuler(control: control, adjustments: $adjustments, isCompact: true)
                         }
                     }
                 }
@@ -41,11 +40,8 @@ public struct AdjustmentInspector: View {
 
     /// A ruler move changes one control; Reset Edits changes several and keeps the selection.
     private func select(changedFrom old: Adjustments, to new: Adjustments) {
-        let changed = AdjustmentGroup.allCases.flatMap { section in
-            section.controls.filter { old[keyPath: $0.keyPath] != new[keyPath: $0.keyPath] }.map { (section, $0.id) }
-        }
-        guard changed.count == 1, let (section, control) = changed.first else { return }
-        if group != section { group = section }
-        if selectedControls[section] != control { selectedControls[section] = control }
+        guard let changed = AdjustmentGroup.changedControl(from: old, to: new) else { return }
+        if group != changed.group { group = changed.group }
+        if selectedControls[changed.group] != changed.control { selectedControls[changed.group] = changed.control }
     }
 }

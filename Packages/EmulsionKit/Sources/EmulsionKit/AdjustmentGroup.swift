@@ -21,6 +21,17 @@ public enum AdjustmentGroup: String, CaseIterable, Identifiable, Sendable {
         }
     }
 
+    /// The one control whose value differs between two edits, or nil when none or several
+    /// do (Reset Edits): a ruler move changes exactly one.
+    public static func changedControl(from old: Adjustments, to new: Adjustments) -> (
+        group: AdjustmentGroup, control: AdjustmentControl.ID
+    )? {
+        let changed = allCases.flatMap { group in
+            group.controls.filter { old[keyPath: $0.keyPath] != new[keyPath: $0.keyPath] }.map { (group: group, control: $0.id) }
+        }
+        return changed.count == 1 ? changed[0] : nil
+    }
+
     public var controls: [AdjustmentControl] {
         switch self {
         case .light:

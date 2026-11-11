@@ -1,8 +1,16 @@
 import SwiftUI
 
+#if os(iOS)
+    import UIKit
+#endif
+
 extension View {
-    /// A horizontal drag that leaves vertical drags to an enclosing scroll view. `onChanged`
-    /// receives the translation since the drag began.
+    /// A horizontal drag that leaves vertical drags to an enclosing scroll view that can
+    /// scroll. `onChanged` receives the translation since the drag began. On iOS a drag that
+    /// starts horizontally (or still) reports no vertical travel, as its direction is already
+    /// decided; a vertical drag with no scroll view to take it is claimed, so nothing behind
+    /// moves, and reports its full translation for `RulerDrag` to ignore. On macOS it reports
+    /// the full translation.
     func horizontalScrub(onChanged: @escaping (CGSize) -> Void, onEnded: @escaping () -> Void) -> some View {
         #if os(iOS)
             // A SwiftUI DragGesture claims the touch before the scroll view's pan can start, even
@@ -19,9 +27,7 @@ extension View {
 }
 
 #if os(iOS)
-    import UIKit
-
-    /// A pan that only begins when it starts out more horizontal than vertical.
+    /// A pan that decides once, as it starts, whether to scrub, claim or yield (`ScrubStart`).
     private struct HorizontalPanGesture: UIGestureRecognizerRepresentable {
         let onChanged: (CGSize) -> Void
         let onEnded: () -> Void
@@ -37,8 +43,8 @@ extension View {
         func handleUIGestureRecognizerAction(_ recognizer: UIPanGestureRecognizer, context: Context) {
             switch recognizer.state {
             case .began, .changed:
-                let translation = recognizer.translation(in: recognizer.view)
-                onChanged(CGSize(width: translation.x, height: translation.y))
+                let start = context.coordinator.start ?? .scrub
+                onChanged(start.reported(recognizer.translation(in: recognizer.view)))
             case .ended, .cancelled, .failed:
                 onEnded()
             default:
@@ -47,10 +53,38 @@ extension View {
         }
 
         final class Coordinator: NSObject, UIGestureRecognizerDelegate {
+            private(set) var start: ScrubStart?
+
             func gestureRecognizerShouldBegin(_ recognizer: UIGestureRecognizer) -> Bool {
                 guard let pan = recognizer as? UIPanGestureRecognizer else { return true }
-                let velocity = pan.velocity(in: pan.view)
-                return abs(velocity.x) > abs(velocity.y)
+                let start = ScrubStart(velocity: pan.velocity(in: pan.view), canScrollVertically: canScrollVertically(under: pan))
+                self.start = start
+                return start != .yield
+            }
+
+            /// Gestures on views behind the scale (a navigation dismiss, say) wait until this
+            /// pan has decided; when it yields, they proceed.
+            func gestureRecognizer(
+                _ recognizer: UIGestureRecognizer, shouldBeRequiredToFailBy other: UIGestureRecognizer
+            ) -> Bool {
+                guard let view = recognizer.view, let otherView = other.view, otherView !== view else { return false }
+                return view.isDescendant(of: otherView)
+            }
+
+            /// Walks up from the view under the touch: SwiftUI may attach the recognizer to a
+            /// host view above the scroll view rather than inside it.
+            private func canScrollVertically(under pan: UIPanGestureRecognizer) -> Bool {
+                guard let view = pan.view else { return false }
+                var ancestor = view.hitTest(pan.location(in: view), with: nil) ?? view
+                while true {
+                    if let scrollView = ancestor as? UIScrollView, scrollView.isScrollEnabled,
+                        scrollView.contentSize.height > scrollView.bounds.height
+                    {
+                        return true
+                    }
+                    guard let next = ancestor.superview else { return false }
+                    ancestor = next
+                }
             }
         }
     }

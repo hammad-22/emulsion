@@ -6,13 +6,17 @@ import SwiftUI
 struct AdjustmentRuler: View {
     let control: AdjustmentControl
     @Binding var adjustments: Adjustments
-    /// Distinguishes rulers for UI tests when several are on screen.
-    var identifier = "adjustment-ruler"
     /// One of several rulers in the inspector: a smaller readout over the minimum touch height.
     var isCompact = false
     @State private var drag = RulerDrag()
 
     private let tickSpacing: CGFloat = 10
+    /// Every fifth tick is major: taller and a level brighter, like a printed scale.
+    private let majorTickHeight: CGFloat = 24
+    private let minorTickHeight: CGFloat = 12
+    private let tickWidth: CGFloat = 1
+    /// Taller and wider than any tick, so the fixed indicator reads first.
+    private let indicatorSize = CGSize(width: 2, height: 36)
     private var scaleHeight: CGFloat { isCompact ? FilmLabLayout.minimumControlHeight : 56 }
     private var value: Double { adjustments[keyPath: control.keyPath] }
     private var neutral: Double { Adjustments()[keyPath: control.keyPath] }
@@ -38,7 +42,7 @@ struct AdjustmentRuler: View {
         .accessibilityElement(children: .ignore)
         .accessibilityLabel(control.title)
         .accessibilityValue(control.formatted(value))
-        .accessibilityIdentifier(identifier)
+        .accessibilityIdentifier("adjustment-ruler")
         .accessibilityAdjustableAction { direction in
             switch direction {
             case .increment: set(value + control.increment)
@@ -87,6 +91,7 @@ struct AdjustmentRuler: View {
         let position = (value - control.range.lowerBound) / control.increment
         let tickCount = self.tickCount
         let tickSpacing = self.tickSpacing
+        let (major, minor, tickWidth, indicatorSize) = (majorTickHeight, minorTickHeight, self.tickWidth, self.indicatorSize)
         return Canvas { context, size in
             let halfSpan = Double(size.width) / 2 / tickSpacing
             let first = max(0, Int((position - halfSpan).rounded(.down)))
@@ -94,13 +99,15 @@ struct AdjustmentRuler: View {
             guard first <= last else { return }
             for tick in first...last {
                 let isMajor = tick.isMultiple(of: 5)
-                let height: CGFloat = isMajor ? 24 : 12
+                let height = isMajor ? major : minor
                 let x = size.width / 2 + (Double(tick) - position) * tickSpacing
-                let mark = CGRect(x: x - 0.5, y: (size.height - height) / 2, width: 1, height: height)
+                let mark = CGRect(x: x - tickWidth / 2, y: (size.height - height) / 2, width: tickWidth, height: height)
                 context.fill(Path(mark), with: isMajor ? .style(.secondary) : .style(.tertiary))
             }
-            let indicator = CGRect(x: size.width / 2 - 1, y: (size.height - 36) / 2, width: 2, height: 36)
-            context.fill(Path(roundedRect: indicator, cornerRadius: 1), with: .style(.primary))
+            let indicator = CGRect(
+                x: (size.width - indicatorSize.width) / 2, y: (size.height - indicatorSize.height) / 2,
+                width: indicatorSize.width, height: indicatorSize.height)
+            context.fill(Path(roundedRect: indicator, cornerRadius: indicatorSize.width / 2), with: .style(.primary))
         }
     }
 

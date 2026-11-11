@@ -1,11 +1,13 @@
 import SwiftUI
 
 extension GeometryProxy {
-    /// Regular width, or a fold present (flat or not): the system split arrangement owns the
-    /// canvas. Always false before iOS 27.1, which keeps the ordinary-iPhone layout.
-    func isExpandedCanvas(horizontalSizeClass: UserInterfaceSizeClass?) -> Bool {
+    /// A fold present (flat or not), or a canvas regular in both directions: the system split
+    /// arrangement owns it. Regular width alone isn't enough: a large iPhone in landscape is
+    /// regular-width but too short for the split. Always false before iOS 27.1, which keeps
+    /// the ordinary-iPhone layout.
+    func isExpandedCanvas(horizontalSizeClass: UserInterfaceSizeClass?, verticalSizeClass: UserInterfaceSizeClass?) -> Bool {
         guard #available(iOS 27.1, *) else { return false }
-        return horizontalSizeClass == .regular
-            || !reservedRegions(kind: .division, options: .includeInactive).isEmpty
+        return !reservedRegions(kind: .division, options: .includeInactive).isEmpty
+            || (horizontalSizeClass == .regular && verticalSizeClass == .regular)
     }
 }

@@ -10,7 +10,7 @@
   - Every UI PR shows proof on the iPhone 17 Pro simulator and the iPhone Duo simulator (folded and unfolded). That needs the Xcode 27.1 SDK.
 - **Screen idiom (MOV-54/55/56):** the library is an edge-to-edge grid under system toolbars, following the system appearance. The editor is a neutral black, white-tinted workspace; the photo stays aspect-fit, without decorative overlays; the title says "Original" while comparing. Keep edit state, the selected adjustment and the library preview above layout branches so folding, hiding and rotation keep them.
   - Compact (iPhone, Duo folded): Adjust reveals one Photos-style ruler on a glass panel; hidden by default.
-  - Expanded (regular width or a division region, iOS 27.1): system split arrangements. Library: a 4-column grid beside a preview pane (photo, date, RAW/Edited, Edit Photo). Editor: photo beside `AdjustmentInspector` (every group on one glass sheet), shown by default; an explicit Adjust tap overrides the default in both postures. Hiding drops the split's axes so the photo view isn't rebuilt; `RenderService.latestRender` covers rebuilds across fold/unfold.
+  - Expanded (a division region, active or not, or regular width and height; iOS 27.1): system split arrangements. Library: a 4-column grid beside a preview pane (photo, date, RAW/Edited, Edit Photo). Editor: photo beside `AdjustmentInspector` (every group on one glass sheet), shown by default; an explicit Adjust tap overrides the default in both postures. Hiding drops the split's axes so the photo view isn't rebuilt; `RenderService.latestRender` covers rebuilds across fold/unfold.
   - Active division/occlusion regions displace the image into a contiguous usable rectangle; system navigation owns vertical bars. Never infer a model from device dimensions. Native Duo fold proof remains open (MOV-62/63).
 - **Accessibility:** every control has a label and supports Dynamic Type.
 - Folders are organized by feature (`Camera/`, `Library/`, `Editor/`), with helpers used by several features in `Shared/`. Models and app logic live in `Packages/EmulsionKit`, not in the app.
@@ -21,3 +21,4 @@
   xcrun xcresulttool export attachments --path /tmp/ui.xcresult --output-path /tmp/ui-shots
   ```
   XCUITest's own landscape screenshots come out garbled; for landscape proof, take a frame from `xcrun simctl io booted recordVideo`.
+  The walkthrough covers the phone layout only: the Duo simulator boots closed and XCUITest can't change its pose. For unfolded proof, set the pose with the Closed / Partially Open / Open buttons under the device in Device Hub (no simctl command exists) and capture the inner display with `xcrun simctl io <udid> screenshot --display primary-1`.

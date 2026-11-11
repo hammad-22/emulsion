@@ -5,8 +5,8 @@ import SwiftUI
 /// A photo developed and printed with its adjustments, or the untouched original for
 /// before/after, rendered off the main actor at the size it's shown.
 /// Until the first render, it shows a cached thumbnail of this exact edit, or for the edited
-/// photo the service's latest render of it (so a layout rebuilt by a fold doesn't flash);
-/// failing those, a filled frame (a thumbnail) waits as a quiet placeholder and a fitted one
+/// photo the service's latest render of it unless this render failed (so a layout rebuilt by
+/// a fold doesn't flash); failing those, a filled frame (a thumbnail) waits as a quiet placeholder and a fitted one
 /// shows progress.
 /// Re-renders when the edit or size changes, keeping the last image so slider drags don't flash
 /// and showing each render that finishes during a drag (`RenderOrder`).
@@ -43,7 +43,9 @@ public struct RenderedPhoto: View {
     /// photo scrolled back into the library grid appears without a placeholder frame), or the
     /// latest render of the edit. An original never borrows an edited frame.
     @ViewBuilder private func content(_ request: Request) -> some View {
-        if let image = image ?? cachedThumbnail(request) ?? latestEdit(request) {
+        if let image = Self.shownImage(
+            rendered: image, thumbnail: cachedThumbnail(request), latestEdit: latestEdit(request), failed: failed)
+        {
             Image(decorative: image, scale: 1)
                 .resizable()
                 .aspectRatio(contentMode: contentMode)
@@ -56,6 +58,14 @@ public struct RenderedPhoto: View {
         } else {
             ProgressView()
         }
+    }
+
+    /// What to show before falling back to a placeholder: a failed render shows its failure
+    /// rather than an older stand-in that would pass for the current edit.
+    static func shownImage(
+        rendered: CGImage?, thumbnail: @autoclosure () -> CGImage?, latestEdit: @autoclosure () -> CGImage?, failed: Bool
+    ) -> CGImage? {
+        rendered ?? thumbnail() ?? (failed ? nil : latestEdit())
     }
 
     private func cachedThumbnail(_ request: Request) -> CGImage? {

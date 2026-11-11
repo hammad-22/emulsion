@@ -6,6 +6,7 @@ import SwiftUI
 /// when it was taken, what kind of file it is, and the way into the editor.
 struct LibraryPreview: View {
     let photoID: PhotoRecord.ID?
+    let isSelecting: Bool
     let edit: (PhotoRecord.ID) -> Void
 
     @Environment(PhotoStore.self) private var store
@@ -16,7 +17,9 @@ struct LibraryPreview: View {
                 RenderedPhoto(url: store.url(for: photo), adjustments: photo.adjustments)
                     .accessibilityLabel("Selected photo")
                     .accessibilityAddTraits(.isImage)
-                PreviewCaption(photo: photo) { edit(photoID) }
+                    // A new photo starts fresh rather than keeping the last one's image.
+                    .id(photoID)
+                PreviewCaption(photo: photo, canEdit: !isSelecting) { edit(photoID) }
             }
             .padding(FilmLabLayout.inset)
         }
@@ -25,6 +28,7 @@ struct LibraryPreview: View {
 
 private struct PreviewCaption: View {
     let photo: PhotoRecord
+    let canEdit: Bool
     let edit: () -> Void
 
     var body: some View {
@@ -56,6 +60,7 @@ private struct PreviewCaption: View {
 
     private var editButton: some View {
         Button("Edit Photo", systemImage: "dial.low", action: edit)
+            .disabled(!canEdit)
             .buttonStyle(.glass)
             .controlSize(.large)
     }

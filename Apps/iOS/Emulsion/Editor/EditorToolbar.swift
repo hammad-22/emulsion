@@ -7,7 +7,8 @@ import SwiftUI
 struct EditorToolbar: ToolbarContent {
     let session: EditSession
     @Binding var isComparing: Bool
-    @Binding var showsAdjustments: Bool
+    let showsAdjustments: Bool
+    let toggleAdjustments: () -> Void
 
     @Environment(PhotoStore.self) private var store
     @Environment(AppSettings.self) private var settings
@@ -55,9 +56,7 @@ struct EditorToolbar: ToolbarContent {
     }
 
     private var adjustmentButton: some View {
-        Button {
-            showsAdjustments.toggle()
-        } label: {
+        Button(action: toggleAdjustments) {
             Label(showsAdjustments ? "Hide Adjustments" : "Adjust", systemImage: "dial.low")
         }
         .titleInHorizontalToolbar()
