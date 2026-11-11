@@ -97,6 +97,18 @@ public actor RenderService {
         return image
     }
 
+    /// A viewfinder frame upright and fitted within `maxDimension`, as the camera delivered
+    /// it: the one place the live film look will be applied (MOV-121). Each frame is read
+    /// back into a CGImage; zero-copy Metal presentation is MOV-12.
+    public func viewfinderImage(_ frame: CameraFrame, maxDimension: CGFloat) throws -> CGImage {
+        let renderer = try engine()
+        let image = frame.uprightImage
+        let upright = image.transformed(by: CGAffineTransform(translationX: -image.extent.minX, y: -image.extent.minY))
+        let scale = min(1, maxDimension / max(upright.extent.width, upright.extent.height))
+        let fitted = upright.transformed(by: CGAffineTransform(scaleX: scale, y: scale))
+        return try renderer.cgImage(fitted.cropped(to: CGRect(origin: .zero, size: fitted.extent.size).integral))
+    }
+
     /// Full-resolution develop and encode, look baked in.
     public func export(_ url: URL, _ adjustments: Adjustments, format: Renderer.ExportFormat) throws -> Data {
         let renderer = try engine()

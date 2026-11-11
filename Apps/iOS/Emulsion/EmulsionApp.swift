@@ -22,11 +22,13 @@ struct EmulsionApp: App {
         #if DEBUG
             if ProcessInfo.processInfo.arguments.contains("--component-gallery") {
                 ComponentGallery()
-            } else {
+            } else if ProcessInfo.processInfo.arguments.contains("--library") {
                 LibraryScreen()
+            } else {
+                CameraScreen()
             }
         #else
-            LibraryScreen()
+            CameraScreen()
         #endif
     }
 }
