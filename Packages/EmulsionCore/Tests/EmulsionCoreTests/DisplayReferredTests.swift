@@ -126,7 +126,12 @@ struct DisplayReferredTests {
 
     /// Measured: white → 2.879 on every channel (the largest of the cube corners), black → 0.18·2⁻⁹.
     @Test func sceneEstimateIsBounded() throws {
-        let corners: [SIMD3<Float>] = (0..<8).map { SIMD3(Float($0 & 1), Float($0 >> 1 & 1), Float($0 >> 2 & 1)) }
+        let corners: [SIMD3<Float>] = (0..<8).map { (corner: Int) -> SIMD3<Float> in
+            let red = Float(corner & 1)
+            let green = Float((corner >> 1) & 1)
+            let blue = Float((corner >> 2) & 1)
+            return SIMD3<Float>(red, green, blue)
+        }
         let scene = try sceneEstimate(Fixtures.row(corners, space: DisplayFixtures.displayP3))
         let ceiling = 0.18 * pow(2, FilmLook.displayCeilingStops)
         let floor = 0.18 * pow(2, FilmLook.displayFloorStops)
