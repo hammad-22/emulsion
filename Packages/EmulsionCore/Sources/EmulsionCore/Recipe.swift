@@ -18,20 +18,17 @@ public struct Recipe: Codable, Equatable, Identifiable, Sendable {
 
     public init(id: UUID = UUID(), name: String, summary: String = "", adjustments: Adjustments) throws(EmulsionError) {
         let name = name.trimmingCharacters(in: .whitespacesAndNewlines)
+        var settings = adjustments
+        settings.seed = 0
         guard !name.isEmpty, name.count <= Self.maximumNameLength, summary.count <= Self.maximumSummaryLength,
             name.utf8.count + summary.utf8.count <= Self.maximumMetadataSize,
             !name.unicodeScalars.contains(where: { CharacterSet.controlCharacters.contains($0) }),
             !summary.unicodeScalars.contains(where: { CharacterSet.controlCharacters.contains($0) }),
-            Self.fields.allSatisfy({ key, range in
-                let value = adjustments[keyPath: key.path]
-                return value.isFinite && range.contains(value)
-            })
+            Field.allCases.allSatisfy({ settings[keyPath: $0.path].isFinite }), settings.clamped() == settings
         else { throw .invalidRecipe }
         self.id = id
         self.name = name
         self.summary = summary
-        var settings = adjustments
-        settings.seed = 0
         self.adjustments = settings
     }
 
@@ -70,7 +67,7 @@ public struct Recipe: Codable, Equatable, Identifiable, Sendable {
         }
         let settings = try container.nestedContainer(keyedBy: Field.self, forKey: .adjustments)
         var adjustments = Adjustments()
-        for (key, _) in Self.fields { adjustments[keyPath: key.path] = try settings.decode(Double.self, forKey: key) }
+        for key in Field.allCases { adjustments[keyPath: key.path] = try settings.decode(Double.self, forKey: key) }
         try self.init(
             id: container.decode(UUID.self, forKey: .id), name: container.decode(String.self, forKey: .name),
             summary: container.decode(String.self, forKey: .summary), adjustments: adjustments)
@@ -84,10 +81,10 @@ public struct Recipe: Codable, Equatable, Identifiable, Sendable {
         try container.encode(name, forKey: .name)
         try container.encode(summary, forKey: .summary)
         var settings = container.nestedContainer(keyedBy: Field.self, forKey: .adjustments)
-        for (key, _) in Self.fields { try settings.encode(adjustments[keyPath: key.path], forKey: key) }
+        for key in Field.allCases { try settings.encode(adjustments[keyPath: key.path], forKey: key) }
     }
 
-    private enum Field: String, CodingKey {
+    private enum Field: String, CodingKey, CaseIterable {
         case exposure, warmth, tint, color, highlights, shadows, grain, halation
         var path: WritableKeyPath<Adjustments, Double> {
             switch self {
@@ -102,10 +99,4 @@ public struct Recipe: Codable, Equatable, Identifiable, Sendable {
             }
         }
     }
-
-    // The recipe boundary rejects rather than clamps untrusted settings. These are the editor's ranges.
-    private static let fields: [(Field, ClosedRange<Double>)] = [
-        (.exposure, -3...3), (.warmth, -1...1), (.tint, -1...1), (.color, -1...1),
-        (.highlights, -1...1), (.shadows, -1...1), (.grain, 0...1), (.halation, 0...1),
-    ]
 }
