@@ -6,7 +6,7 @@
 UI: before/after screenshots or a short screen recording (iOS Simulator; a device when it matters).
 Engine: before/after renders of a reference fixture plus the measured numbers.
 Docs only: "No visual change."
-Images and recordings live on a proof/<issue> branch, linked by commit SHA; never commit them to this branch. -->
+Images and recordings go on a proof/<issue> branch, never in this PR (AGENTS.md, "Prove it in the PR"). -->
 
 | Before | After |
 | --- | --- |
