@@ -58,33 +58,31 @@ struct AdjustmentRuler: View {
     }
 
     private var scale: some View {
-        ZStack {
-            ticks
-            Capsule().fill(.primary).frame(width: 2, height: 36)
-        }
-        .frame(maxWidth: .infinity, maxHeight: .infinity)
-        .mask {
-            LinearGradient(colors: [.clear, .black, .black, .clear], startPoint: .leading, endPoint: .trailing)
-        }
-        .contentShape(.rect)
-        .horizontalScrub { translation in
-            let next = drag.update(
-                value: value, translation: translation.width, verticalTranslation: translation.height,
-                pointsPerUnit: tickSpacing / control.increment, range: control.range,
-                neutral: neutral, detent: control.increment * 0.3
-            )
-            set(next)
-        } onEnded: {
-            drag.end()
-        }
-        .onTapGesture(count: 2) { set(neutral) }
-        .frame(height: scaleHeight)
-        .clipped()
+        ticks
+            .frame(maxWidth: .infinity, maxHeight: .infinity)
+            .mask {
+                LinearGradient(colors: [.clear, .black, .black, .clear], startPoint: .leading, endPoint: .trailing)
+            }
+            .contentShape(.rect)
+            .horizontalScrub { translation in
+                let next = drag.update(
+                    value: value, translation: translation.width, verticalTranslation: translation.height,
+                    pointsPerUnit: tickSpacing / control.increment, range: control.range,
+                    neutral: neutral, detent: control.increment * 0.3
+                )
+                set(next)
+            } onEnded: {
+                drag.end()
+            }
+            .onTapGesture(count: 2) { set(neutral) }
+            .frame(height: scaleHeight)
+            .clipped()
     }
 
     /// One drawing for the whole scale, so a drag redraws the visible ticks instead of
     /// re-laying out a view per tick. `.style` resolves the hierarchical colors in the
-    /// environment, keeping light/dark and Increase Contrast.
+    /// environment, keeping light/dark and Increase Contrast. The fixed indicator is drawn
+    /// last and a level brighter than any tick, so it reads first.
     private var ticks: some View {
         let position = (value - control.range.lowerBound) / control.increment
         let tickCount = self.tickCount
@@ -99,8 +97,10 @@ struct AdjustmentRuler: View {
                 let height: CGFloat = isMajor ? 24 : 12
                 let x = size.width / 2 + (Double(tick) - position) * tickSpacing
                 let mark = CGRect(x: x - 0.5, y: (size.height - height) / 2, width: 1, height: height)
-                context.fill(Path(mark), with: isMajor ? .style(.primary) : .style(.secondary))
+                context.fill(Path(mark), with: isMajor ? .style(.secondary) : .style(.tertiary))
             }
+            let indicator = CGRect(x: size.width / 2 - 1, y: (size.height - 36) / 2, width: 2, height: 36)
+            context.fill(Path(roundedRect: indicator, cornerRadius: 1), with: .style(.primary))
         }
     }
 
