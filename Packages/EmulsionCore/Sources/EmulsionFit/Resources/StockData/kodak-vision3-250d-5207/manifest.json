@@ -1,0 +1,185 @@
+{
+  "formatVersion": 1,
+  "stock": "kodak-vision3-250d-5207",
+  "filmType": "cameraNegative",
+  "source": {
+    "publisher": "Eastman Kodak Company",
+    "document": "H-1-5207",
+    "title": "KODAK VISION3 250D Color Negative Film 5207 / 7207",
+    "revision": "March 2026 (as printed in the PDF: 'MARCH 2026', footer 'Revised 3-26')",
+    "url": "https://www.kodak.com/content/products-brochures/motion-picture/KODAK-VISION3-250D-5207-7207-technical-information.pdf",
+    "pdfSHA256": "70adb298a7aabb285d986b720e07c87c27eb2361f0925aea2b15903c08282e16"
+  },
+  "tracings": "Not published in this repository. Re-trace them from the public datasheet PDF with Tools/stock-digitizing/digitize.py; each chart's sha256 is the digest of the CSV this manifest describes.",
+  "charts": {
+    "characteristic": {
+      "file": "characteristic.csv",
+      "sha256": "59e3ae0b1cf6b26e60d4269dbdb34e4d8d0f33c41792b29d80303e4708b8fe69",
+      "page": 3,
+      "figureTitle": "Sensitometric Curves",
+      "figureCode": null,
+      "imageIndex": 1,
+      "imageSizePixels": [664, 688],
+      "imageSHA256": "cdc484dae83ae5cc6cce75ca64519e0e7dbeced71a7962b7c638dc1f9d751511",
+      "conditions": "Exposure: 5500 K Daylight, 1/50 sec; Process: ECN-2; Densitometry: Status M",
+      "gridStep": 0.05,
+      "xAxis": {
+        "quantity": "log10 exposure (lux-seconds)",
+        "anchors": [[89.62, -3.7], [157.5, -3.1], [225.42, -2.5], [292.53, -1.9], [360.49, -1.3], [427.61, -0.7], [495.5, -0.1], [563.42, 0.5], [630.53, 1.1]],
+        "pixelsPerUnit": 112.685,
+        "fitResidualPixels": 0.226,
+        "anchorResidualsPixels": [-0.23, 0.04, 0.35, -0.15, 0.2, -0.29, -0.01, 0.3, -0.21]
+      },
+      "yAxis": {
+        "quantity": "density (Status M)",
+        "anchors": [[639.5, 0.0], [459.5, 1.0], [279.11, 2.0], [98.57, 3.0]],
+        "pixelsPerUnit": 180.318,
+        "fitResidualPixels": 0.137,
+        "anchorResidualsPixels": [-0.15, 0.17, 0.1, -0.12]
+      },
+      "lineWidthPixels": 2.73,
+      "uncertainty": {
+        "x": 0.0152,
+        "y": 0.0085,
+        "note": "1-sigma per point = half the drawn line width (1.36 px) plus that axis's largest tick-fit residual (x 0.35 px, y 0.17 px), in data units; the residual term covers unevenly drawn ticks. Where the curve is steep the y error grows with slope: at the 95th-percentile slope of these curves (0.57 y-units per x-unit) a point's y uncertainty is 0.0121. Does not include any error in how the publisher drew the chart."
+      },
+      "curves": {
+        "red": {
+          "xRange": [-3.7, 1.099],
+          "interpolatedSpans": [[-3.7, -3.663], [1.061, 1.099]],
+          "sharedSpans": []
+        },
+        "green": {
+          "xRange": [-3.7, 1.099],
+          "interpolatedSpans": [[-3.7, -3.663], [1.063, 1.099]],
+          "sharedSpans": []
+        },
+        "blue": {
+          "xRange": [-3.7, 1.099],
+          "interpolatedSpans": [[-3.7, -3.663], [1.06, 1.099]],
+          "sharedSpans": []
+        }
+      },
+      "cameraStops": {
+        "anchors": [[89.96, -8], [123.5, -7], [157.5, -6], [191.46, -5], [225.11, -4], [259.0, -3], [292.54, -2], [326.51, -1], [360.49, 0], [394.42, 1], [427.61, 2], [461.5, 3], [495.5, 4], [529.5, 5], [563.43, 6], [597.38, 7], [630.54, 8]],
+        "stopZeroLogExposure": -1.2995,
+        "logExposurePerStop": 0.3
+      },
+      "notes": ["Calibrated against the top LOG EXPOSURE axis. The camera-stop TICK MARKS on the bottom axis are uniform (about 33.8 px apart, -8 at the left frame edge, +8 at the right) and every second one coincides with a top log-exposure tick: 0.300 log E per stop, stop 0 at x = 360.5 px = -1.30 log lux-s. Only the printed stop LABEL text (-6, -5, -4 crowded, a gap before -3) is unevenly placed; cameraStops records the ticks, not the label positions.", "The first and last ~3 px of each curve are hidden by the frame line and continued straight to it (listed as interpolated spans).", "x axis fit: RMS residual 0.226 px, max 0.351 px", "y axis fit: RMS residual 0.137 px, max 0.172 px"]
+    },
+    "spectralSensitivity": {
+      "file": "spectral_sensitivity.csv",
+      "sha256": "9d65feee4affba4a9864a7862ae5b4240545f099950a98f5f3293c4e9eeda87f",
+      "page": 4,
+      "figureTitle": "Spectral Sensitivity Curves",
+      "figureCode": null,
+      "imageIndex": 5,
+      "imageSizePixels": [737, 749],
+      "imageSHA256": "a69a8d9373f579d4008989f5858d8a4fc6cfe617cecc7a9064a0fddf9a14596e",
+      "conditions": "Effective Exposure: 0.02 sec; Process: ECN-2; Densitometry: Status M; Density: 0.2>D-min",
+      "gridStep": 5,
+      "xAxis": {
+        "quantity": "wavelength (nm)",
+        "anchors": [[105.0, 250], [164.0, 300], [223.0, 350], [281.0, 400], [340.0, 450], [399.0, 500], [458.0, 550], [517.0, 600], [575.0, 650], [634.0, 700], [692.91, 750]],
+        "pixelsPerUnit": 1.176,
+        "fitResidualPixels": 0.262,
+        "anchorResidualsPixels": [-0.1, 0.12, 0.34, -0.44, -0.21, 0.01, 0.23, 0.45, -0.32, -0.1, 0.03]
+      },
+      "yAxis": {
+        "quantity": "log10 sensitivity (sensitivity = reciprocal of exposure in erg/cm2 required to produce the specified density)",
+        "anchors": [[602.5, 0.0], [491.0, 1.0], [380.0, 2.0], [269.0, 3.0], [157.91, 4.0]],
+        "pixelsPerUnit": 111.118,
+        "fitResidualPixels": 0.13,
+        "anchorResidualsPixels": [0.18, -0.2, -0.08, 0.04, 0.06]
+      },
+      "lineWidthPixels": 2.61,
+      "uncertainty": {
+        "x": 1.4967,
+        "y": 0.0135,
+        "note": "1-sigma per point = half the drawn line width (1.31 px) plus that axis's largest tick-fit residual (x 0.45 px, y 0.20 px), in data units; the residual term covers unevenly drawn ticks. Where the curve is steep the y error grows with slope: at the 95th-percentile slope of these curves (0.12 y-units per x-unit) a point's y uncertainty is 0.1851. Does not include any error in how the publisher drew the chart."
+      },
+      "curves": {
+        "yellow_forming_layer": {
+          "xRange": [360.123, 519.842],
+          "interpolatedSpans": [[465.82, 469.338], [487.084, 490.877]],
+          "sharedSpans": []
+        },
+        "magenta_forming_layer": {
+          "xRange": [401.323, 598.698],
+          "interpolatedSpans": [[487.55, 493.833], [585.745, 588.907], [592.809, 593.033]],
+          "sharedSpans": []
+        },
+        "cyan_forming_layer": {
+          "xRange": [537.526, 698.237],
+          "interpolatedSpans": [[537.526, 544.412], [584.695, 590.615], [606.011, 611.36], [668.47, 671.458]],
+          "sharedSpans": []
+        }
+      },
+      "notes": ["The cyan-forming curve starts at about 527 nm lying on the frame's bottom line; the part touching the frame (about 527-537 nm) is not traced, and 537.5-544 nm is a straight continuation into the frame (interpolated).", "Peaks and dips that fall on grid lines (yellow-forming dip at 440 nm, magenta-forming peak at 550 nm) are bridged across the grid line and listed as interpolated.", "x axis fit: RMS residual 0.262 px, max 0.453 px", "y axis fit: RMS residual 0.130 px, max 0.199 px"]
+    },
+    "spectralDyeDensity": {
+      "file": "spectral_dye_density.csv",
+      "sha256": "95255edd0edcb11e8b4acf707c1a773743d2ae3fbe08465acc59cd703c129fb9",
+      "page": 4,
+      "figureTitle": "Spectral Dye Density Curves",
+      "figureCode": null,
+      "imageIndex": 4,
+      "imageSizePixels": [693, 754],
+      "imageSHA256": "0e49e0068dd4d186251bcb875ab0f5e3e414cb249fecc9a3af7d133ab60d9ec9",
+      "conditions": "Process: ECN-2; D-mins subtracted",
+      "gridStep": 5,
+      "xAxis": {
+        "quantity": "wavelength (nm)",
+        "anchors": [[104.96, 400], [240.0, 500], [375.05, 600], [510.09, 700], [645.09, 800]],
+        "pixelsPerUnit": 1.35,
+        "fitResidualPixels": 0.011,
+        "anchorResidualsPixels": [-0.01, -0.0, 0.01, 0.02, -0.02]
+      },
+      "yAxis": {
+        "quantity": "diffuse spectral density",
+        "anchors": [[669.51, -0.2], [616.09, 0.0], [561.59, 0.2], [507.91, 0.4], [453.81, 0.6], [399.92, 0.8], [345.9, 1.0], [291.91, 1.2], [237.91, 1.4], [183.92, 1.6], [129.91, 1.8]],
+        "pixelsPerUnit": 269.893,
+        "fitResidualPixels": 0.141,
+        "anchorResidualsPixels": [-0.23, 0.32, -0.2, 0.1, -0.02, 0.06, 0.03, 0.02, -0.01, -0.02, -0.05]
+      },
+      "lineWidthPixels": 2.24,
+      "uncertainty": {
+        "x": 0.8393,
+        "y": 0.0053,
+        "note": "1-sigma per point = half the drawn line width (1.12 px) plus that axis's largest tick-fit residual (x 0.02 px, y 0.32 px), in data units; the residual term covers unevenly drawn ticks. Where the curve is steep the y error grows with slope: at the 95th-percentile slope of these curves (0.02 y-units per x-unit) a point's y uncertainty is 0.0153. Does not include any error in how the publisher drew the chart."
+      },
+      "curves": {
+        "yellow": {
+          "xRange": [399.968, 788.393],
+          "interpolatedSpans": [[399.968, 403.935], [405.787, 407.415], [467.937, 468.782], [490.76, 494.017], [536.353, 541.118]],
+          "sharedSpans": []
+        },
+        "magenta": {
+          "xRange": [407.12, 800.073],
+          "interpolatedSpans": [[459.293, 464.42], [490.961, 492.415], [573.657, 576.775], [585.886, 591.956], [786.362, 789.986]],
+          "sharedSpans": []
+        },
+        "cyan": {
+          "xRange": [407.1, 800.073],
+          "interpolatedSpans": [[458.869, 464.452], [535.821, 541.565], [584.154, 591.83], [619.197, 633.267], [744.96, 777.019], [796.378, 800.073]],
+          "sharedSpans": []
+        },
+        "midscale_neutral": {
+          "xRange": [399.968, 800.073],
+          "interpolatedSpans": [[399.968, 404.05], [405.651, 407.248], [440.444, 444.497], [619.336, 633.276], [744.947, 776.995], [796.005, 800.073]],
+          "sharedSpans": []
+        },
+        "minimum_density": {
+          "xRange": [399.968, 790.685],
+          "interpolatedSpans": [[411.966, 429.648], [459.521, 481.517], [497.537, 514.82], [568.207, 584.253], [586.178, 597.114]],
+          "sharedSpans": []
+        }
+      },
+      "notes": ["Page text: 'Cyan, Magenta, and Yellow Dye Curves are peak-normalized.'", "Curve identity by continuity through the crossings: the curve near 0.0 at 400 nm that dips slightly BELOW zero around 430-470 nm is the short-wavelength tail of MAGENTA (masking coupler consumed), which then rises to the 540 nm peak; the curve starting near 0.2 at 400 nm and falling to about 0.03 near 500 nm before rising to the 685 nm peak is CYAN; yellow starts near 0.5 at 400 nm.", "Minimum Density is drawn dashed; gaps between dashes are bridged by interpolation and not listed as interpolated spans.", "The yellow tail meets the magenta tail at about 790 nm and stops there; the trace ends at 789 nm, where the two lines are last separable.", "Cyan and Midscale Neutral run together between about 750 and 775 nm (interpolated). Which line is which beyond 775 nm is a judgement: the traced reading has them cross (cyan, the steeper line before the merge, continues as the lower line). The alternative, touching without crossing, would swap the two columns above 775 nm by up to 0.05 density.", "Magenta and cyan start under the 0.0 and 0.2 tick marks at the left edge; their first ~7 nm (400-407) are not traced.", "Crossings were bridged with shape-preserving (PCHIP) interpolation between measured points on either side; every bridge is listed in interpolatedSpans.", "x axis fit: RMS residual 0.011 px, max 0.016 px", "y axis fit: RMS residual 0.141 px, max 0.323 px"]
+    }
+  },
+  "method": "Each chart is the embedded raster extracted from the PDF with poppler pdfimages (native pixels, no re-rendering). Axes: the frame lines and every labelled tick (or grid line) are located on a darkness profile across a strip just inside the frame, keeping only features that cross the whole strip, with sub-pixel centroids; a linear fit over all measurable ticks per axis maps pixels to data (per-tick residuals in the manifest). Curves: a line follower walks each curve one pixel at a time, taking the darkness-weighted centre of the line on a profile perpendicular to the local direction (so steep flanks are sampled along the curve, not per column). Seed points and waypoints per chart are listed in Tools/stock-digitizing/charts.json; the trace must pass within 3 px of every waypoint, which catches a swap onto another curve. Frame, ticks and text boxes listed in the config are treated as unknown, grid lines as blank. Where the line is hidden (crossings, grid lines, labels, dash gaps) the trace coasts and the gap is replaced by PCHIP interpolation between measured neighbours; sharp vertices hidden by a grid line are rebuilt from the two arms (x) and the ink at the tip (y). Measured points are smoothed with a 5-tap binomial filter (sigma = 1 px). The centreline is resampled onto the fixed grid by linear interpolation between adjacent trace points (about 1 px apart) inside each curve's drawn extent only; grid points within 0.5 px beyond a curve end take the end value. No extrapolation, no fitting of model curves. Stretches where curves lie on the axis line are read from the stroke's visible upper or lower edge plus or minus half the line width; one drawn line shared by several curves is given to each and listed in sharedSpans. imageSHA256 hashes the PNG written by poppler pdfimages (version in popplerVersion); another poppler version may encode the same pixels differently.",
+  "tool": "Tools/stock-digitizing/digitize.py",
+  "popplerVersion": "26.08.0",
+  "tracedOn": "2026-11-10"
+}

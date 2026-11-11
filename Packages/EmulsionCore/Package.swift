@@ -11,9 +11,12 @@ let package = Package(
     targets: [
         .target(name: "EmulsionCore", resources: [.process("Resources")]),
         .target(name: "EmulsionFixtures"),
+        // Offline stock data and fitting. Deliberately not a library product: the datasheet data must never reach an app bundle.
+        .target(name: "EmulsionFit", resources: [.copy("Resources/StockData")]),
         .testTarget(
             name: "EmulsionCoreTests", dependencies: ["EmulsionCore", "EmulsionFixtures"],
             resources: [.copy("References"), .copy("Goldens"), .copy("Scenes")]),
+        .testTarget(name: "EmulsionFitTests", dependencies: ["EmulsionFit"]),
     ],
     swiftLanguageModes: [.v6]
 )

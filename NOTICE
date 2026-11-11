@@ -6,3 +6,12 @@ This product is licensed under the Apache License, Version 2.0 (see LICENSE).
 Film stock names (e.g. Kodak, Vision, Fujifilm, Eterna) mentioned in the
 documentation are trademarks of their respective owners and are used only to
 describe research sources. The apps use descriptive look names.
+
+The provenance manifests in Packages/EmulsionCore/Sources/EmulsionFit/Resources/StockData
+describe this project's own numeric readings of charts published in Eastman Kodak Company
+technical data sheets (H-1-5207, H-1-5219, H-1-2383): source document, revision, URL,
+PDF SHA-256, figure, tracing method, error estimates and the SHA-256 of each traced curve
+file. The traced curves themselves are not included in this repository. The data sheets
+are copyright Eastman Kodak Company and are not redistributed here. The readings are used
+only by the offline fitting tool and are not part of the apps. This project is not
+affiliated with or endorsed by Kodak.
