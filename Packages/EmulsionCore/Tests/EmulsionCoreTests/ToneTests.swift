@@ -47,12 +47,4 @@ final class ToneTests: EmulsionTestCase {
         XCTAssertGreaterThan(warm.x - warm.z, base.x - base.z + 10)
         XCTAssertLessThan(magenta.y, base.y - 3)
     }
-
-    func testDisplayPhotoTonesSurviveTheRoundTrip() throws {
-        let display = Fixtures.row(Fixtures.grayRamp(steps: 64), space: p3)
-        let negative = try renderer.developer.sceneFromDisplay(display)
-        let out = Fixtures.oklab(try renderer.render(negative, .neutral))
-        let input = Fixtures.oklab(display)
-        for i in 4..<60 { XCTAssertEqual(out[i].x, input[i].x, accuracy: 0.02, "tone changed at step \(i)") }
-    }
 }

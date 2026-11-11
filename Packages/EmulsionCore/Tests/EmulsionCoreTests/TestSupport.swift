@@ -13,10 +13,13 @@ class EmulsionTestCase: XCTestCase {
     let p3 = Renderer.outputSpace
 
     func render(_ scene: CIImage, _ a: Adjustments = .neutral) throws -> CIImage {
-        try renderer.render(Negative(image: scene, source: .raw), a)
+        try renderer.render(Negative(image: scene, contract: .sceneReferred), a)
     }
     /// Encoded Display P3 values ×255, before 8-bit rounding.
-    func codes(_ image: CIImage) -> [SIMD3<Double>] { Fixtures.encodedFloats(image, space: p3).map { $0 * 255 } }
+    func codes(_ image: CIImage) -> [SIMD3<Double>] { Self.codes(image) }
+    static func codes(_ image: CIImage) -> [SIMD3<Double>] {
+        Fixtures.encodedFloats(image, space: Renderer.outputSpace).map { $0 * 255 }
+    }
     /// Display P3 luminance weights.
     func luma(_ c: SIMD3<Double>) -> Double { 0.2290 * c.x + 0.6917 * c.y + 0.0793 * c.z }
     func sd(_ v: [Double]) -> Double {
@@ -24,7 +27,8 @@ class EmulsionTestCase: XCTestCase {
         return (v.map { ($0 - m) * ($0 - m) }.reduce(0, +) / Double(v.count)).squareRoot()
     }
     /// Index of pixel (x, y) in a fixture's bottom-row-first pixel array.
-    func pixel(x: Int, y: Int, width: Int) -> Int { y * width + x }
+    func pixel(x: Int, y: Int, width: Int) -> Int { Self.pixel(x: x, y: y, width: width) }
+    static func pixel(x: Int, y: Int, width: Int) -> Int { y * width + x }
     /// Linear Display P3 → OKLab.
     func p3ToLab(_ p: SIMD3<Double>) -> SIMD3<Double> {
         let m = simd_double3x3(rows: [

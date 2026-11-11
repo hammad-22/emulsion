@@ -1,9 +1,10 @@
 import Foundation
 import simd
 
-/// Camera and display encodings Emulsion can read, each decoded to scene light (0.18 =
-/// mid-gray) in the linear sRGB/D65 working space. Curves and primaries follow each
-/// manufacturer's published white paper (cross-checked against the colour-science library).
+/// Camera and display encodings Emulsion can read, each decoded to linear light (0.18 =
+/// mid-gray) in the linear sRGB/D65 working space; `contract` says what that light means.
+/// Curves and primaries follow each manufacturer's published white paper (cross-checked
+/// against the colour-science library).
 public enum InputColorSpace: String, CaseIterable, Identifiable, Codable, Sendable {
     case appleLog, sLog3SGamut3Cine, arriLogC3, arriLogC4, vLog, davinciIntermediate, acescct
     case hlgRec2020, rec709, displayP3, linearP3
@@ -25,9 +26,16 @@ public enum InputColorSpace: String, CaseIterable, Identifiable, Codable, Sendab
         }
     }
 
-    /// Display-referred sources are inverted through the film system's neutral response;
-    /// everything else is scene-referred after its curve.
-    public var isDisplayReferred: Bool { self == .rec709 || self == .displayP3 }
+    /// Display-referred sources get a scene estimate and are printed relative to themselves;
+    /// everything else is decoded as scene light by its curve.
+    public var contract: InputContract {
+        switch self {
+        case .rec709, .displayP3: return .displayReferred
+        case .hlgRec2020: return .nominalScene
+        case .appleLog, .sLog3SGamut3Cine, .arriLogC3, .arriLogC4, .vLog, .davinciIntermediate, .acescct, .linearP3:
+            return .sceneReferred
+        }
+    }
 
     /// Curve identifier understood by the `inputTransform` kernel.
     var curve: Int {

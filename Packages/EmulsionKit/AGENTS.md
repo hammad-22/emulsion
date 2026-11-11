@@ -13,4 +13,4 @@ Shared app logic for the iOS and Mac apps: the photo library (`PhotoStore`, `Pho
   (cd Packages/EmulsionKit && xcodebuild test -scheme EmulsionKit -destination 'platform=iOS Simulator,name=iPhone 17 Pro')
   ```
   If the newest simulator runtime has no iPhone 17 Pro, add its OS to the destination (e.g. `,OS=26.2`).
-  Each test gets its own `TestLibrary` (folder and `RenderService`), so tests can run in parallel. User-facing strings use `String(localized:bundle: .module)`.
+  Each test gets its own `TestLibrary` (folder and `RenderService`), so tests can run in parallel; the services share one `Renderer`, as the app has one (MOV-127), and keep thumbnails in a store the system never purges, so caching is checkable (MOV-130). Build test services through `TestLibrary`, not `RenderService()`. User-facing strings use `String(localized:bundle: .module)`.

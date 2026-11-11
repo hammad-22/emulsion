@@ -64,11 +64,15 @@ float3 fitP3(float3 rgb) {
 }
 
 // ---- Photochemical film system (see FilmModel.swift; equations must match) ----
+// Kernel-argument ABI (packed by FilmModel+Kernel.swift):
 // m0..m2: layer sensitivity rows. neg = (gammaR, gammaG, gammaB, range).
 // negOff = (offset R, G, B log10, exposure EV). prt = (gammaR, gammaG, gammaB, range).
 // misc = (paper dmin, Richards shape, saturation, highlight chroma retention).
-// lights = printer lights (log10).
+// lights = printer lights (log10): calibrated plus the user's.
 // d0..d2: print dye cross-absorption rows.
+// Display-referred kernels add ends = soft ends (kneeHigh, a, kneeLow, b) (see SoftEnds in
+// FilmModel+Display.swift); displayToScene adds i0..i2, the rows of the inverse sensitivity;
+// filmSystemRelative adds baseLights = the calibrated printer lights alone.
 float logistic(float x) { return 1.0/(1.0+exp(-x)); }
 
 float3 filmRender(float3 p, float3 m0, float3 m1, float3 m2, float4 neg, float4 negOff,
@@ -88,45 +92,113 @@ float3 filmRender(float3 p, float3 m0, float3 m1, float3 m2, float4 neg, float4 
     return exp10(-(dPrint-paper));
 }
 
-// Scene light (working space) → displayed print (working space), soft-mapped into P3.
-extern "C" float4 filmSystem(coreimage::sample_t sample, float4 m0, float4 m1, float4 m2,
-                             float4 neg, float4 negOff, float4 prt, float4 misc, float4 lights,
-                             float4 d0, float4 d1, float4 d2) {
-    float a=sample.a;
-    float3 p=toP3(sample.rgb/max(a,1e-6));
-    float3 o=filmRender(p,m0.xyz,m1.xyz,m2.xyz,neg,negOff,prt,misc,lights.xyz,d0.xyz,d1.xyz,d2.xyz);
-    // Highlight chroma retention (misc.w): blend bright saturated light toward a
-    // ratio-preserving rendering through the same neutral response (see FilmModel).
+// Scene light (linear P3) → displayed print (display-linear P3) before the gamut fit: filmRender
+// plus highlight chroma retention (misc.w), which blends bright saturated light toward a
+// ratio-preserving rendering through the same neutral response (see FilmModel.render).
+float3 filmPrint(float3 p, float3 m0, float3 m1, float3 m2, float4 neg, float4 negOff,
+                 float4 prt, float4 misc, float3 lights, float3 d0, float3 d1, float3 d2) {
+    float3 o=filmRender(p,m0,m1,m2,neg,negOff,prt,misc,lights,d0,d1,d2);
     float3 q=p*exp2(negOff.w); float Yq=lumaP3(q); q=Yq+(q-Yq)*misc.z;
     float m=max(max(q.x,q.y),max(q.z,1e-7));
     float w=misc.w*smoothstep(1.5,4.0,log2(m/0.18));
     if(w>0.0) {
         // Neutral of brightness m: undo the exposure filmRender re-applies, no saturation.
-        float g=filmRender(float3(m)*exp2(-negOff.w),m0.xyz,m1.xyz,m2.xyz,neg,negOff,prt,float4(misc.x,misc.y,1.0,0.0),lights.xyz,d0.xyz,d1.xyz,d2.xyz).y;
+        float g=filmRender(float3(m)*exp2(-negOff.w),m0,m1,m2,neg,negOff,prt,float4(misc.x,misc.y,1.0,0.0),lights,d0,d1,d2).y;
         o=mix(o,q*(g/m),w);
     }
+    return o;
+}
+
+// Scene light (working space, premultiplied) → displayed print (working space), soft-mapped into P3.
+extern "C" float4 filmSystem(coreimage::sample_t sample, float4 m0, float4 m1, float4 m2,
+                             float4 neg, float4 negOff, float4 prt, float4 misc, float4 lights,
+                             float4 d0, float4 d1, float4 d2) {
+    float a=sample.a;
+    float3 p=toP3(sample.rgb/max(a,1e-6));
+    float3 o=filmPrint(p,m0.xyz,m1.xyz,m2.xyz,neg,negOff,prt,misc,lights.xyz,d0.xyz,d1.xyz,d2.xyz);
     return float4(fitP3(fromP3(o))*a,a);
 }
 
-// Display-referred photo → scene light: invert the system's neutral response per channel
-// (bisection in log exposure), so a JPEG/HEIC is re-rendered by the same film rather than
-// having film stacked on top of Apple's rendering.
+// ---- Display-referred sources (see FilmModel+Display.swift; equations must match) ----
+// Display white and black are given a finite scene estimate (FilmLook constants, mirrored here
+// for the bisection bracket): engineering choices, not measurements.
+constant float displayCeilingStops=4.0;
+constant float displayFloorStops=-9.0;
+constant float displaySearchMarginStops=0.5;
+constant int displaySearchSteps=22;
+
+// F_n: display-linear green of the calibrated print of a neutral scene `linear`, at zero edits.
+float neutralPrint(float linear, float3 m0, float3 m1, float3 m2, float4 neg, float4 negOff,
+                   float4 prt, float4 misc, float3 lights, float3 d0, float3 d1, float3 d2) {
+    return filmRender(float3(linear),m0,m1,m2,neg,float4(negOff.xyz,0.0),prt,float4(misc.x,misc.y,1.0,0.0),lights,d0,d1,d2).y;
+}
+// F_n of each component: three neutral scenes, one per channel.
+float3 neutralPrint3(float3 v, float3 m0, float3 m1, float3 m2, float4 neg, float4 negOff,
+                     float4 prt, float4 misc, float3 lights, float3 d0, float3 d1, float3 d2) {
+    return float3(neutralPrint(v.x,m0,m1,m2,neg,negOff,prt,misc,lights,d0,d1,d2),
+                  neutralPrint(v.y,m0,m1,m2,neg,negOff,prt,misc,lights,d0,d1,d2),
+                  neutralPrint(v.z,m0,m1,m2,neg,negOff,prt,misc,lights,d0,d1,d2));
+}
+// Soft ends K: identity between the knees, compressing display values toward the print's
+// reachable range [F_n(floor), F_n(ceiling)]; `expand` is the closed-form inverse on that range.
+float compressEnds(float y, float4 ends) {
+    if(y>ends.x) { float u=y-ends.x; return ends.x+u/(1.0+ends.y*u); }
+    if(y<ends.z) { float u=ends.z-y; return ends.z-u/(1.0+ends.w*u); }
+    return y;
+}
+float expandEnds(float v, float4 ends) {
+    if(v>ends.x) { float u=v-ends.x; return ends.x+u/(1.0-ends.y*u); }
+    if(v<ends.z) { float u=ends.z-v; return ends.z-u/(1.0-ends.w*u); }
+    return v;
+}
+float3 compressEnds3(float3 y, float4 ends) { return float3(compressEnds(y.x,ends),compressEnds(y.y,ends),compressEnds(y.z,ends)); }
+float3 expandEnds3(float3 v, float4 ends) { return float3(expandEnds(v.x,ends),expandEnds(v.y,ends),expandEnds(v.z,ends)); }
+
+// Display-referred photo (display-linear, working space, premultiplied) → scene estimate (linear,
+// working space, premultiplied). Per channel, bisection finds the neutral exposure v whose print
+// equals the soft-ended display value; the layers are then given exactly v (s = sensitivity⁻¹·v).
 extern "C" float4 displayToScene(coreimage::sample_t sample, float4 m0, float4 m1, float4 m2,
                                  float4 neg, float4 negOff, float4 prt, float4 misc, float4 lights,
-                                 float4 d0, float4 d1, float4 d2) {
+                                 float4 d0, float4 d1, float4 d2, float4 ends, float4 i0, float4 i1, float4 i2) {
     float a=sample.a;
-    float3 target=clamp(toP3(sample.rgb/max(a,1e-6)),0.0,1.0);
-    float3 lo=float3(-16.0), hi=float3(12.0);
-    for(int i=0;i<26;i++) {
+    float3 x=clamp(toP3(sample.rgb/max(a,1e-6)),0.0,1.0);
+    float3 target=compressEnds3(x,ends);
+    float3 lo=float3(displayFloorStops-displaySearchMarginStops), hi=float3(displayCeilingStops+displaySearchMarginStops);
+    for(int i=0;i<displaySearchSteps;i++) {
         float3 mid=(lo+hi)*.5;
-        float3 o=float3(filmRender(float3(0.18*exp2(mid.x)),m0.xyz,m1.xyz,m2.xyz,neg,negOff,prt,misc,lights.xyz,d0.xyz,d1.xyz,d2.xyz).y,
-                        filmRender(float3(0.18*exp2(mid.y)),m0.xyz,m1.xyz,m2.xyz,neg,negOff,prt,misc,lights.xyz,d0.xyz,d1.xyz,d2.xyz).y,
-                        filmRender(float3(0.18*exp2(mid.z)),m0.xyz,m1.xyz,m2.xyz,neg,negOff,prt,misc,lights.xyz,d0.xyz,d1.xyz,d2.xyz).y);
+        float3 o=neutralPrint3(0.18*exp2(mid),m0.xyz,m1.xyz,m2.xyz,neg,negOff,prt,misc,lights.xyz,d0.xyz,d1.xyz,d2.xyz);
         lo=select(lo,mid,o<target); hi=select(mid,hi,o<target);
     }
     float3 v=0.18*exp2((lo+hi)*.5);
-    v=select(v,float3(0.0),target<=0.0);
-    return float4(fromP3(v)*a,a);
+    float3 s=float3(dot(i0.xyz,v),dot(i1.xyz,v),dot(i2.xyz,v));
+    return float4(fromP3(s)*a,a);
+}
+
+// Scene estimate of a display-referred photo `edited` (with the user's halation added) and
+// `original` (the estimate untouched), both linear working space, premultiplied → displayed print
+// (working space), soft-mapped into P3. The edited print's change from the zero-edit print is
+// applied to the original display value, so zero edits reproduce the photo up to fitP3 (chroma
+// above 85% of the P3 boundary is compressed); edit arguments as
+// filmSystem, plus ends and the calibrated printer lights (baseLights).
+extern "C" float4 filmSystemRelative(coreimage::sample_t edited, coreimage::sample_t original, float4 m0, float4 m1, float4 m2,
+                                     float4 neg, float4 negOff, float4 prt, float4 misc, float4 lights,
+                                     float4 d0, float4 d1, float4 d2, float4 ends, float4 baseLights) {
+    float a=edited.a;
+    float3 p=toP3(edited.rgb/max(a,1e-6));
+    float3 s0=toP3(original.rgb/max(original.a,1e-6));
+    float4 baseNegOff=float4(negOff.xyz,0.0), baseMisc=float4(misc.x,misc.y,1.0,misc.w);
+    float3 e=filmPrint(p,m0.xyz,m1.xyz,m2.xyz,neg,negOff,prt,misc,lights.xyz,d0.xyz,d1.xyz,d2.xyz);
+    float3 b=filmPrint(s0,m0.xyz,m1.xyz,m2.xyz,neg,baseNegOff,prt,baseMisc,baseLights.xyz,d0.xyz,d1.xyz,d2.xyz);
+    float3 E=max(float3(dot(m0.xyz,s0),dot(m1.xyz,s0),dot(m2.xyz,s0)),float3(1e-7));
+    // Clamped to what the soft ends produce for display 0…1, so the inverse stays in 0…1.
+    float lo=compressEnds(0.0,ends), hi=compressEnds(1.0,ends);
+    float3 x=expandEnds3(clamp(neutralPrint3(E,m0.xyz,m1.xyz,m2.xyz,neg,negOff,prt,misc,baseLights.xyz,d0.xyz,d1.xyz,d2.xyz),lo,hi),ends);
+    float3 g=x/max(b,float3(1e-6));
+    // The ratio g carries the photo's offset from its print. Where g < 1 a brightening edit adds
+    // (1−g)² of the print's increase on top, so a zero channel can still rise (desaturation) while
+    // the slope stays continuous through zero edits.
+    float3 out=e*g+select(float3(0.0),(1.0-g)*(1.0-g)*max(e-b,0.0),g<1.0);
+    return float4(fitP3(fromP3(out))*a,a);
 }
 
 // ---- Input transforms: camera log / display encodings → working-space light ----

@@ -4,17 +4,20 @@ import Foundation
 import ImageIO
 import UniformTypeIdentifiers
 
-/// A developed photo in scene-referred linear light, ready for the look.
+/// A developed photo in linear working-space light, ready for the look. `contract` says what
+/// that light is: scene light, nominal scene light, or (for display-referred sources) a scene
+/// estimate that the renderer prints relative to the photo, so zero edits reproduce it up to
+/// the output gamut fit (which compresses chroma above 85% of the P3 boundary).
 public struct Negative: @unchecked Sendable {
-    public enum Source: Sendable { case raw, display }
     public let image: CIImage
-    public let source: Source
+    public let contract: InputContract
     public var size: CGSize { image.extent.size }
 }
 
-/// Turns camera data into scene light. RAW (ProRAW or Bayer DNG) goes through Apple's
-/// CIRAWFilter with its look processing switched off; display-referred photos are brought
-/// back to approximate scene light through the inverse of the neutral film curve.
+/// Turns camera data into linear light for the film system. RAW (ProRAW or Bayer DNG) goes
+/// through Apple's CIRAWFilter with its look processing switched off. Display-referred photos
+/// only get an estimate of scene light from the neutral film curve: the camera's rendering
+/// can't be undone.
 public struct Developer {
     private let kernels: Kernels
     init(kernels: Kernels) { self.kernels = kernels }
@@ -45,8 +48,10 @@ public struct Developer {
             guard let output = raw.outputImage, !output.extent.isEmpty, !output.extent.isInfinite else {
                 throw EmulsionError.unsupportedPhoto
             }
-            return Negative(image: normalized(output), source: .raw)
+            return Negative(image: normalized(output), contract: .sceneReferred)
         }
+        // Known limitation: HDR stills are read as their SDR rendition (a gain map is ignored,
+        // PQ/HLG stills are tone-mapped by Core Image), so HDR headroom is discarded until MOV-49.
         guard var image = CIImage(data: data, options: [.applyOrientationProperty: true, .toneMapHDRtoSDR: true]),
             !image.extent.isEmpty, !image.extent.isInfinite
         else { throw EmulsionError.unsupportedPhoto }
@@ -59,19 +64,22 @@ public struct Developer {
         return try sceneFromDisplay(normalized(image))
     }
 
-    /// Display-referred linear image → scene light (neutral inverse film curve).
+    /// Display-referred linear image → a scene estimate: per channel, the neutral exposure whose
+    /// print matches the display value, with white and black held at a finite ceiling and floor
+    /// (`FilmModel.sceneEstimate(fromDisplay:)`). Not a recovery of the scene.
     public func sceneFromDisplay(_ image: CIImage) throws -> Negative {
-        let args: [Any] = [image] + FilmLook.stock.kernelArguments()
-        return Negative(image: try kernels.run(kernels.displayToScene, image.extent, args), source: .display)
+        let args: [Any] = [image] + FilmLook.stock.displayToSceneArguments()
+        return Negative(image: try kernels.run(kernels.displayToScene, image.extent, args), contract: .displayReferred)
     }
 
     /// Decode R′G′B′ code values (an image created without color matching, sample = code / 1023)
-    /// coded in `range`, from a camera or display encoding into scene light.
+    /// coded in `range`, from a camera or display encoding into light under `space.contract`.
     public func scene(fromEncoded image: CIImage, as space: InputColorSpace, range: SignalRange) throws -> Negative {
         try scene(fromWorkingLight: workingLight(fromEncoded: image, as: space, range: range), as: space)
     }
 
-    /// Decode a 10-bit Y′CbCr video frame (`x420`, `xf20`, `x422` or `xf22`) into scene light.
+    /// Decode a 10-bit Y′CbCr video frame (`x420`, `xf20`, `x422` or `xf22`) into light under
+    /// `space.contract`.
     /// `signal` defaults to the frame's own range and matrix tag; pass it to override a mistagged file.
     /// The frame stays retained and locked while the returned negative's image is alive, so a
     /// frame source should `materialize` (or drop) it before holding it across frames.
@@ -86,7 +94,7 @@ public struct Developer {
     }
 
     /// The input transform alone (curve and gamut matrix): working-space light before display
-    /// encodings go through the inverse film curve.
+    /// encodings get their scene estimate.
     func workingLight(fromEncoded image: CIImage, as space: InputColorSpace, range: SignalRange) throws -> CIImage {
         let transform = CurveInputTransform(rgbIn: range, sampleUnitsPerCode: 1 / 1023, for: space)
         return try workingLight(kernels.inputTransform, image.extent, [image], transform, as: space)
@@ -99,7 +107,7 @@ public struct Developer {
     }
 
     private func scene(fromWorkingLight light: CIImage, as space: InputColorSpace) throws -> Negative {
-        space.isDisplayReferred ? try sceneFromDisplay(light) : Negative(image: light, source: .raw)
+        space.contract == .displayReferred ? try sceneFromDisplay(light) : Negative(image: light, contract: space.contract)
     }
 
     private func normalized(_ image: CIImage) -> CIImage {
