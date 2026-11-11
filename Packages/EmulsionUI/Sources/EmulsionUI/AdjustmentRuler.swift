@@ -31,6 +31,7 @@ struct AdjustmentRuler: View {
                     title
                     readout
                 }
+                .frame(maxWidth: .infinity, alignment: .leading)
             }
             scale
         }
