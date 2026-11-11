@@ -73,19 +73,16 @@ struct AdjustmentRuler: View {
                 LinearGradient(colors: [.clear, .black, .black, .clear], startPoint: .leading, endPoint: .trailing)
             }
             .contentShape(.rect)
-            .simultaneousGesture(
-                DragGesture(minimumDistance: 10)
-                    .onChanged { gesture in
-                        let next = drag.update(
-                            value: value, translation: gesture.translation.width,
-                            verticalTranslation: gesture.translation.height,
-                            pointsPerUnit: tickSpacing / control.increment, range: control.range,
-                            neutral: neutral, detent: control.increment * 0.3
-                        )
-                        set(next)
-                    }
-                    .onEnded { _ in drag.end() }
-            )
+            .horizontalScrub { translation in
+                let next = drag.update(
+                    value: value, translation: translation.width, verticalTranslation: translation.height,
+                    pointsPerUnit: tickSpacing / control.increment, range: control.range,
+                    neutral: neutral, detent: control.increment * 0.3
+                )
+                set(next)
+            } onEnded: {
+                drag.end()
+            }
             .onTapGesture(count: 2) { set(neutral) }
         }
         .frame(height: scaleHeight)
