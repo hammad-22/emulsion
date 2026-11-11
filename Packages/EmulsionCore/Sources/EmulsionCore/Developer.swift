@@ -15,30 +15,35 @@ public struct Negative: @unchecked Sendable {
 }
 
 /// Turns camera data into linear light for the film system. RAW (ProRAW or Bayer DNG) goes
-/// through Apple's CIRAWFilter with its look processing switched off. Display-referred photos
-/// only get an estimate of scene light from the neutral film curve: the camera's rendering
-/// can't be undone.
+/// through Apple's CIRAWFilter with its rendering bypassed, so highlights keep their headroom
+/// above 1.0. Display-referred photos only get an estimate of scene light from the neutral
+/// film curve: the camera's rendering can't be undone.
 public struct Developer {
     private let kernels: Kernels
     init(kernels: Kernels) { self.kernels = kernels }
 
-    public static func isRAW(_ data: Data) -> Bool {
-        guard let source = CGImageSourceCreateWithData(data as CFData, nil),
-            let type = CGImageSourceGetType(source), let uti = UTType(type as String)
-        else { return false }
-        return uti.conforms(to: .rawImage)
+    public static func isRAW(_ data: Data) -> Bool { rawTypeIdentifier(of: data) != nil }
+
+    private static let dngTypeIdentifier = "com.adobe.raw-image"
+
+    /// The RAW type of `data`, or nil when it isn't RAW. Read from memory, ImageIO types many
+    /// DNGs as plain TIFF (23 of 25 ProRAW files tested, MOV-79) and CIRAWFilter then decodes
+    /// them as TIFF too (BaselineExposure ignored, values capped at 1.0), so a file that isn't
+    /// RAW on its own is asked again with a DNG hint. A plain TIFF keeps its type under the hint.
+    private static func rawTypeIdentifier(of data: Data) -> String? {
+        func type(hint: CFDictionary?) -> String? {
+            guard let source = CGImageSourceCreateWithData(data as CFData, hint),
+                let type = CGImageSourceGetType(source) as String?, UTType(type)?.conforms(to: .rawImage) == true
+            else { return nil }
+            return type
+        }
+        return type(hint: nil) ?? type(hint: [kCGImageSourceTypeIdentifierHint: dngTypeIdentifier] as CFDictionary)
     }
 
     /// `maxDimension` develops a smaller image (RAW draft mode) for fast previews.
     public func develop(_ data: Data, maxDimension: CGFloat? = nil) throws -> Negative {
-        if Self.isRAW(data), let raw = CIRAWFilter(imageData: data, identifierHint: nil) {
-            // Bypass Apple's rendering: no tone boost, no local tone mapping, no extra
-            // contrast. What remains is demosaiced, white-balanced, linear scene light.
-            raw.boostAmount = 0
-            raw.boostShadowAmount = 0
-            if raw.isLocalToneMapSupported { raw.localToneMapAmount = 0 }
-            if raw.isContrastSupported { raw.contrastAmount = 0 }
-            raw.extendedDynamicRangeAmount = 0
+        if let type = Self.rawTypeIdentifier(of: data), let raw = CIRAWFilter(imageData: data, identifierHint: type) {
+            developLinear(raw)
             if let maxDimension {
                 let native = raw.nativeSize
                 let scale = min(1, maxDimension / max(native.width, native.height))
@@ -62,6 +67,28 @@ public struct Developer {
             }
         }
         return try sceneFromDisplay(normalized(image))
+    }
+
+    /// Bypass Apple's rendering: no tone boost, local tone mapping, extra contrast, gamut
+    /// mapping or shadow bias. What remains is demosaiced, white-balanced, linear scene light
+    /// scaled by the file's BaselineExposure; noise reduction, sharpening, lens correction and
+    /// the decoder version stay at the file's defaults. Measured on synthetic DNGs and 25 real
+    /// files (MOV-79, `RAWDevelopTests`).
+    private func developLinear(_ raw: CIRAWFilter) {
+        raw.boostAmount = 0
+        raw.boostShadowAmount = 0
+        if raw.isLocalToneMapSupported { raw.localToneMapAmount = 0 }
+        if raw.isContrastSupported { raw.contrastAmount = 0 }
+        // EDR 1–2 re-expands ProRAW highlights non-linearly and shifts midtones; 0 keeps them linear.
+        raw.extendedDynamicRangeAmount = 0
+        // Apple's gamut mapping clips highlights near 1.0 and pulls saturated colours inward;
+        // without it out-of-gamut colours stay negative for the film model to handle.
+        raw.isGamutMappingEnabled = false
+        // A rendering default of 5 on cameras Apple has no profile for (bends the shadows); 0 on iPhone ProRAW.
+        raw.shadowBias = 0
+        // Clipped channels are estimated from unclipped ones so blown highlights stay neutral:
+        // an estimate, not measured light.
+        if raw.isHighlightRecoverySupported { raw.isHighlightRecoveryEnabled = true }
     }
 
     /// Display-referred linear image → a scene estimate: per channel, the neutral exposure whose

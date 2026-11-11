@@ -15,9 +15,9 @@
 - **Film simulation.** The engine exists, is fast, and passes 20 automated quality checks: near-neutral grays, smooth highlights, stable skin tones, film grain and highlight glow (halation).
 - **Speed.** On an Apple M4 Max Mac (32-core GPU), a 1600×1200 preview *renders* in about 6–7 ms. That excludes putting it on screen. A 48 MP image renders in about 0.1 s before file encoding. iPhone GPUs are several times slower; the review estimates about 30 ms per preview (not measured), so iPhone numbers are needed before we promise anything.
 - **Inputs.** It reads Apple Log, Sony, ARRI, Panasonic, DaVinci and ACES footage using each manufacturer's published math.
-- **Not yet verified on real material.** Every test so far uses synthetic images. No real RAW photo or log clip has been run, and we have no iPhone performance numbers yet.
+- **Barely verified on real material.** The test suite uses synthetic images. Real RAW files have been checked once, opt-in (25 DNGs, MOV-79); no real log clip has been run, and we have no iPhone performance numbers yet.
 - **Known input-correctness gaps (found in review, to fix first):**
-  - RAW decoding probably clips highlights above 1.0 (`extendedDynamicRangeAmount = 0`; Apple's header says 0 means no extended range).
+  - RAW decoding clipped highlights near 1.0. Measured cause: Apple's gamut mapping, not `extendedDynamicRangeAmount`. Fixed in MOV-79, which also found that most iPhone ProRAW files read from memory never reached the RAW decoder.
   - Video legal/full signal range isn't handled.
   - Apple Log 2 (iPhone 17 Pro) is missing.
   - JPEG/HEIC highlights posterize when re-printed.
@@ -77,7 +77,7 @@ Along the way there's texture. **Grain** comes from the dye forming in tiny clum
 - No video pipeline yet; output is limited to Display P3.
 
 **Bugs and risks found by the review:**
-- RAW highlight headroom is probably clipped.
+- RAW highlight headroom was clipped by Apple's gamut mapping (fixed in MOV-79).
 - Video legal/full range isn't handled.
 - Apple Log 2 isn't supported.
 - JPEG/HEIC highlights posterize and saturated colors shift after the inversion.
@@ -397,7 +397,7 @@ The full report is in `docs/REVIEW-2026-10-28.md`. Verdict: **adjust strongly, a
 
 **New findings (now reflected above):**
 - **Market:** Dehancer iOS and free spektrafilm undercut the original market claim.
-- **Inputs:** RAW highlight clipping is likely; video range handling and Apple Log 2 are missing; the JPEG inversion posterizes highlights.
+- **Inputs:** RAW highlight clipping is likely (confirmed and fixed in MOV-79: the clip came from Apple's gamut mapping); video range handling and Apple Log 2 are missing; the JPEG inversion posterizes highlights.
 - **Grain:** integer seeds give identical grain.
 - **Tone:** a naive 2383 refit over-contrasts.
 - **Legal:** the 2023 grain method is patented, and spektrafilm's license terms are stricter than first reported.

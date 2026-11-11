@@ -7,6 +7,9 @@
 - Prefer independent references (published values, colour-science tables) over checking the code against its own mirror.
 - Input transforms are checked against `References/input-transforms.json` (and 10-bit video against `References/video-signal.json`) through `ColorReferences` (loaders, tolerances); reuse it for any new input or signal-range test.
 - Fixtures are synthetic and deterministic (the only photos are the frozen CC0 scenes in `Scenes/`). Never read the user's photo library or private images.
+- Fixtures are synthetic and deterministic. Never read the user's photo library or private images.
+- RAW develop is tested on synthetic DNGs from `SyntheticDNG` and `RAWDevelopChart` (EmulsionFixtures). Keep generated files ≥ 128 KiB (`SyntheticDNG.minimumFileSize`), or ImageIO reads them as TIFF instead of DNG.
+- Real-file RAW checks are opt-in and real samples never enter the repo: `EMULSION_RAW_SAMPLES=<dir>:<dir>` runs `RAWDevelopRealFileTests` (and the probe's real-file pass), `EMULSION_RAW_PROBE=1` runs the `RAWDevelopProbe` measurements, and `EMULSION_PROOF_DIR=<dir>` writes before/after PNGs (only `*_CC0.dng` samples are rendered).
 - Timing lives in `PerformanceProbe` and runs only when `EMULSION_PERF=1` is set.
 - Suites that read video with AVAssetReader are `.serialized`: its blocking reads starve the Swift concurrency pool when many run in parallel.
 
