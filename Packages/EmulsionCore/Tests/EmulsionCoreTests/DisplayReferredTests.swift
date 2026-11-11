@@ -73,6 +73,48 @@ struct DisplayReferredTests {
         }
     }
 
+    /// A fiftieth of a stop up and down from zero changes every channel by nearly the same factor
+    /// (log-slope in linear P3): no slope jump where the edit changes direction. The step is
+    /// small so the film's own curvature stays below the bound. Measured: 1.6% at worst; the
+    /// earlier two-branch formula jumped by up to 12.9% (rise above fall).
+    @Test func exposureResponseIsSmoothThroughZeroEdits() throws {
+        let patches: [SIMD3<Float>] = [[0.2, 0.5, 1], [0.3, 0.7, 0.3], [0.9, 0.3, 0.2], [0.6, 0.45, 0.35], [0.3, 0.35, 0.75]]
+        let negative = try developed(Fixtures.row(patches, space: DisplayFixtures.displayP3))
+        func out(_ stops: Double) throws -> [SIMD3<Double>] {
+            var a = Adjustments.neutral
+            a.exposure = stops
+            return Fixtures.encodedFloats(try renderer.render(negative, a), space: SceneFixtures.linearP3)
+        }
+        let (down, zero, up) = (try out(-0.02), try out(0), try out(0.02))
+        for i in patches.indices {
+            for c in 0..<3 {
+                let (rise, fall) = (log(up[i][c] / zero[i][c]), log(zero[i][c] / down[i][c]))
+                #expect(abs(rise - fall) <= 0.04 * (rise + fall) / 2, "\(patches[i]) channel \(c): up \(rise), down \(fall)")
+            }
+        }
+    }
+
+    /// Display white is estimated as a +4-stop light, above the halation threshold, so a clipped
+    /// white in a photo still glows (as `HalationTests` does for scene light). Measured just
+    /// outside the disc: +(10.1, 4.0, 1.5) codes; far away: 0.
+    @Test func clippedHighlightsInAPhotoStillGlow() throws {
+        let size = 400
+        let picture = Fixtures.image(width: size, height: size, space: DisplayFixtures.displayP3) { x, y in
+            hypot(Float(x - size / 2), Float(y - size / 2)) < 6 ? SIMD3(repeating: 1) : SIMD3(repeating: 40.0 / 255)
+        }
+        let negative = try developed(picture)
+        var on = Adjustments.neutral
+        on.halation = 1
+        let with = EmulsionTestCase.codes(try renderer.render(negative, on))
+        let without = EmulsionTestCase.codes(try renderer.render(negative, .neutral))
+        let ring = EmulsionTestCase.pixel(x: 214, y: 200, width: size)  // ~8 px outside the disc edge
+        let delta = with[ring] - without[ring]
+        let far = EmulsionTestCase.pixel(x: 20, y: 20, width: size)
+        #expect(delta.x > 3, "visible glow \(delta)")
+        #expect(delta.x > delta.y * 1.5 && delta.y > delta.z, "red-biased \(delta)")
+        #expect(abs(with[far].x - without[far].x) <= 0.5, "glow stays local")
+    }
+
     @Test func halationOnAPhotoStaysFinite() throws {
         var a = Adjustments.neutral
         a.halation = 1

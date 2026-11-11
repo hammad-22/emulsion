@@ -46,7 +46,8 @@ public final class Renderer: @unchecked Sendable {
         }
 
         if negative.contract == .displayReferred {
-            // A finished picture is printed relative to itself: zero edits reproduce it.
+            // A finished picture is printed relative to itself: zero edits reproduce it up to the
+            // output gamut fit (chroma above 85% of the P3 boundary is compressed).
             let film = FilmLook.stock.relativeKernelArguments(lights: a.printerLights, exposure: a.exposure, saturation: a.printSaturation)
             image = try kernels.run(kernels.filmSystemRelative, extent, [image, negative.image] + film)
         } else {

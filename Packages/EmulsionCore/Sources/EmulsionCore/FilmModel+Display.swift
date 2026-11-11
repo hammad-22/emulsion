@@ -7,7 +7,7 @@ import simd
 /// A finished picture has no scene to recover. Its display values get a scene estimate through
 /// the film's own neutral print response, with soft ends where the print can't reach (pure white
 /// and black). At render time the print's change under the user's edits is applied to the photo
-/// itself, so zero edits reproduce it.
+/// itself, so zero edits reproduce it (before the output gamut fit).
 extension FilmModel {
     /// Bisection steps of the Swift reference; the kernel takes 22 (3e-6 stops, below float precision).
     private static let referenceSearchSteps = 60
@@ -76,8 +76,9 @@ extension FilmModel {
     /// `estimate` is the photo's scene estimate; `edited` is the scene the edits print (the
     /// estimate with exposure and halation applied: `render` does not apply exposure).
     /// Per channel, the edited print's ratio to the zero-edit print is applied to the photo. Where
-    /// the photo is darker than its print and the edit brightens the channel, the print's
-    /// increase is added instead, so a zero channel can still rise (desaturation).
+    /// the photo is darker than its print (gain < 1) and the edit brightens the channel, (1 − gain)²
+    /// of the print's increase is added on top, so a zero channel can still rise (desaturation)
+    /// and the response has no slope jump at zero edits.
     func renderRelative(estimate: SIMD3<Double>, edited: SIMD3<Double>, lights: SIMD3<Double>, saturation: Double) -> SIMD3<Double> {
         let base = render(estimate)
         let print = render(edited, lights: lights, saturation: saturation)
@@ -85,7 +86,8 @@ extension FilmModel {
         return SIMD3(
             (0..<3).map { c -> Double in
                 let gain = photo[c] / max(base[c], 1e-6)
-                return gain >= 1 || print[c] <= base[c] ? print[c] * gain : print[c] - (base[c] - photo[c])
+                let lift = gain < 1 ? (1 - gain) * (1 - gain) * max(print[c] - base[c], 0) : 0
+                return print[c] * gain + lift
             })
     }
 }

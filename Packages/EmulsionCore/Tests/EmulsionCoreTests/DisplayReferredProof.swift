@@ -14,7 +14,7 @@ struct DisplayReferredProof {
     private var renderer: Renderer { EmulsionTestCase.sharedRenderer }
 
     @Test func writeRendersAndNumbers() throws {
-        let directory = URL(fileURLWithPath: try #require(ProcessInfo.processInfo.environment["EMULSION_PROOF"]))
+        let directory = URL(filePath: try #require(ProcessInfo.processInfo.environment["EMULSION_PROOF"]))
         try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
         let chart = DisplayFixtures.proofChart()
         let negative = try renderer.materialize(try renderer.developer.sceneFromDisplay(chart))
@@ -29,7 +29,7 @@ struct DisplayReferredProof {
         let down3 = try rendered(exposure: -3)
         let up2 = try rendered(exposure: 2)
         for (name, image) in [("source", chart), ("zero-edits", zero), ("minus-3ev", down3), ("plus-2ev", up2)] {
-            try writePNG(image, to: directory.appendingPathComponent("\(name).png"))
+            try writePNG(image, to: directory.appending(path: "\(name).png"))
         }
 
         var lines = ["Display-referred proof (chart \(width) px wide; codes are encoded Display P3 x255, before 8-bit rounding)"]
@@ -70,9 +70,9 @@ struct DisplayReferredProof {
         let outLab = Fixtures.oklab(zero)
         for (i, patch) in DisplayFixtures.patches.enumerated() {
             let (x, y) = DisplayFixtures.patchCenter(i)
-            let i = EmulsionTestCase.pixel(x: x, y: y, width: width)
-            let a = sourceLab[i]
-            let b = outLab[i]
+            let index = EmulsionTestCase.pixel(x: x, y: y, width: width)
+            let a = sourceLab[index]
+            let b = outLab[index]
             lines.append(
                 String(
                     format: "%@ %+.4f  %6.2f   %.3f         %.2f", patch.name.padding(toLength: 13, withPad: " ", startingAt: 0), b.x - a.x,
@@ -94,7 +94,7 @@ struct DisplayReferredProof {
 
         let table = lines.joined(separator: "\n")
         print(table)
-        try table.write(to: directory.appendingPathComponent("numbers.txt"), atomically: true, encoding: .utf8)
+        try table.write(to: directory.appending(path: "numbers.txt"), atomically: true, encoding: .utf8)
     }
 
     private func writePNG(_ image: CIImage, to url: URL) throws {

@@ -6,7 +6,8 @@ import UniformTypeIdentifiers
 
 /// A developed photo in linear working-space light, ready for the look. `contract` says what
 /// that light is: scene light, nominal scene light, or (for display-referred sources) a scene
-/// estimate that the renderer prints relative to the photo, so zero edits reproduce it.
+/// estimate that the renderer prints relative to the photo, so zero edits reproduce it up to
+/// the output gamut fit (which compresses chroma above 85% of the P3 boundary).
 public struct Negative: @unchecked Sendable {
     public let image: CIImage
     public let contract: InputContract

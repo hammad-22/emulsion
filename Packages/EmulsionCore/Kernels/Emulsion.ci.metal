@@ -177,7 +177,8 @@ extern "C" float4 displayToScene(coreimage::sample_t sample, float4 m0, float4 m
 // Scene estimate of a display-referred photo `edited` (with the user's halation added) and
 // `original` (the estimate untouched), both linear working space, premultiplied → displayed print
 // (working space), soft-mapped into P3. The edited print's change from the zero-edit print is
-// applied to the original display value, so zero edits reproduce the photo; edit arguments as
+// applied to the original display value, so zero edits reproduce the photo up to fitP3 (chroma
+// above 85% of the P3 boundary is compressed); edit arguments as
 // filmSystem, plus ends and the calibrated printer lights (baseLights).
 extern "C" float4 filmSystemRelative(coreimage::sample_t edited, coreimage::sample_t original, float4 m0, float4 m1, float4 m2,
                                      float4 neg, float4 negOff, float4 prt, float4 misc, float4 lights,
@@ -193,7 +194,10 @@ extern "C" float4 filmSystemRelative(coreimage::sample_t edited, coreimage::samp
     float lo=compressEnds(0.0,ends), hi=compressEnds(1.0,ends);
     float3 x=expandEnds3(clamp(neutralPrint3(E,m0.xyz,m1.xyz,m2.xyz,neg,negOff,prt,misc,baseLights.xyz,d0.xyz,d1.xyz,d2.xyz),lo,hi),ends);
     float3 g=x/max(b,float3(1e-6));
-    float3 out=select(e-(b-x),e*g,g>=1.0 || e<=b);
+    // The ratio g carries the photo's offset from its print. Where g < 1 a brightening edit adds
+    // (1−g)² of the print's increase on top, so a zero channel can still rise (desaturation) while
+    // the slope stays continuous through zero edits.
+    float3 out=e*g+select(float3(0.0),(1.0-g)*(1.0-g)*max(e-b,0.0),g<1.0);
     return float4(fitP3(fromP3(out))*a,a);
 }
 
