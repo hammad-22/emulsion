@@ -9,8 +9,10 @@ import Foundation
 enum TestPhoto {
     static let jpeg: Data = {
         let space = CGColorSpace(name: CGColorSpace.sRGB)!
+        // Encoded on the CPU so the tests' only GPU context is the shared renderer's (MOV-127).
         // A fixture that fails to encode is a broken test setup, not a test failure.
-        return CIContext().jpegRepresentation(of: SceneFixtures.patches(), colorSpace: space)!
+        return CIContext(options: [.useSoftwareRenderer: true])
+            .jpegRepresentation(of: SceneFixtures.patches(), colorSpace: space)!
     }()
 }
 
@@ -29,7 +31,7 @@ final class TestLibrary {
     lazy var store = PhotoStore(folder: folder, renderService: renderService)
 
     /// The same folder opened again, as on the next launch.
-    func reopened() -> PhotoStore { PhotoStore(folder: folder, renderService: RenderService(renderer: Self.renderer)) }
+    func reopened() -> PhotoStore { PhotoStore(folder: folder, renderService: RenderService(renderer: TestLibrary.renderer)) }
 
     isolated deinit { try? FileManager.default.removeItem(at: folder) }
 }
