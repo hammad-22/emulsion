@@ -61,7 +61,7 @@ final class GrainTests: EmulsionTestCase {
         a.grain = 1
         a.seed = 9
         let export = SceneFixtures.flat(0.18, width: 4000, height: 3000)
-        let negative = Negative(image: export, source: .raw)
+        let negative = Negative(image: export, contract: .sceneReferred)
         let preview = renderer.resized(negative, longestEdge: 1600)
         let previewSD = sd(codes(try renderer.render(preview, a)).map(luma))
         let full = try renderer.render(negative, a)

@@ -95,6 +95,7 @@ swift format lint --recursive Packages Apps Tools            # style (config: .s
 
 ## Hard rules
 - Film/input math changes go into the Metal kernel *and* its Swift mirror, with metallibs rebuilt in the same commit.
+- Every new input declares its `InputContract` (`docs/ENGINE.md`, "Input contracts"); never describe a display-referred source as scene light.
 - Don't call anything "physical", "accurate" or "like stock X" without a measurement or a primary source. Label artistic choices as artistic.
 - No GPL code or data in the engine or apps (Apache-2.0 plan, MOV-94). No film brand names in the product (MOV-92).
 - Don't add per-pixel iterative solves to the live preview path without profiling on device.
