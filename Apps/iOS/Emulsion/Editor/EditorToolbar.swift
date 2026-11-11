@@ -7,7 +7,8 @@ import SwiftUI
 struct EditorToolbar: ToolbarContent {
     let session: EditSession
     @Binding var isComparing: Bool
-    @Binding var showsAdjustments: Bool
+    let showsAdjustments: Bool
+    let toggleAdjustments: () -> Void
 
     @Environment(PhotoStore.self) private var store
     @Environment(AppSettings.self) private var settings
@@ -18,12 +19,7 @@ struct EditorToolbar: ToolbarContent {
 
     var body: some ToolbarContent {
         ToolbarItem(placement: .bottomBar) {
-            Button {
-                showsAdjustments.toggle()
-            } label: {
-                Label(showsAdjustments ? "Hide Adjustments" : "Adjust", systemImage: "dial.low")
-            }
-            .labelStyle(.titleAndIcon)
+            adjustmentButton
         }
         ToolbarItemGroup(placement: .topBarTrailing) {
             // Neutral like the rest of the editor: no accent color beside the photograph.
@@ -57,6 +53,13 @@ struct EditorToolbar: ToolbarContent {
                     Text("The original file and its edits are removed from Emulsion.")
                 }
         }
+    }
+
+    private var adjustmentButton: some View {
+        Button(action: toggleAdjustments) {
+            Label(showsAdjustments ? "Hide Adjustments" : "Adjust", systemImage: "dial.low")
+        }
+        .titleInHorizontalToolbar()
     }
 
     private func export() async {

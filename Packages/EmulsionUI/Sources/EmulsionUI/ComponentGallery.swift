@@ -10,6 +10,8 @@
         @State private var isComparing = false
         @State private var group = AdjustmentGroup.light
         @State private var selection: [AdjustmentGroup: String] = [:]
+        /// Room for a few rulers, so the inspector's own scrolling shows inside the gallery.
+        private let inspectorHeight: CGFloat = 480
 
         public init() {}
 
@@ -31,6 +33,8 @@
                         }
                         .background(.gray, in: .rect)
                         AdjustmentPanel(adjustments: $adjustments, group: $group, selection: $selection)
+                        AdjustmentInspector(adjustments: $adjustments, group: $group, selection: $selection)
+                            .frame(height: inspectorHeight)
                     }
                     .padding(FilmLabLayout.inset)
                 }

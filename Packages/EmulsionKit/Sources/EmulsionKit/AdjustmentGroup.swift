@@ -2,7 +2,7 @@ import EmulsionCore
 
 /// The editor's controls, grouped the way the film process is: exposure and local tone,
 /// printer lights and color density, then texture. Shared so iOS and Mac show the same
-/// controls with the same ranges; the iOS app shows one group at a time.
+/// controls with the same ranges; the iPhone panel shows one group at a time.
 public enum AdjustmentGroup: String, CaseIterable, Identifiable, Sendable {
     case light, color, texture
 
@@ -19,6 +19,17 @@ public enum AdjustmentGroup: String, CaseIterable, Identifiable, Sendable {
         case .color: String(localized: "Color", bundle: .module)
         case .texture: String(localized: "Texture", bundle: .module)
         }
+    }
+
+    /// The one control whose value differs between two edits, or nil when none or several
+    /// do (Reset Edits): a ruler move changes exactly one.
+    public static func changedControl(from old: Adjustments, to new: Adjustments) -> (
+        group: AdjustmentGroup, control: AdjustmentControl.ID
+    )? {
+        let changed = allCases.flatMap { group in
+            group.controls.filter { old[keyPath: $0.keyPath] != new[keyPath: $0.keyPath] }.map { (group: group, control: $0.id) }
+        }
+        return changed.count == 1 ? changed[0] : nil
     }
 
     public var controls: [AdjustmentControl] {

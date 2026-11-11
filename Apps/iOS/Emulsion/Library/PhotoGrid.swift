@@ -2,23 +2,33 @@ import EmulsionKit
 import EmulsionUI
 import SwiftUI
 
-/// Square thumbnails edge to edge, like a contact sheet: three across on iPhone, more on
-/// wider canvases. Each one zooms into the editor, or is picked while selecting.
+/// Square thumbnails edge to edge, like a contact sheet: three across on iPhone, or a fixed
+/// count beside the expanded library's preview. A tap previews or opens an edit, or picks the photo while selecting.
 struct PhotoGrid: View {
     @Binding var selection: LibrarySelection
     let transition: Namespace.ID
-    let open: (PhotoRecord.ID) -> Void
+    /// A fixed number of columns, or nil for as many 110 pt cells as fit.
+    var columnCount: Int? = nil
+    var previewID: PhotoRecord.ID? = nil
+    let edit: (PhotoRecord.ID) -> Void
+    /// A tap outside Select: opens the editor on iPhone, previews in the expanded library.
+    let activate: (PhotoRecord.ID) -> Void
 
     @Environment(PhotoStore.self) private var store
 
     /// Three columns on a 402 pt wide iPhone; more as the canvas widens.
-    private let columns = [GridItem(.adaptive(minimum: 110), spacing: FilmLabLayout.gridSpacing)]
+    private let adaptiveColumn = GridItem(.adaptive(minimum: 110), spacing: FilmLabLayout.gridSpacing)
+
+    private var columns: [GridItem] {
+        guard let columnCount else { return [adaptiveColumn] }
+        return Array(repeating: GridItem(.flexible(), spacing: FilmLabLayout.gridSpacing), count: columnCount)
+    }
 
     var body: some View {
         ScrollView {
             LazyVGrid(columns: columns, spacing: FilmLabLayout.gridSpacing) {
                 ForEach(store.photos) { photo in
-                    PhotoCell(photo: photo, selection: $selection, open: open)
+                    PhotoCell(photo: photo, isPreviewed: previewID == photo.id, selection: $selection, edit: edit, activate: activate)
                         .matchedTransitionSource(id: photo.id, in: transition)
                 }
             }
@@ -28,8 +38,10 @@ struct PhotoGrid: View {
 
 private struct PhotoCell: View {
     let photo: PhotoRecord
+    let isPreviewed: Bool
     @Binding var selection: LibrarySelection
-    let open: (PhotoRecord.ID) -> Void
+    let edit: (PhotoRecord.ID) -> Void
+    let activate: (PhotoRecord.ID) -> Void
 
     @Environment(PhotoStore.self) private var store
 
@@ -37,9 +49,14 @@ private struct PhotoCell: View {
 
     var body: some View {
         Button {
-            if selection.isActive { selection.toggle(photo.id) } else { open(photo.id) }
+            if selection.isActive { selection.toggle(photo.id) } else { activate(photo.id) }
         } label: {
             PhotoThumbnail(url: store.url(for: photo), adjustments: photo.adjustments)
+                .overlay {
+                    if isPreviewed && !selection.isActive {
+                        Rectangle().strokeBorder(Color.primary, lineWidth: FilmLabLayout.hairline)
+                    }
+                }
                 .overlay { if isSelected { Color.white.opacity(selectedWash) } }
                 .overlay(alignment: .bottomTrailing) {
                     if selection.isActive { SelectionBadge(isSelected: isSelected) }
@@ -48,10 +65,10 @@ private struct PhotoCell: View {
         .buttonStyle(.plain)
         .accessibilityLabel(Text("Photo from \(photo.created, format: .dateTime.day().month().year())"))
         .accessibilityValue(photo.isEdited ? Text("Edited") : Text(""))
-        .accessibilityAddTraits(isSelected ? .isSelected : [])
+        .accessibilityAddTraits(isSelected || (!selection.isActive && isPreviewed) ? .isSelected : [])
         .contextMenu {
             if !selection.isActive {
-                Button("Edit", systemImage: "slider.horizontal.3") { open(photo.id) }
+                Button("Edit", systemImage: "slider.horizontal.3") { edit(photo.id) }
                 Button("Select", systemImage: "checkmark.circle") { selection.begin(with: photo.id) }
                 Button("Delete", systemImage: "trash", role: .destructive) { selection.pendingDeletion = [photo.id] }
             }

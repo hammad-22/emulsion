@@ -8,8 +8,13 @@ struct LibraryScreen: View {
     @Environment(PhotoStore.self) private var store
     @State private var path: [PhotoRecord.ID] = []
     @State private var selection = LibrarySelection()
+    @State private var previewID: PhotoRecord.ID?
+    @Environment(\.horizontalSizeClass) private var horizontalSizeClass
+    @Environment(\.verticalSizeClass) private var verticalSizeClass
     @State private var importError: String?
     @Namespace private var editorTransition
+    /// An even column count for the grid beside the preview (HIG, iPhone Duo inner display).
+    private let expandedColumnCount = 4
 
     var body: some View {
         NavigationStack(path: $path) {
@@ -17,7 +22,7 @@ struct LibraryScreen: View {
                 if store.photos.isEmpty {
                     LibraryEmptyState(error: $importError)
                 } else {
-                    PhotoGrid(selection: $selection, transition: editorTransition) { path.append($0) }
+                    libraryContent
                 }
             }
             .navigationTitle(selection.isActive ? selection.title : Text("Library"))
@@ -43,6 +48,46 @@ struct LibraryScreen: View {
                 if isEmpty { selection = LibrarySelection() }
             }
         }
+    }
+
+    private var libraryContent: some View {
+        GeometryReader { geometry in
+            if #available(iOS 27.1, *),
+                geometry.isExpandedCanvas(horizontalSizeClass: horizontalSizeClass, verticalSizeClass: verticalSizeClass)
+            {
+                expandedLibrary
+            } else {
+                PhotoGrid(selection: $selection, transition: editorTransition, edit: openEditor) { id in
+                    previewID = id
+                    openEditor(id)
+                }
+            }
+        }
+    }
+
+    @available(iOS 27.1, *)
+    private var expandedLibrary: some View {
+        ArrangementView {
+            PhotoGrid(
+                selection: $selection, transition: editorTransition, columnCount: expandedColumnCount,
+                previewID: shownPreviewID, edit: openEditor
+            ) {
+                previewID = $0
+            }
+        } secondary: {
+            UnobscuredContent {
+                LibraryPreview(photoID: shownPreviewID, isSelecting: selection.isActive, edit: openEditor)
+            }
+        }
+        .arrangementViewStyle(.split)
+    }
+
+    private func openEditor(_ id: PhotoRecord.ID) { path.append(id) }
+
+    /// The photo picked for preview while it still exists, otherwise the newest.
+    private var shownPreviewID: PhotoRecord.ID? {
+        if let previewID, store.photo(previewID) != nil { return previewID }
+        return store.photos.first?.id
     }
 
     private var photoCount: Text {
