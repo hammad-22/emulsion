@@ -31,14 +31,14 @@ struct DigitizedChart: Sendable, Equatable {
     let sha256: String
 
     init(kind: Kind, entry: StockManifest.Chart, file: String, data: Data) throws(FitError) {
-        try self.init(kind: kind, entry: entry, file: file, data: data, sha256: Self.sha256(of: data))
-    }
-
-    /// - Parameter sha256: the digest of `data`, already computed by the caller.
-    init(kind: Kind, entry: StockManifest.Chart, file: String, data: Data, sha256: String) throws(FitError) {
         guard let text = String(data: data, encoding: .utf8) else {
             throw .unreadableFile(file, reason: "not UTF-8 text.")
         }
+        try self.init(kind: kind, entry: entry, file: file, text: text, sha256: Self.sha256(of: data))
+    }
+
+    /// - Parameter sha256: the digest of the file's bytes, already computed by the caller.
+    init(kind: Kind, entry: StockManifest.Chart, file: String, text: String, sha256: String) throws(FitError) {
         self.kind = kind
         self.entry = entry
         self.file = file

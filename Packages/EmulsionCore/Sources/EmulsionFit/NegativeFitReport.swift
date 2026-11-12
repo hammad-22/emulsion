@@ -106,16 +106,6 @@ struct NegativeFitReport: Codable, Sendable, Equatable {
 
     func fit(_ parameterization: NegativeFit.Parameterization) -> Fit? { fits.first { $0.parameterization == parameterization } }
 
-    func encoded() throws(NegativeFitError) -> Data {
-        let encoder = JSONEncoder()
-        encoder.outputFormatting = [.prettyPrinted, .sortedKeys, .withoutEscapingSlashes]
-        do {
-            return try encoder.encode(self)
-        } catch {
-            throw .encodingFailed(error.localizedDescription)
-        }
-    }
-
     /// `log_exposure_lux_s,layer,measured,fitted_shared_range,fitted_per_layer_range`, one row per sample, for plotting.
     func plotTable() -> String {
         let shared = fit(.sharedRange)?.samples ?? []
