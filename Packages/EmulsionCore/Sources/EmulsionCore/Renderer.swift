@@ -18,11 +18,15 @@ public final class Renderer: @unchecked Sendable {
 
     public init() throws {
         kernels = try Kernels()
-        context = CIContext(options: [
-            .workingColorSpace: Self.workingSpace, .workingFormat: CIFormat.RGBAh,
-            .outputColorSpace: Self.outputSpace, .cacheIntermediates: false,
+        context = Self.context(cachesIntermediates: false)
+        developer = Developer(kernels: kernels, context: Self.context(cachesIntermediates: true))
+    }
+
+    private static func context(cachesIntermediates: Bool) -> CIContext {
+        CIContext(options: [
+            .workingColorSpace: workingSpace, .workingFormat: CIFormat.RGBAh,
+            .outputColorSpace: outputSpace, .cacheIntermediates: cachesIntermediates,
         ])
-        developer = Developer(kernels: kernels, context: context)
     }
 
     /// Scene light → display light (in the working space), look applied. Display-referred

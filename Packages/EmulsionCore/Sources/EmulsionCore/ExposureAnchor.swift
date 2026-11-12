@@ -21,6 +21,9 @@ enum ExposureAnchor {
 
     /// The anchor of `raw`, which needs Apple's rendering bypassed, the thumbnail scale set and
     /// draft mode off. Leaves local tone map and boost back at 0.
+    /// `context` caches intermediates, so the profile render reuses the linear render's decode:
+    /// Apple's own reuse between renders of one filter depends on what the process decoded
+    /// before (on the iPhone 14 Pro, 12 Pro and Pixel files every render could decode again, MOV-134).
     static func stops(of raw: CIRAWFilter, context: CIContext) -> Double {
         let linear = pixels(raw.outputImage, context: context)
         // Only these two: changing boostShadowAmount or contrastAmount too forces a new decode.
@@ -29,6 +32,7 @@ enum ExposureAnchor {
         let profile = pixels(raw.outputImage, context: context)
         raw.localToneMapAmount = 0
         raw.boostAmount = 0
+        context.clearCaches()
         return stops(linear: linear, profile: profile)
     }
 
