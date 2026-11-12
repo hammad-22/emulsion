@@ -257,16 +257,38 @@ extern "C" float4 ycbcrInputTransform(coreimage::sample_t luma, coreimage::sampl
     return float4(samplesToWorking(float4(luma.r,chroma.r,chroma.g,1.0),r0,r1,r2,curve,m0,m1,m2),1.0);
 }
 
-// ---- Halation ----
-// Scene highlights above `threshold` (linear luminance) expose through the base and back
-// into the red-sensitive layer: the excess, tinted red-orange, is blurred and added back.
-extern "C" float4 halationSource(coreimage::sample_t sample, float threshold) {
-    float Y=max(lumaSRGB(sample.rgb/max(sample.a,1e-6)),0.0);
-    float e=max(Y-threshold,0.0)/(1.0+max(Y-threshold,0.0)*.25);
-    return float4(e*float3(1.0,.32,.10),1.0);
+// ---- Halation (see Halation.swift; equations must match) ----
+// Light re-exposing the emulsion from behind after reflecting at the back of the base; linear in
+// exposure. m0..m2: layer sensitivity rows; i0..i2: rows of its inverse; weights = the profile's
+// Gaussian weights (x, y, z); k = returned light per layer (red, green, blue).
+
+// Scene light (working space, premultiplied) → layer exposure E = max(sensitivity·p, 0) (rgb = red,
+// green, blue layer), opaque. The renderer blurs it with each of the profile's Gaussians.
+extern "C" float4 halationSource(coreimage::sample_t sample, float4 m0, float4 m1, float4 m2) {
+    float3 p=toP3(sample.rgb/max(sample.a,1e-6));
+    return float4(max(float3(dot(m0.xyz,p),dot(m1.xyz,p),dot(m2.xyz,p)),0.0),1.0);
 }
-extern "C" float4 halationAdd(coreimage::sample_t sample, coreimage::sample_t glow, float strength) {
-    return float4(sample.rgb+glow.rgb*strength*sample.a,sample.a);
+// Warp: destination coordinate → the source coordinate reflected at the edges of `extent` (x, y,
+// width, height), repeating without end. Pixel centres map to pixel centres (edge pixels are
+// mirrored, not repeated), so a uniform field stays uniform up to the border.
+extern "C" float2 mirroredEdges(float4 extent, coreimage::destination dest) {
+    float2 period=2.0*extent.zw;
+    float2 u=dest.coord()-extent.xy;
+    float2 m=u-period*floor(u/period);
+    return extent.xy+select(m,period-m,m>extent.zw);
+}
+float3 exposureWithHalation(float3 E, float3 glow, float3 k) { return (E+k*glow)/(1.0+k); }
+// Scene light (working space, premultiplied) and the three blurred layer exposures → scene light
+// (working space, premultiplied) whose layer exposure is E + ΔE, ΔE = exposureWithHalation − E.
+extern "C" float4 halationAdd(coreimage::sample_t sample, coreimage::sample_t blur0, coreimage::sample_t blur1,
+                              coreimage::sample_t blur2, float4 weights, float4 k, float4 m0, float4 m1, float4 m2,
+                              float4 i0, float4 i1, float4 i2) {
+    float a=sample.a;
+    float3 p=toP3(sample.rgb/max(a,1e-6));
+    float3 E=max(float3(dot(m0.xyz,p),dot(m1.xyz,p),dot(m2.xyz,p)),0.0);
+    float3 glow=max(weights.x*blur0.rgb+weights.y*blur1.rgb+weights.z*blur2.rgb,0.0);
+    float3 dE=exposureWithHalation(E,glow,k.xyz)-E;
+    return float4(fromP3(p+float3(dot(i0.xyz,dE),dot(i1.xyz,dE),dot(i2.xyz,dE)))*a,a);
 }
 
 // ---- Grain ----

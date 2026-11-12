@@ -80,6 +80,20 @@ struct RecipeTests {
         }
     }
 
+    /// The backing is optional in format 1: a recipe written before it existed keeps rem-jet, and an
+    /// unknown backing is rejected.
+    @Test func backingIsOptionalAndValidated() throws {
+        var unbacked = Adjustments()
+        unbacked.backing = .none
+        let json = String(decoding: try Recipe(name: "Glow", adjustments: unbacked).encoded(), as: UTF8.self)
+        #expect(try Recipe.decode(Data(json.utf8)).adjustments.backing == AntihalationBacking.none)
+        let withoutBacking = json.replacingOccurrences(of: "\"backing\" : \"none\",", with: "")
+        #expect(withoutBacking != json)
+        #expect(try Recipe.decode(Data(withoutBacking.utf8)).adjustments.backing == .remJet)
+        let unknown = json.replacingOccurrences(of: "\"backing\" : \"none\"", with: "\"backing\" : \"felt\"")
+        #expect(throws: EmulsionError.invalidRecipe) { try Recipe.decode(Data(unknown.utf8)) }
+    }
+
     /// MOV-92: no film brand or stock names in the product.
     @Test func curatedLooksNameNoFilmBrandOrStock() {
         let banned = [

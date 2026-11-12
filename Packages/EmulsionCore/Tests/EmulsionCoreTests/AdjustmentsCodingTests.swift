@@ -20,9 +20,18 @@ struct AdjustmentsCodingTests {
         #expect(Adjustments().whiteBalance == nil)
     }
 
+    /// Edits saved before the backing existed (MOV-32) keep the default rem-jet backing.
+    @Test func editsWithoutABackingUseRemJet() throws {
+        let saved = try JSONDecoder().decode(Adjustments.self, from: Data(#"{"halation": 0.5}"#.utf8))
+        #expect(saved.backing == .remJet)
+        var unbacked = Adjustments()
+        unbacked.backing = .none
+        #expect(try JSONDecoder().decode(Adjustments.self, from: JSONEncoder().encode(unbacked)).backing == AntihalationBacking.none)
+    }
+
     @Test func everyFieldRoundTrips() throws {
         let edited = Adjustments.everyFieldEdited
-        #expect(Mirror(reflecting: edited).children.count == 10, "a new field needs a line in init(from:) and here")
+        #expect(Mirror(reflecting: edited).children.count == 11, "a new field needs a line in init(from:) and here")
         #expect(try JSONDecoder().decode(Adjustments.self, from: JSONEncoder().encode(edited)) == edited)
     }
 }
@@ -39,6 +48,7 @@ extension Adjustments {
         a.shadows = 0.5
         a.grain = 0.6
         a.halation = 0.7
+        a.backing = .undercoat
         a.seed = 8
         a.whiteBalance = CameraWhiteBalance(temperature: 3200, tint: 9)
         return a

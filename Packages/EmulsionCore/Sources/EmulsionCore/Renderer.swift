@@ -37,17 +37,7 @@ public final class Renderer: @unchecked Sendable {
         let extent = image.extent
         let longEdge = max(extent.width, extent.height)
 
-        // Halation is an exposure effect, computed in scene light. Exposure is applied later
-        // (in the film kernel), so the threshold is scaled by 2^-exposure instead (MOV-102).
-        if a.halation > 0 {
-            let threshold = FilmLook.halationThreshold / pow(2, a.exposure)
-            let source = try kernels.run(kernels.halationSource, extent, [image, threshold])
-            let core = Self.lowResBlur(source, sigma: FilmLook.halationRadius * longEdge)
-            let skirt = Self.lowResBlur(source, sigma: FilmLook.halationSkirt * longEdge)
-            let coreShare = FilmLook.halationCoreShare
-            image = try kernels.run(kernels.halationAdd, extent, [image, core.cropped(to: extent), a.halation * coreShare])
-            image = try kernels.run(kernels.halationAdd, extent, [image, skirt.cropped(to: extent), a.halation * (1 - coreShare)])
-        }
+        image = try sceneWithHalation(image, a)
 
         if negative.contract == .displayReferred {
             // A finished picture is printed relative to itself: zero edits reproduce it up to the
@@ -72,17 +62,62 @@ public final class Renderer: @unchecked Sendable {
         return image.cropped(to: extent)
     }
 
-    /// Blurs at reduced scale: exact 2×2 halvings keep the energy of small highlights.
-    static func lowResBlur(_ image: CIImage, sigma: Double) -> CIImage {
+    /// Scene light with halation added, before the film (see `Halation`). Linear in the scene, so it
+    /// commutes with exposure, which the film kernel applies (MOV-102).
+    func sceneWithHalation(_ scene: CIImage, _ adjustments: Adjustments) throws -> CIImage {
+        let a = adjustments.clamped()
+        guard a.halation > 0 else { return scene }
+        let extent = scene.extent
+        let sensitivity = FilmLook.stock.sensitivity
+        let exposure = try kernels.run(kernels.halationSource, extent, [scene] + CIVector.rows(of: sensitivity))
+        let mirrored = try mirroredToInfinity(exposure)
+        let pixelsPerBase = Halation.pixelsPerBaseThickness(longEdge: max(extent.width, extent.height))
+        let sigmas = Halation.sigmasInBaseThicknesses * pixelsPerBase
+        let blurs = Self.lowResBlurs(mirrored, sigmas: (0..<3).map { sigmas[$0] }).map { $0.cropped(to: extent) }
+        let weights = Halation.weights
+        let k = Halation.layerReturn(amount: a.halation, backing: a.backing)
+        let arguments: [Any] =
+            [scene] + blurs + [CIVector(x: weights.x, y: weights.y, z: weights.z, w: 0), CIVector(x: k.x, y: k.y, z: k.z, w: 0)]
+            + CIVector.rows(of: sensitivity) + CIVector.rows(of: sensitivity.inverse)
+        return try kernels.run(kernels.halationAdd, extent, arguments)
+    }
+
+    /// `image` reflected at its edges, repeating without end (the warp `mirroredEdges`). Unlike
+    /// clamping, a bright border pixel is not repeated to infinity (review F-12), and a uniform
+    /// field stays uniform up to the border.
+    func mirroredToInfinity(_ image: CIImage) throws -> CIImage {
+        let e = image.extent
+        guard
+            let mirrored = kernels.mirroredEdges.apply(
+                extent: .infinite, roiCallback: { _, _ in e }, image: image.clampedToExtent().samplingNearest(),
+                arguments: [CIVector(cgRect: e)])
+        else { throw EmulsionError.renderFailed }
+        // An intermediate, so a later scale is not folded into the warp's nearest sampling.
+        return mirrored.insertingIntermediate(cache: false)
+    }
+
+    /// Gaussian blurs of an infinite image, each at reduced scale. Each halving is its own 2×2
+    /// average (an intermediate: Core Image would otherwise fold successive halvings into one sparse
+    /// sample and drop small highlights), shared by the blurs. The Gaussian is narrowed by the
+    /// variance the halvings (box of N px: (N² − 1)/12) and the bilinear return (N²/6) add, so each
+    /// blur's effective sigma is the one asked for.
+    static func lowResBlurs(_ image: CIImage, sigmas: [Double]) -> [CIImage] {
         let maxHalvings = 3
         let minBlurPixels = 2.0
-        var levels = 0
-        while levels < maxHalvings && sigma / pow(2, Double(levels + 1)) >= minBlurPixels { levels += 1 }
-        var small = image.clampedToExtent()
-        for _ in 0..<levels { small = small.transformed(by: CGAffineTransform(scaleX: 0.5, y: 0.5)) }
-        let factor = pow(2, CGFloat(levels))
-        return small.applyingGaussianBlur(sigma: sigma / Double(factor))
-            .transformed(by: CGAffineTransform(scaleX: factor, y: factor))
+        let levels = sigmas.map { sigma in
+            (0...maxHalvings).last { $0 == 0 || sigma / pow(2, Double($0)) >= minBlurPixels } ?? 0
+        }
+        var pyramid = [image]
+        for _ in 0..<(levels.max() ?? 0) {
+            pyramid.append(
+                pyramid[pyramid.count - 1].transformed(by: CGAffineTransform(scaleX: 0.5, y: 0.5)).insertingIntermediate(cache: false))
+        }
+        return zip(sigmas, levels).map { sigma, level in
+            let n = pow(2, Double(level))
+            let added = level == 0 ? 0 : (n * n - 1) / 12 + n * n / 6
+            let lowSigma = max(sigma * sigma - added, 0).squareRoot() / n
+            return pyramid[level].applyingGaussianBlur(sigma: lowSigma).transformed(by: CGAffineTransform(scaleX: n, y: n))
+        }
     }
 
     /// Develop once: render the (lazy) negative into a half-float buffer so interactive edits
