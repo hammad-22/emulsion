@@ -38,14 +38,30 @@ public enum RAWDevelopChart {
         scene.map { SyntheticDNG.camera(linearSRGB: $0, cameraFromXYZ: cameraFromXYZ) }
     }
 
-    /// A DNG of `chart` (scene values in linear sRGB) as `camera` records it under D65.
+    /// Camera values of `scene` (linear sRGB reflectances) lit by a light of chromaticity `light`
+    /// instead of D65, at the same luminance: each D65 value scaled per channel by the ratio of
+    /// the two lights in camera space (von Kries in camera space). Exact for neutral patches; for
+    /// chromatic ones a simple model, not a spectral simulation.
+    public static func cameraValues(_ scene: [SIMD3<Double>], light: SIMD2<Double>) -> [SIMD3<Double>] {
+        let lightRatio =
+            SyntheticDNG.camera(chromaticity: light, cameraFromXYZ: camera)
+            / SyntheticDNG.camera(chromaticity: SyntheticDNG.d65Chromaticity, cameraFromXYZ: camera)
+        return cameraValues(scene).map { $0 * lightRatio }
+    }
+
+    /// A DNG of `chart` (scene values in linear sRGB) as `camera` records it lit by a light of
+    /// chromaticity `light`, whose AsShotNeutral is the camera neutral of `taggedLight`: the light
+    /// the camera believed it saw. At the D65 defaults the stored neutral is `SyntheticDNG.daylightNeutral`
+    /// to the six decimals the file keeps, so the file is the one the MOV-79 and MOV-134 measurements used.
     public static func dng(
-        _ mosaic: SyntheticDNG.Mosaic, chart: PatchChart, baselineStops: Double = 0, profile: SyntheticDNG.Profile? = nil
+        _ mosaic: SyntheticDNG.Mosaic, chart: PatchChart, light: SIMD2<Double> = SyntheticDNG.d65Chromaticity,
+        taggedLight: SIMD2<Double> = SyntheticDNG.d65Chromaticity, baselineStops: Double = 0, profile: SyntheticDNG.Profile? = nil
     ) -> Data {
-        let sensor = PatchChart(cameraValues(chart.patches), cell: chart.cell, columns: chart.columns)
+        let sensor = PatchChart(cameraValues(chart.patches, light: light), cell: chart.cell, columns: chart.columns)
         return SyntheticDNG(
             mosaic: mosaic, width: chart.width, height: chart.height, baselineExposureStops: baselineStops,
-            asShotNeutral: SyntheticDNG.daylightNeutral, cameraFromXYZ: camera, profile: profile
+            asShotNeutral: SyntheticDNG.neutral(chromaticity: taggedLight, cameraFromXYZ: camera), cameraFromXYZ: camera,
+            profile: profile
         ).data { sensor.value(x: $0, y: $1) }
     }
 }

@@ -87,3 +87,21 @@ enum TestLooks {
         try #require(CuratedLooks.recipes.dropFirst(index).first)
     }
 }
+
+/// A synthetic DNG of a mid-gray and a red patch lit by CIE illuminant A (tungsten), which the
+/// camera tagged as daylight (D65): as shot it develops with a strong cast.
+enum TestRAW {
+    static let chart = PatchChart([SIMD3(repeating: 0.18), SIMD3(0.4, 0.05, 0.03)])
+    static let tungstenTaggedAsDaylight = RAWDevelopChart.dng(
+        .linearRGB, chart: chart, light: SyntheticDNG.planckianChromaticity(kelvin: SyntheticDNG.illuminantAKelvin),
+        taggedLight: SyntheticDNG.d65Chromaticity)
+
+    /// How far the gray patch's centre is from neutral: the largest difference between its
+    /// channels, in 8-bit codes of a Display P3 image (as the renderer and its exports make them).
+    static func grayCast(_ image: CGImage) throws -> Int {
+        try #require(image.bitsPerPixel == 32 && image.bitsPerComponent == 8, "not 8-bit RGBA")
+        let pixel = (chart.cell / 2 * image.width + chart.cell / 2) * 4
+        let gray = TestPixels.rgba(image)[pixel..<pixel + 3].map(Int.init)
+        return (gray.max() ?? 0) - (gray.min() ?? 0)
+    }
+}

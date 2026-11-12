@@ -1,6 +1,7 @@
 import Foundation
 
-/// An artistic adjustment snapshot for the single built-in film model. A photo owns its grain seed.
+/// An artistic adjustment snapshot for the single built-in film model. A photo owns its grain
+/// seed and its RAW white balance, which describes the light it was shot under.
 public struct Recipe: Codable, Equatable, Identifiable, Sendable {
     public static let formatVersion = 1
     public static let engineModel = "emulsion-default-v1"
@@ -20,6 +21,7 @@ public struct Recipe: Codable, Equatable, Identifiable, Sendable {
         let name = name.trimmingCharacters(in: .whitespacesAndNewlines)
         var settings = adjustments
         settings.seed = 0
+        settings.whiteBalance = nil
         guard !name.isEmpty, name.count <= Self.maximumNameLength, summary.count <= Self.maximumSummaryLength,
             name.utf8.count + summary.utf8.count <= Self.maximumMetadataSize,
             !name.unicodeScalars.contains(where: { CharacterSet.controlCharacters.contains($0) }),
@@ -35,6 +37,7 @@ public struct Recipe: Codable, Equatable, Identifiable, Sendable {
     public func applying(to current: Adjustments) -> Adjustments {
         var result = adjustments
         result.seed = current.seed
+        result.whiteBalance = current.whiteBalance
         return result
     }
 

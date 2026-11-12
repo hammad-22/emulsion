@@ -44,9 +44,10 @@ final class PerformanceProbe: XCTestCase {
         }
     }
 
-    /// RAW develop without the exposure anchor (before), measuring it (after) and given the
-    /// anchor an earlier develop reported (known anchor, MOV-134), developed and materialized,
-    /// for the first DNG of each native size in EMULSION_RAW_SAMPLES. Opt-in: EMULSION_PERF=1.
+    /// RAW develop without the exposure anchor (before), measuring it (after), given the anchor an
+    /// earlier develop reported (known anchor, MOV-134), and at a white balance (MOV-10),
+    /// developed and materialized, for the first DNG of each native size in EMULSION_RAW_SAMPLES.
+    /// Opt-in: EMULSION_PERF=1.
     func testRAWDevelopTimings() throws {
         try XCTSkipUnless(ProcessInfo.processInfo.environment["EMULSION_PERF"] != nil, "set EMULSION_PERF=1 to run")
         try XCTSkipUnless(RAWDevelopSupport.samplesFolders != nil, "set EMULSION_RAW_SAMPLES to run")
@@ -58,18 +59,21 @@ final class PerformanceProbe: XCTestCase {
             let size = try RAWDevelopSupport.filter(data).nativeSize
             if seenSizes.insert("\(size)").inserted { files.append((url, data, size)) }
         }
+        let tungsten = CameraWhiteBalance(temperature: 3200, tint: 0)
         print("| File | Native size | Long edge | Variant | Median ms | First ms | Anchor |")
         print("| --- | --- | ---: | --- | ---: | ---: | ---: |")
         for (url, data, size) in files {
             let measured = try r.developer.develop(data, maxDimension: ExposureAnchor.thumbnailLongEdge).exposureAnchorStops
-            let variants: [(name: String, anchor: ExposureAnchor.Choice)] = [
-                ("before", .none), ("after", .measured), ("known anchor", .known(stops: measured)),
+            let variants: [(name: String, anchor: ExposureAnchor.Choice, whiteBalance: CameraWhiteBalance?)] = [
+                ("before", .none, nil), ("after", .measured, nil), ("known anchor", .known(stops: measured), nil),
+                ("after, 3200 K", .measured, tungsten), ("known anchor, 3200 K", .known(stops: measured), tungsten),
             ]
             for edge in [CGFloat(1024), 1600, nil] {
                 for variant in variants {
                     var anchor = 0.0
                     let times = try Self.milliseconds(runs: 4) {
-                        let negative = try r.developer.develop(data, maxDimension: edge, anchor: variant.anchor)
+                        let negative = try r.developer.develop(
+                            data, maxDimension: edge, whiteBalance: variant.whiteBalance, anchor: variant.anchor)
                         _ = try r.materialize(negative)
                         anchor = negative.exposureAnchorStops
                     }

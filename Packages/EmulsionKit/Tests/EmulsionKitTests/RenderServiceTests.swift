@@ -1,4 +1,5 @@
 import EmulsionCore
+import EmulsionFixtures
 import Foundation
 import ImageIO
 import Testing
@@ -130,5 +131,97 @@ extension RenderServiceTests {
 
     private static func decoded(_ data: Data) throws -> CGImage {
         try #require(CGImageSourceCreateWithData(data as CFData, nil).flatMap { CGImageSourceCreateImageAtIndex($0, 0, nil) })
+    }
+}
+
+// MARK: RAW white balance (MOV-10)
+
+extension RenderServiceTests {
+    static var tungstenWhiteBalance: Adjustments {
+        var adjustments = Adjustments.neutral
+        adjustments.whiteBalance = CameraWhiteBalance(temperature: SyntheticDNG.illuminantAKelvin, tint: 0)
+        return adjustments
+    }
+
+    @Test func newWhiteBalanceRedevelopsAndReplacesTheCachedDevelop() async throws {
+        let library = TestLibrary()
+        let url = library.store.url(for: try await library.store.add(TestRAW.tungstenTaggedAsDaylight, fileExtension: "dng"))
+        let service = library.renderService
+        let key = "\(url.absoluteString)@1024"
+
+        let asShot = try await service.image(url, .neutral, maxDimension: 900)
+        let corrected = try await service.image(url, Self.tungstenWhiteBalance, maxDimension: 900)
+        #expect(await service.developCount == 2)
+        #expect(await service.cachedPreviewKeys == [key], "one develop per photo and size, whatever the white balance")
+        #expect(try TestRAW.grayCast(corrected) < TestRAW.grayCast(asShot), "the develop used the new white balance")
+
+        var cooler = Self.tungstenWhiteBalance
+        for kelvin in [3000.0, 3200, 3400] {
+            cooler.whiteBalance?.temperature = kelvin
+            _ = try await service.image(url, cooler, maxDimension: 900)
+        }
+        #expect(await service.cachedPreviewKeys == [key], "a temperature drag doesn't fill the cache")
+        #expect(await service.developCount == 5)
+    }
+
+    /// Only a RAW photo develops again for a new white balance; the developer ignores it on others.
+    @Test func whiteBalanceRedevelopsOnlyRAWPhotos() async throws {
+        let library = TestLibrary()
+        let jpeg = library.store.url(for: try await library.store.add(TestPhoto.jpeg, fileExtension: "jpg"))
+        let raw = library.store.url(for: try await library.store.add(TestRAW.tungstenTaggedAsDaylight, fileExtension: "dng"))
+        let service = library.renderService
+
+        _ = try await service.image(jpeg, .neutral, maxDimension: 900)
+        _ = try await service.image(jpeg, Self.tungstenWhiteBalance, maxDimension: 900)
+        #expect(await service.developCount == 1, "a JPEG isn't developed again for a white balance")
+
+        _ = try await service.image(raw, .neutral, maxDimension: 900)
+        _ = try await service.image(raw, Self.tungstenWhiteBalance, maxDimension: 900)
+        #expect(await service.developCount == 3, "a RAW photo is")
+    }
+
+    @Test func sameWhiteBalanceReusesTheCachedDevelop() async throws {
+        let library = TestLibrary()
+        let url = library.store.url(for: try await library.store.add(TestRAW.tungstenTaggedAsDaylight, fileExtension: "dng"))
+        let service = library.renderService
+        var warmer = Self.tungstenWhiteBalance
+        warmer.warmth = 0.4
+
+        _ = try await service.image(url, Self.tungstenWhiteBalance, maxDimension: 900)
+        _ = try await service.image(url, warmer, maxDimension: 900)
+        #expect(await service.developCount == 1, "printer lights only re-run the look")
+    }
+
+    /// The anchor is measured as shot, so a new white balance develops again with the file's anchor.
+    @Test func newWhiteBalanceReusesTheExposureAnchor() async throws {
+        let library = TestLibrary()
+        let url = library.store.url(for: try await library.store.add(TestPhoto.anchoredRAW, fileExtension: "dng"))
+        let service = library.renderService
+
+        _ = try await service.image(url, .neutral, maxDimension: 512)
+        let anchor = try #require(await service.exposureAnchor(url))
+        #expect(anchor != 0)
+        let reused = try await service.image(url, Self.tungstenWhiteBalance, maxDimension: 512)
+        #expect(await service.developCount == 2, "the white balance developed again")
+        #expect(await service.exposureAnchor(url) == anchor)
+        let measured = try await TestLibrary().renderService.image(url, Self.tungstenWhiteBalance, maxDimension: 512)
+        #expect(TestPixels.rgba(reused) == TestPixels.rgba(measured))
+    }
+
+    @Test func exportDevelopsAtTheWhiteBalance() async throws {
+        let library = TestLibrary()
+        let url = library.store.url(for: try await library.store.add(TestRAW.tungstenTaggedAsDaylight, fileExtension: "dng"))
+        let service = library.renderService
+
+        func decoded(_ adjustments: Adjustments) async throws -> CGImage {
+            let data = try await service.export(url, adjustments, format: .jpeg)
+            let source = try #require(CGImageSourceCreateWithData(data as CFData, nil))
+            return try #require(CGImageSourceCreateImageAtIndex(source, 0, nil))
+        }
+        let asShot = try TestRAW.grayCast(await decoded(.neutral))
+        let corrected = try TestRAW.grayCast(await decoded(Self.tungstenWhiteBalance))
+        #expect(corrected < asShot, "gray cast \(corrected) codes at 2856 K, \(asShot) as shot")
+        // Measured 0 codes at 2856 K, 98 as shot.
+        #expect(corrected <= 1, "gray cast \(corrected) codes at 2856 K")
     }
 }

@@ -11,9 +11,18 @@ struct AdjustmentsCodingTests {
         #expect(saved == expected)
     }
 
+    /// A library saved before RAW white balance existed (MOV-10) develops as shot.
+    @Test func editsWithoutAWhiteBalanceDevelopAsShot() throws {
+        let saved = try JSONDecoder().decode(
+            Adjustments.self, from: Data(#"{"exposure": 0.5, "warmth": 0.2, "grain": 0.1, "seed": 3}"#.utf8))
+        #expect(saved.whiteBalance == nil)
+        #expect(Adjustments.neutral.whiteBalance == nil)
+        #expect(Adjustments().whiteBalance == nil)
+    }
+
     @Test func everyFieldRoundTrips() throws {
         let edited = Adjustments.everyFieldEdited
-        #expect(Mirror(reflecting: edited).children.count == 9, "a new field needs a line in init(from:) and here")
+        #expect(Mirror(reflecting: edited).children.count == 10, "a new field needs a line in init(from:) and here")
         #expect(try JSONDecoder().decode(Adjustments.self, from: JSONEncoder().encode(edited)) == edited)
     }
 }
@@ -31,6 +40,7 @@ extension Adjustments {
         a.grain = 0.6
         a.halation = 0.7
         a.seed = 8
+        a.whiteBalance = CameraWhiteBalance(temperature: 3200, tint: 9)
         return a
     }
 }
