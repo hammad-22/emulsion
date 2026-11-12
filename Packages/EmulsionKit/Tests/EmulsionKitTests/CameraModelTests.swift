@@ -72,6 +72,35 @@ struct CameraModelTests {
         #expect(model.status == .running)
     }
 
+    /// An interruption reported before the camera stopped, but handled after, doesn't leave the
+    /// next session looking paused.
+    @Test func interruptionArrivingAfterStopIsIgnored() async {
+        let library = TestLibrary()
+        let model = library.camera()
+        await model.start()
+        await model.stop()
+
+        model.handle(.interrupted(.inUseByAnotherApp))
+        await model.start()
+
+        #expect(model.status == .running)
+    }
+
+    /// A camera that failed while running is still stopped on leaving the screen, so a later
+    /// recovery can't restart it behind the app.
+    @Test func stoppingAFailedCameraStopsTheSource() async {
+        let library = TestLibrary()
+        let source = MockCameraSource()
+        let model = library.camera(source)
+        await model.start()
+        model.handle(.failed)
+
+        await model.stop()
+
+        #expect(model.status == .idle)
+        #expect(await !source.isRunning)
+    }
+
     /// An unrecoverable session error shows the camera as unavailable; starting again retries.
     @Test func sessionFailureIsUnavailableUntilRetried() async {
         let library = TestLibrary()

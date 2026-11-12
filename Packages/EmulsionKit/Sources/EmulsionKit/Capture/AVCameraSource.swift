@@ -34,8 +34,10 @@
         /// The frame rate each device is held to under pressure; a device not listed runs its
         /// format's default. Per device, since a lens keeps its rate while another one runs.
         private var throttledRates: [ObjectIdentifier: Int32] = [:]
-        /// The session and focus notifications followed while the camera is started.
-        private var observations: [Task<Void, Never>] = []
+        /// Focus changes, followed while the camera is started.
+        private var subjectAreaChanges: Task<Void, Never>?
+        /// The session's notifications, observed while the camera is started.
+        private var sessionObservers: [any NSObjectProtocol] = []
         private let logger = Logger(subsystem: "com.hammad.emulsion", category: "Camera")
 
         public init() {}
@@ -48,28 +50,18 @@
             try await authorize()
             try configure()
             if input == nil { try use(lens) }
-            if observations.isEmpty {
-                observations = [
-                    Task { await self.followSubjectAreaChanges() },
-                    // The session restarts itself after an interruption (AVCaptureSession.h).
-                    Task {
-                        await self.relay(AVCaptureSession.wasInterruptedNotification) {
-                            .interrupted(CameraInterruption(reasonIn: $0.userInfo))
-                        }
-                    },
-                    Task { await self.relay(AVCaptureSession.interruptionEndedNotification) { _ in .interruptionEnded } },
-                    Task { await self.followRuntimeErrors() },
-                ]
-            }
+            if subjectAreaChanges == nil { subjectAreaChanges = Task { await self.followSubjectAreaChanges() } }
+            if sessionObservers.isEmpty { observeSession() }
             if !session.isRunning { session.startRunning() }
             return capabilities
         }
 
-        /// Stops the session and the notifications followed while it ran, so a stopped camera
-        /// holds no tasks.
+        /// Stops the session and what was followed while it ran.
         public func stop() {
-            for observation in observations { observation.cancel() }
-            observations = []
+            subjectAreaChanges?.cancel()
+            subjectAreaChanges = nil
+            for observer in sessionObservers { NotificationCenter.default.removeObserver(observer) }
+            sessionObservers = []
             if session.isRunning { session.stopRunning() }
         }
 
@@ -256,7 +248,11 @@
             eventDelivery.yield(.pressure(pressure))
             let rate = Self.frameRate(under: pressure)
             guard rate != throttledRates[deviceID] else { return }
-            if let rate, !device.activeFormat.videoSupportedFrameRateRanges.contains(where: { $0.minFrameRate <= Double(rate) }) {
+            if let rate,
+                !device.activeFormat.videoSupportedFrameRateRanges.contains(where: {
+                    ($0.minFrameRate...$0.maxFrameRate).contains(Double(rate))
+                })
+            {
                 return
             }
             configure(device) {
@@ -279,30 +275,34 @@
             }
         }
 
-        /// Passes each of the session's `name` notifications on as an event.
-        private func relay(_ name: Notification.Name, as event: @escaping @Sendable (Notification) -> CameraEvent) async {
-            for await event in sessionNotifications(name).map(event) { eventDelivery.yield(event) }
+        /// Reports interruptions and runtime errors. Registered before the session starts, since
+        /// `startRunning` itself may interrupt it (a camera another app holds). The session
+        /// restarts itself after an interruption (AVCaptureSession.h).
+        private func observeSession() {
+            let center = NotificationCenter.default
+            sessionObservers = [
+                center.addObserver(forName: AVCaptureSession.wasInterruptedNotification, object: session, queue: nil) {
+                    [eventDelivery] in eventDelivery.yield(.interrupted(CameraInterruption(reasonIn: $0.userInfo)))
+                },
+                center.addObserver(forName: AVCaptureSession.interruptionEndedNotification, object: session, queue: nil) {
+                    [eventDelivery] _ in eventDelivery.yield(.interruptionEnded)
+                },
+                center.addObserver(forName: AVCaptureSession.runtimeErrorNotification, object: session, queue: nil) {
+                    [weak self] in
+                    let code = ($0.userInfo?[AVCaptureSessionErrorKey] as? AVError)?.code
+                    Task { await self?.recover(from: code) }
+                },
+            ]
         }
 
         /// Restarts the session after the media services reset, as Apple's AVCam sample does;
         /// any other runtime error, or a restart that doesn't take, is reported as a failure the
         /// user can retry.
-        private func followRuntimeErrors() async {
-            let errors = sessionNotifications(AVCaptureSession.runtimeErrorNotification)
-                .map { ($0.userInfo?[AVCaptureSessionErrorKey] as? AVError)?.code }
-            for await code in errors {
-                logger.error("Capture session runtime error \(code?.rawValue ?? 0)")
-                if code == .mediaServicesWereReset, !session.isRunning { session.startRunning() }
-                if !session.isRunning { eventDelivery.yield(.failed) }
-            }
-        }
-
-        /// This session's notifications named `name`. Matched by identity, since the session
-        /// itself can't be sent to the notification sequence.
-        private func sessionNotifications(_ name: Notification.Name) -> some AsyncSequence<Notification, Never> {
-            let sessionID = ObjectIdentifier(session)
-            return NotificationCenter.default.notifications(named: name)
-                .filter { ($0.object as AnyObject?).map(ObjectIdentifier.init) == sessionID }
+        private func recover(from code: AVError.Code?) {
+            logger.error("Capture session runtime error \(code?.rawValue ?? 0)")
+            guard !sessionObservers.isEmpty else { return }
+            if code == .mediaServicesWereReset, !session.isRunning { session.startRunning() }
+            if !session.isRunning { eventDelivery.yield(.failed) }
         }
 
         private func trackRotation(of device: AVCaptureDevice) {

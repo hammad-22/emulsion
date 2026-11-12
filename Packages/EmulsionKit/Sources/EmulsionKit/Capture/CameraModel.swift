@@ -77,9 +77,12 @@ public final class CameraModel {
 
     func handle(_ event: CameraEvent) {
         switch event {
-        case .interrupted(let reason): interruption = reason
+        case .interrupted(let reason):
+            // Queued before `stop`: the next start reports a camera that's still taken.
+            guard lifecycle == .starting || lifecycle == .running else { return }
+            interruption = reason
         case .interruptionEnded: interruption = nil
-        case .pressure(let level): pressure = level
+        case .pressure(let level): if pressure != level { pressure = level }
         case .failed:
             guard lifecycle == .running else { return }
             interruption = nil
@@ -123,10 +126,11 @@ public final class CameraModel {
         }
     }
 
-    /// Stops the camera (leaving the app, opening the library). Safe to call repeatedly. An
-    /// interruption is forgotten: a camera that's still taken reports it again on the next start.
+    /// Stops the camera (leaving the app, opening the library), including one that failed while
+    /// running, so it can't restart behind the app. Safe to call repeatedly. An interruption is
+    /// forgotten: a camera that's still taken reports it again on the next start.
     public func stop() async {
-        guard lifecycle == .starting || lifecycle == .running else { return }
+        guard lifecycle == .starting || lifecycle == .running || lifecycle == .unavailable else { return }
         lifecycle = .idle
         interruption = nil
         await source.stop()
