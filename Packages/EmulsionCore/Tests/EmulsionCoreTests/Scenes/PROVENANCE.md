@@ -27,8 +27,8 @@ float in the working space. The test prints sizes and SHA-256 of source and outp
 | `pixel8pro-dng.tiff` | `Pixel8Pro_CC0.dng` (45,101,750 bytes) | https://raw.pixls.us, id 7751 | CC0 | `45420c595401547cca950ae58d552bc82b32d31ce1d58c082df33004016197f5` | 240×180 | Look on a non-Apple phone DNG: default look and a graded edit |
 
 Derived file SHA-256 (macOS 27.2.1, Apple M4 Max): `iphone12pro-proraw.tiff`
-`8c9e8b0efcb99c420b032d0530f60503f1de02422be79ff50159141b6d78ca43`, `pixel8pro-dng.tiff`
-`9a995ca443289e891dadff5257cbcf33c246c977887c5552e6267da448dce91b`.
+`8be2eaf60c8acd7d7d77479876f1e60bb10918ccf3c1a64c25dd8d205af3ca64`, `pixel8pro-dng.tiff`
+`a8f08531ffa4400a3b63441f549c68a2a62ddc7a852fcc0b6f5426a05dec7617`.
 
 Notes:
 
