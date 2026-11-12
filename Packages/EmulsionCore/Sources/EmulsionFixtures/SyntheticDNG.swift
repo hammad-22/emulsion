@@ -164,7 +164,8 @@ extension SyntheticDNG {
         return value / value.y
     }
 
-    /// CIE 1931 xy of a Planckian radiator, Kim et al. 2002 cubic spline (US patent 7,024,034), 1667–25000 K.
+    /// CIE 1931 xy of a Planckian radiator, 1667–25000 K: the Kim et al. 2002 cubic-spline
+    /// approximation of the Planckian locus.
     public static func planckianChromaticity(kelvin t: Double) -> SIMD2<Double> {
         let t3 = t * t * t
         let x =
@@ -185,107 +186,6 @@ extension SyntheticDNG {
     /// D65 white point as the colour standards round it (sRGB, Rec. 709/2020, Display P3), the
     /// value `InputColorSpace.d65` uses.
     public static let d65Chromaticity = SIMD2<Double>(0.3127, 0.3290)
-}
-
-// MARK: Patch charts
-
-/// A grid of flat patches, `cell` pixels square, row-major from the top-left. Cells are large
-/// enough that demosaic and denoise edges leave each centre untouched.
-public struct PatchChart: Sendable {
-    private static let minimumCell = 32
-
-    public let patches: [SIMD3<Double>]
-    public let cell: Int
-    public let columns: Int
-
-    public init(_ patches: [SIMD3<Double>], cell: Int = 48, columns: Int = 8) {
-        precondition(cell >= Self.minimumCell && cell.isMultiple(of: 2), "cells must be even and at least \(Self.minimumCell) px")
-        self.patches = patches
-        self.cell = cell
-        self.columns = min(columns, patches.count)
-    }
-
-    public var rows: Int { (patches.count + columns - 1) / columns }
-    public var width: Int { columns * cell }
-    public var height: Int { rows * cell }
-
-    /// The patch under pixel (x, y), y = 0 the top row; black outside the patches.
-    public func value(x: Int, y: Int) -> SIMD3<Double> {
-        let index = (y / cell) * columns + x / cell
-        return index < patches.count ? patches[index] : .zero
-    }
-
-    /// The central quarter (half width, half height) of patch `index` in top-left pixel
-    /// coordinates, for an image drawn at `scale` times the chart size.
-    public func centre(of index: Int, scale: Double = 1) -> (x: Range<Int>, y: Range<Int>) {
-        let size = Double(cell) * scale
-        let left = Double(index % columns) * size
-        let top = Double(index / columns) * size
-        let lower = { (origin: Double) in Int((origin + size / 4).rounded()) }
-        let upper = { (origin: Double) in max(lower(origin) + 1, Int((origin + 3 * size / 4).rounded())) }
-        return (lower(left)..<upper(left), lower(top)..<upper(top))
-    }
-
-    /// Mean of each patch's central quarter in `pixels` (bottom row first, as `Fixtures.linear`
-    /// returns them) of an image `width` × `height` drawn from this chart at any scale.
-    public func means(of pixels: [SIMD3<Double>], width: Int, height: Int) -> [SIMD3<Double>] {
-        let scale = Double(width) / Double(self.width)
-        return patches.indices.map { index in
-            let (xs, ys) = centre(of: index, scale: scale)
-            var sum = SIMD3<Double>.zero
-            for y in ys { for x in xs { sum += pixels[(height - 1 - y) * width + x] } }
-            return sum / Double(xs.count * ys.count)
-        }
-    }
-}
-
-// MARK: Develop charts
-
-/// The scene and synthetic files used to measure RAW develop (MOV-79): a half-stop neutral
-/// wedge around mid-gray followed by chromatic patches, two of them outside sRGB.
-public enum RAWDevelopChart {
-    /// Linear Display P3 → linear sRGB (both D65).
-    static let linearSRGBFromP3 =
-        SyntheticDNG.xyzFromLinearSRGB.inverse
-        * simd_double3x3(rows: [
-            SIMD3(0.4865709, 0.2656677, 0.1982173),
-            SIMD3(0.2289746, 0.6917385, 0.0792869),
-            SIMD3(0.0000000, 0.0451134, 1.0439444),
-        ])
-
-    public static let midGray = 0.18
-    /// With the default camera the top three patches clip green at the sensor, and +3.5 also clips blue.
-    public static let wedgeStops = Array(stride(from: -4.0, through: 3.5, by: 0.5))
-    /// Display P3 colours with a negative linear sRGB component: P3 red at 0.9 (G −0.038,
-    /// B −0.018 in sRGB) and a saturated green (R −0.118).
-    public static let outOfSRGBP3: [SIMD3<Double>] = [[0.9, 0, 0], [0.05, 0.8, 0.1]]
-    /// Linear sRGB: the six chromatic `SceneFixtures.patchesP3`, then `outOfSRGBP3`.
-    public static let chromaticScene: [SIMD3<Double>] =
-        SceneFixtures.patchesP3.prefix(6).map { linearSRGBFromP3 * SIMD3<Double>($0) }
-        + outOfSRGBP3.map { linearSRGBFromP3 * $0 }
-    static let neutralScene = wedgeStops.map { SIMD3(repeating: midGray * pow(2, $0)) }
-    /// Linear sRGB scene: the neutral wedge, then the chromatic patches.
-    public static let scene = neutralScene + chromaticScene
-    public static let neutralIndices = neutralScene.indices
-    public static let chromaticIndices = neutralScene.count..<scene.count
-    public static let outOfSRGBIndices = (scene.count - outOfSRGBP3.count)..<scene.count
-    /// Display P3 colours outside sRGB survive this camera's sensor.
-    public static let camera = SyntheticDNG.wideGamutCameraFromXYZ
-
-    public static func chart(cell: Int = 48) -> PatchChart { PatchChart(scene, cell: cell) }
-
-    public static func cameraValues(_ scene: [SIMD3<Double>], cameraFromXYZ: simd_double3x3 = camera) -> [SIMD3<Double>] {
-        scene.map { SyntheticDNG.camera(linearSRGB: $0, cameraFromXYZ: cameraFromXYZ) }
-    }
-
-    /// A DNG of `chart` (scene values in linear sRGB) as `camera` records it under D65.
-    public static func dng(_ mosaic: SyntheticDNG.Mosaic, chart: PatchChart, baselineStops: Double = 0) -> Data {
-        let sensor = PatchChart(cameraValues(chart.patches), cell: chart.cell, columns: chart.columns)
-        return SyntheticDNG(
-            mosaic: mosaic, width: chart.width, height: chart.height, baselineExposureStops: baselineStops,
-            asShotNeutral: SyntheticDNG.daylightNeutral, cameraFromXYZ: camera
-        ).data { sensor.value(x: $0, y: $1) }
-    }
 }
 
 // MARK: TIFF encoding

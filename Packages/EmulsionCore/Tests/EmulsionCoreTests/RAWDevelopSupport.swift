@@ -53,9 +53,9 @@ enum RAWDevelopSupport {
             let count = Double(pixels.count)
             maxValue = RAWDevelopSupport.maxValue(pixels)
             p999 = sortedLuminance[min(sortedLuminance.count - 1, Int(count * 0.999))]
-            over1 = Double(pixels.filter { $0.max() > 1 }.count) / count
-            over2 = Double(pixels.filter { $0.max() > 2 }.count) / count
-            over4 = Double(pixels.filter { $0.max() > 4 }.count) / count
+            over1 = Double(pixels.count(where: { $0.max() > 1 })) / count
+            over2 = Double(pixels.count(where: { $0.max() > 2 })) / count
+            over4 = Double(pixels.count(where: { $0.max() > 4 })) / count
             isFinite = pixels.allSatisfy { $0.x.isFinite && $0.y.isFinite && $0.z.isFinite }
         }
     }
@@ -85,6 +85,13 @@ enum RAWDevelopSupport {
 extension Double {
     /// Four significant digits, for probe and real-file tables.
     var fourDigits: String { String(format: "%.4g", self) }
+}
+
+extension Duration {
+    /// Elapsed time in milliseconds, for probe timings.
+    var milliseconds: Double {
+        Double(components.seconds) * 1000 + Double(components.attoseconds) / 1e15
+    }
 }
 
 extension SIMD3<Double> {

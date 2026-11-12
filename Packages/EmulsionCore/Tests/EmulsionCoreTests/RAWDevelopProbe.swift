@@ -40,18 +40,18 @@ struct RAWDevelopProbe {
         var extent: CGRect
         var pixels: [SIMD3<Double>]
         var milliseconds: Double
-        var nanCount: Int { pixels.filter { $0.x.isNaN || $0.y.isNaN || $0.z.isNaN }.count }
+        var nanCount: Int { pixels.count(where: { $0.x.isNaN || $0.y.isNaN || $0.z.isNaN }) }
     }
 
     static func read(_ raw: CIRAWFilter) -> Readout? {
-        let start = Date()
+        let start = ContinuousClock.now
         guard let image = raw.outputImage, !image.extent.isEmpty, !image.extent.isInfinite else { return nil }
         return read(image, since: start)
     }
 
-    static func read(_ image: CIImage, since start: Date = Date()) -> Readout {
+    static func read(_ image: CIImage, since start: ContinuousClock.Instant = .now) -> Readout {
         let pixels = Fixtures.linear(image)
-        return Readout(extent: image.extent, pixels: pixels, milliseconds: Date().timeIntervalSince(start) * 1000)
+        return Readout(extent: image.extent, pixels: pixels, milliseconds: start.duration(to: .now).milliseconds)
     }
 
     static func means(_ out: Readout, chart: PatchChart) -> [SIMD3<Double>] {
@@ -285,13 +285,13 @@ struct RAWDevelopProbe {
                 for (name, context) in contexts {
                     let raw = try Self.filter(data)
                     Self.apply(Settings(decoder: version), raw)
-                    let start = Date()
+                    let start = ContinuousClock.now
                     guard let image = raw.outputImage, !image.extent.isInfinite, !image.extent.isEmpty else {
                         print("  \(version.rawValue) \(name): outputImage nil")
                         continue
                     }
                     let values = Self.rgba(image, context: context)
-                    let ms = Date().timeIntervalSince(start) * 1000
+                    let ms = start.duration(to: .now).milliseconds
                     let means = chart.means(
                         of: values.map { SIMD3<Double>(Double($0.x), Double($0.y), Double($0.z)) }, width: Int(image.extent.width),
                         height: Int(image.extent.height))
@@ -585,11 +585,11 @@ extension RAWDevelopProbe {
                 for gamut in [true, false] {
                     let raw = try Self.realFilter(url, scaled: false)
                     Self.apply(Settings(edr: edr, gamutMapping: gamut, highlightRecovery: true), raw)
-                    let start = Date()
+                    let start = ContinuousClock.now
                     guard let image = raw.outputImage else { continue }
                     let max = Self.areaMaximum(image)
                     print(
-                        "  FULL SIZE \(image.extent.size) EDR \(edr) GM \(gamut) HR on: max \(max.fourDigits) (\((Date().timeIntervalSince(start) * 1000).fourDigits) ms)"
+                        "  FULL SIZE \(image.extent.size) EDR \(edr) GM \(gamut) HR on: max \(max.fourDigits) (\(start.duration(to: .now).milliseconds.fourDigits) ms)"
                     )
                 }
             }
