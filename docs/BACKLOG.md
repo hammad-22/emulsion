@@ -48,13 +48,13 @@ The product strategy is **Easy now, Pro later, same engine.** Every engine contr
 | IO2 | HDR outputs: Rec.2100 PQ and HLG with highlight "unroll" to a nit target | P1 → IO1 | 1000-nit target; SDR/HDR consistency test at mid-gray |
 | IO3 | More camera inputs: RED Log3G10/RWG, Canon Log 2/3, BMD Film Gen5, Fuji F-Log2, DJI D-Log, Nikon N-Log, Samsung Log, ACEScg | P2 | Published mid-gray tests per curve (like current suite) |
 | IO4 | Gain-map HDR stills (Apple + ISO 21496-1) as scene-light input | P1 | Synthetic gain-map fixture: headroom recovered; SDR identity at zero edit |
-| IO5 | ProRAW/DNG: true RAW white balance (Kelvin/tint in camera space), RAW 9 decoder when available | P0 | Fixture tests; white balance moves the camera neutral, not printer lights |
+| IO5 | ProRAW/DNG: true RAW white balance (Kelvin/tint in camera space), RAW 9 decoder when available | P0 | Fixture tests; white balance moves the camera neutral, not printer lights. **Engine done (MOV-10):** `CameraWhiteBalance` at develop, tested on synthetic tungsten charts and 25 real files; UI control pending. RAW 9 not used: see [RAW white balance](ENGINE.md#raw-white-balance) |
 | IO6 | Gamut compression on input (wide-gamut log, e.g. neon in S-Gamut3) before film | P2 | No hue flips on out-of-gamut test patches |
 
 ## ENG-G · Grading controls (engine API; easy UI shows a subset)
 | ID | Title | P | Acceptance |
 | --- | --- | --- | --- |
-| G1 | Exposure / RAW WB / printer lights (points, Kodak convention) | P0 | Done partially; printer-point units tested |
+| G1 | Exposure / RAW WB / printer lights (points, Kodak convention) | P0 | Done partially; printer-point units tested; RAW WB in the engine (MOV-10), no UI control yet |
 | G2 | Lab controls: push/pull process, print density, bleach bypass (silver retention) | P1 → S8 | Each tested on charts |
 | G3 | Whites/Blacks, Highlights/Shadows (local tone ✅), Contrast in density space | P1 | No halos; monotone |
 | G4 | Color mixer (hue/sat/lum per band) in scene space before the negative | P2 | Smooth bands; skin protection optional |
