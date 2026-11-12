@@ -1,4 +1,3 @@
-import CryptoKit
 import Foundation
 import Testing
 import simd
@@ -6,17 +5,42 @@ import simd
 @testable import EmulsionCore
 
 struct FilmStockTests {
-    @Test func defaultStockRendersBitIdenticalToBeforeStockFiles() {
-        // Recorded from `main` at commit 1bc3532, when the parameters were hard-coded in FilmModel.
-        #expect(Self.renderFingerprint(FilmLook.stock) == "5752d668f795198e928296ee1d632d20fb49f2ca7ff6b4f9e0ad8408f5e208c4")
+    /// Pins the default stock's look at a handful of chromatic inputs (display-linear P3, before the gamut fit). The
+    /// earlier pin, bit-identical to the engine before stock files, was retired when the default's negative was fitted
+    /// to the 250D datasheet (MOV-25): the look changed on purpose. Values recorded from this commit's engine.
+    @Test(arguments: [
+        (SIMD3(0.18, 0.18, 0.18), SIMD3(0.17000000000000007, 0.17000000000000007, 0.16999999999999982)),
+        (SIMD3(0.40, 0.20, 0.13), SIMD3(0.36993044991474383, 0.19463700419777452, 0.12120576504022522)),
+        (SIMD3(0.05, 0.12, 0.30), SIMD3(0.02451369480675786, 0.09200677713732108, 0.2409896810652891)),
+        (SIMD3(0.02, 0.01, 0.01), SIMD3(0.006922726087520104, 0.004052342913380471, 0.0036608580872483447)),
+        (SIMD3(1.80, 1.20, 0.30), SIMD3(0.8147603833611772, 0.6151174848019969, 0.22386845728808275)),
+    ])
+    func defaultStockRendersItsPinnedLook(_ scene: SIMD3<Double>, _ pinned: SIMD3<Double>) {
+        let rendered = FilmLook.stock.render(scene)
+        for c in 0..<3 { #expect(abs(rendered[c] - pinned[c]) < 1e-9, "channel \(c): \(rendered)") }
     }
 
-    @Test func bundledDefaultHoldsTheEngineDefaults() throws {
-        #expect(try FilmStock.bundled(named: "emulsion-default") == .engineDefault)
+    @Test func midGrayRendersMiddleGrayOut() {
+        let midGray = FilmLook.stock.render(SIMD3(repeating: 0.18))
+        for c in 0..<3 { #expect(abs(midGray[c] - FilmLook.stock.middleGrayOut) <= 1e-6) }
+    }
+
+    /// Largest R, G, B spread of the default's gray scale from −6 to +5 stops, display-linear: measured 0.0030 at +3
+    /// stops (docs/ENGINE.md).
+    static let neutralScaleSpread = 0.004
+
+    @Test(arguments: Array(stride(from: -6.0, through: 5.0, by: 0.5)))
+    func neutralScaleStaysNeutral(_ stops: Double) {
+        let gray = FilmLook.stock.render(SIMD3(repeating: 0.18 * pow(2, stops)))
+        #expect(gray.max() - gray.min() < Self.neutralScaleSpread, "\(gray)")
+    }
+
+    @Test func bundledDefaultPassesValidation() throws {
+        _ = try FilmModel(stock: FilmStock.bundledDefault())
     }
 
     @Test func stockRoundTripsThroughJSON() throws {
-        var stock = FilmStock.engineDefault
+        var stock = try FilmStock.bundledDefault()
         stock.provenance = .init(
             source: "Synthetic fit", fitDate: "2026-11-10", tool: "test", sourceSHA256: String(repeating: "0", count: 64),
             fitResiduals: ["rmsDensity": 0.004], notes: ["a", "b"])
@@ -24,17 +48,19 @@ struct FilmStockTests {
     }
 
     @Test func encodingIsStable() throws {
-        let stock = FilmStock.engineDefault
+        let stock = try FilmStock.bundledDefault()
         #expect(try stock.encoded() == FilmStock(data: stock.encoded()).encoded())
     }
 
     @Test func missingOptionalProvenanceIsOmitted() throws {
-        let json = try #require(String(data: FilmStock.engineDefault.encoded(), encoding: .utf8))
+        var stock = try FilmStock.bundledDefault()
+        stock.provenance = .init(source: "Hand-tuned")
+        let json = try #require(String(data: stock.encoded(), encoding: .utf8))
         #expect(!json.contains("fitDate") && !json.contains("null"))
     }
 
     @Test func changedPrintGammasStillPrintMidGrayAtMiddleGrayOut() throws {
-        var stock = FilmStock.engineDefault
+        var stock = try FilmStock.bundledDefault()
         stock.print.gamma = SIMD3(2.6, 2.0, 1.8)
         let model = try FilmModel(stock: stock)
         let midGray = model.render(SIMD3(repeating: 0.18))
@@ -45,28 +71,31 @@ struct FilmStockTests {
     @Test func scalarNegativeCurveMatchesTheLayerCurves() {
         let model = FilmLook.stock
         let logE = SIMD3(-1.3, 0.2, 1.7)
-        let layers = model.negativeDensity(logE)
+        let layers = model.negativeDyeAmount(logE)
         for c in 0..<3 {
-            let scalar = FilmModel.negativeDensity(
-                logExposure: logE[c], gamma: model.negativeGamma[c], densityRange: model.negativeRange,
-                exposureOffset: model.negativeOffset[c])
+            let scalar = FilmModel.negativeDyeAmount(
+                logExposure: logE[c], gamma: model.negativeGamma[c], toeExposure: model.negativeToeExposure[c],
+                toeWidth: model.negativeToeWidth[c], shoulderExposure: model.negativeShoulderExposure[c],
+                shoulderWidth: model.negativeShoulderWidth[c])
             #expect(scalar.bitPattern == layers[c].bitPattern)
         }
+        #expect(model.negativePrintingDensity(logE) == model.printingDensity * layers)
     }
 
     @Test(arguments: InvalidStock.allCases)
-    func invalidStockIsRejected(_ invalid: InvalidStock) {
+    func invalidStockIsRejected(_ invalid: InvalidStock) throws {
+        let stock = try invalid.stock()
         #expect {
-            try FilmModel(stock: invalid.stock)
+            try FilmModel(stock: stock)
         } throws: { error in
-            guard case .invalidStock = error as? EmulsionError else { return false }
-            return true
+            guard case .invalidStock(let reason) = error as? EmulsionError else { return false }
+            return reason.contains(invalid.reasonMentions)
         }
     }
 
     @Test func invalidStockKeepsItsReasonOutOfTheAlertText() throws {
-        var stock = FilmStock.engineDefault
-        stock.negative.gamma = SIMD3(0, 0.62, 0.65)
+        var stock = try FilmStock.bundledDefault()
+        stock.negative.gamma.x = 0
         do {
             _ = try FilmModel(stock: stock)
             Issue.record("a zero negative gamma must be rejected")
@@ -79,33 +108,70 @@ struct FilmStockTests {
 
     @Test(arguments: InvalidStockFile.allCases)
     func invalidStockFileIsRejected(_ invalid: InvalidStockFile) throws {
-        let json = try #require(String(data: FilmStock.engineDefault.encoded(), encoding: .utf8))
-        let edited = invalid.edit(json)
-        #expect(edited != json, "the edit must apply to the canonical encoding")
+        let edited = try invalid.edit(FilmStock.bundledDefault().encoded())
         #expect {
-            try FilmStock(data: Data(edited.utf8))
+            try FilmStock(data: edited)
         } throws: { error in
             guard case .invalidStock = error as? EmulsionError else { return false }
             return true
         }
     }
+
+    /// The format before MOV-25 (logistic negative, no printing-density matrix) is not migrated: the only such file was
+    /// the bundled default.
+    @Test func versionOneStockFileIsRejectedNamingTheVersion() {
+        let versionOne = """
+            {"formatVersion": 1, "name": "Emulsion Default", "provenance": {"source": "Hand-tuned", "notes": []},
+             "negative": {"sensitivity": [[1.07, -0.05, -0.02], [-0.04, 1.08, -0.04], [-0.01, -0.07, 1.08]],
+                          "gamma": [0.60, 0.62, 0.65], "densityRange": 3.0, "exposureOffset": [0.45, 0.45, 0.45]},
+             "print": {"gamma": [2.20, 2.15, 2.05], "minimumDensity": 0.06, "densityRange": 3.3, "shape": 0.5,
+                       "dyes": [[0.94, 0.05, 0.01], [0.04, 0.90, 0.06], [0.01, 0.07, 0.92]]},
+             "rendering": {"highlightChromaRetention": 0.6, "middleGrayOut": 0.17}}
+            """
+        #expect {
+            try FilmStock(data: Data(versionOne.utf8))
+        } throws: { error in
+            guard case .invalidStock(let reason) = error as? EmulsionError else { return false }
+            return reason.contains("version 1") && reason.contains("version \(FilmStock.supportedFormatVersion)")
+        }
+    }
 }
 
 enum InvalidStock: CaseIterable, CustomTestStringConvertible {
-    case notANumber, infinity, zeroNegativeGamma, zeroPrintGamma, zeroNegativeRange, zeroPrintRange, zeroPrintShape
-    case negativeMinimumDensity, middleGrayOutOfRange, retentionOutOfRange, sensitivityRowNotOne, dyeRowNotOne
-    case calibrationCannotConverge
+    case notANumber, infinity, zeroNegativeGamma, zeroPrintGamma, zeroToeWidth, zeroShoulderWidth, shoulderBelowToe
+    case negativeCurveFalls
+    case printingDensityNotFinite, printingDensityDiagonalNotPositive, printingDensitySingular, printingDensityGammaNotPositive
+    case zeroPrintRange, zeroPrintShape, negativeMinimumDensity, middleGrayOutOfRange, retentionOutOfRange
+    case sensitivityRowNotOne, dyeRowNotOne, calibrationCannotConverge
 
     var testDescription: String { "\(self)" }
 
-    var stock: FilmStock {
-        var s = FilmStock.engineDefault
+    func stock() throws -> FilmStock {
+        var s = try FilmStock.bundledDefault()
         switch self {
-        case .notANumber: s.negative.exposureOffset.y = .nan
+        case .notANumber: s.negative.toeExposure.y = .nan
         case .infinity: s.print.densityRange = .infinity
         case .zeroNegativeGamma: s.negative.gamma.x = 0
         case .zeroPrintGamma: s.print.gamma.z = 0
-        case .zeroNegativeRange: s.negative.densityRange = 0
+        case .zeroToeWidth: s.negative.toeWidth.y = 0
+        case .zeroShoulderWidth: s.negative.shoulderWidth.z = 0
+        case .shoulderBelowToe: s.negative.shoulderExposure.x = s.negative.toeExposure.x
+        // A toe far narrower than the shoulder: the shoulder's bend starts pulling the curve down below the toe.
+        case .negativeCurveFalls:
+            s.negative.toeExposure.y = 0
+            s.negative.toeWidth.y = 0.02
+            s.negative.shoulderExposure.y = 0.5
+            s.negative.shoulderWidth.y = 2.0
+        case .printingDensityNotFinite: s.negative.printingDensity[1, 0] = .infinity
+        case .printingDensityDiagonalNotPositive: s.negative.printingDensity[1, 1] = 0
+        // Two equal rows: positive diagonal, zero determinant.
+        case .printingDensitySingular:
+            s.negative.printingDensity = simd_double3x3(rows: [SIMD3(1, 0.5, 0), SIMD3(1, 0.5, 0), SIMD3(0, 0, 1)])
+        // Positive diagonal and invertible, but red printing density falls as neutral exposure rises.
+        case .printingDensityGammaNotPositive:
+            s.negative.printingDensity = simd_double3x3(rows: [
+                SIMD3(0.9, -1.0, 0), SIMD3(0.1, 0.85, 0.09), SIMD3(0.05, 0.07, 0.85),
+            ])
         case .zeroPrintRange: s.print.densityRange = 0
         case .zeroPrintShape: s.print.shape = 0
         case .negativeMinimumDensity: s.print.minimumDensity = -0.01
@@ -118,6 +184,30 @@ enum InvalidStock: CaseIterable, CustomTestStringConvertible {
         }
         return s
     }
+
+    /// A word the rejection's reason must contain.
+    var reasonMentions: String {
+        switch self {
+        case .notANumber, .infinity, .printingDensityNotFinite: "finite"
+        case .zeroNegativeGamma: "negative gamma"
+        case .zeroPrintGamma: "print gamma"
+        case .zeroToeWidth: "toe width"
+        case .zeroShoulderWidth: "shoulder width"
+        case .shoulderBelowToe: "shoulder exposure"
+        case .negativeCurveFalls: "green layer's negative curve"
+        case .printingDensityDiagonalNotPositive: "diagonal"
+        case .printingDensitySingular: "determinant"
+        case .printingDensityGammaNotPositive: "rise with neutral exposure"
+        case .zeroPrintRange: "density range"
+        case .zeroPrintShape: "shape"
+        case .negativeMinimumDensity: "minimum density"
+        case .middleGrayOutOfRange: "middle gray"
+        case .retentionOutOfRange: "retention"
+        case .sensitivityRowNotOne: "sensitivity"
+        case .dyeRowNotOne: "dye"
+        case .calibrationCannotConverge: "printer lights"
+        }
+    }
 }
 
 enum InvalidStockFile: CaseIterable, CustomTestStringConvertible {
@@ -125,58 +215,26 @@ enum InvalidStockFile: CaseIterable, CustomTestStringConvertible {
 
     var testDescription: String { "\(self)" }
 
-    func edit(_ json: String) -> String {
+    /// Edits the decoded JSON tree, so the cases don't depend on the encoder's layout.
+    func edit(_ data: Data) throws -> Data {
+        var json = try #require(try JSONSerialization.jsonObject(with: data) as? [String: Any])
+        var negative = try #require(json["negative"] as? [String: Any])
+        var print = try #require(json["print"] as? [String: Any])
         switch self {
-        case .unsupportedFormatVersion: json.replacingOccurrences(of: #""formatVersion" : 1"#, with: #""formatVersion" : 2"#)
-        case .shortGamma: json.replacingOccurrences(of: "0.6,\n      0.62,", with: "0.6,")
-        case .twoMatrixRows: json.replacingOccurrences(of: "[\n        1.07,\n        -0.05,\n        -0.02\n      ],", with: "")
-        case .longMatrixRow: json.replacingOccurrences(of: "1.07,", with: "1.07, 0.0,")
-        case .missingKey: json.replacingOccurrences(of: #""minimumDensity" : 0.06,"#, with: "")
+        case .unsupportedFormatVersion: json["formatVersion"] = FilmStock.supportedFormatVersion + 1
+        case .shortGamma: negative["gamma"] = (negative["gamma"] as? [Double]).map { Array($0.prefix(2)) }
+        case .twoMatrixRows: negative["sensitivity"] = (negative["sensitivity"] as? [[Double]]).map { Array($0.dropFirst()) }
+        case .longMatrixRow:
+            negative["printingDensity"] = (negative["printingDensity"] as? [[Double]]).map { [$0[0] + [0]] + $0.dropFirst() }
+        case .missingKey: print["minimumDensity"] = nil
         }
+        json["negative"] = negative
+        json["print"] = print
+        return try JSONSerialization.data(withJSONObject: json)
     }
 }
 
 extension FilmStock {
-    /// Today's engine constants, written out independently of the bundled file.
-    static let engineDefault = FilmStock(
-        name: "Emulsion Default",
-        provenance: .init(
-            source: "Hand-tuned in the engine; not fitted to any datasheet.",
-            notes: ["Artistic/approximated parameters, see docs/FILM-THEORY.md §7."]),
-        negative: .init(
-            sensitivity: simd_double3x3(rows: [SIMD3(1.07, -0.05, -0.02), SIMD3(-0.04, 1.08, -0.04), SIMD3(-0.01, -0.07, 1.08)]),
-            gamma: SIMD3(0.60, 0.62, 0.65), densityRange: 3.0, exposureOffset: SIMD3(0.45, 0.45, 0.45)),
-        print: .init(
-            gamma: SIMD3(2.20, 2.15, 2.05), minimumDensity: 0.06, densityRange: 3.3, shape: 0.5,
-            dyes: simd_double3x3(rows: [SIMD3(0.94, 0.05, 0.01), SIMD3(0.04, 0.90, 0.06), SIMD3(0.01, 0.07, 0.92)])),
-        rendering: .init(highlightChromaRetention: 0.6, middleGrayOut: 0.17))
-}
-
-extension FilmStockTests {
-    /// SHA-256 over the bit patterns of a fixed set of renders, the printer lights and the kernel arguments.
-    static func renderFingerprint(_ model: FilmModel) -> String {
-        var bits = [UInt64]()
-        func append(_ v: SIMD3<Double>) { bits += [v.x.bitPattern, v.y.bitPattern, v.z.bitPattern] }
-        for stops in stride(from: -8.0, through: 8.0, by: 0.25) {
-            append(model.render(SIMD3(repeating: 0.18 * pow(2, stops))))
-        }
-        var seed: UInt32 = 107
-        func next() -> Double {
-            seed = seed &* 1_664_525 &+ 1_013_904_223
-            return Double(seed >> 8) / Double(1 << 24)
-        }
-        for i in 0..<435 {
-            let color = SIMD3(next(), next(), next()) * 0.18 * pow(2, 16 * next() - 8)
-            append(model.render(color))
-            if i.isMultiple(of: 10) {
-                append(model.render(color, lights: SIMD3(0.05, -0.05, 0.1), saturation: 1.3))
-            }
-        }
-        append(model.printerLights)
-        for vector in model.kernelArguments(lights: SIMD3(0.05, -0.05, 0.1), exposure: 0.5, saturation: 1.3) {
-            bits += (0..<vector.count).map { Double(vector.value(at: $0)).bitPattern }
-        }
-        let data = bits.withUnsafeBytes { Data($0) }
-        return SHA256.hash(data: data).map { String(format: "%02x", $0) }.joined()
-    }
+    /// The bundled default stock file. Throws rather than traps, so a broken file fails the tests that read it.
+    static func bundledDefault() throws(EmulsionError) -> FilmStock { try .bundled(named: "emulsion-default") }
 }

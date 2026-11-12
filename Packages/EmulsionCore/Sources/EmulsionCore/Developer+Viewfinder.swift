@@ -24,14 +24,15 @@ extension Developer {
 /// The approximate preview inverse behind `Developer.viewfinderNegative(from:)`.
 ///
 /// `CIColorCurves` looks the table up in extended Display P3, whose sRGB-shaped encoding spaces
-/// the steps by lightness instead of linear light, so the deep shadows (the floor is −9 stops)
+/// the steps by lightness instead of linear light, so the deep shadows (the floor is −6 stops)
 /// aren't coarse. Table values are encoded the same way and the filter decodes them back; it
 /// doesn't clamp them, so white keeps its +4-stop estimate. Its input is clamped to the table's
 /// domain, 0…1, as the kernel clamps display values, and alpha passes through
 /// (`ViewfinderEstimateTests`).
 struct ViewfinderEstimate {
     /// Table steps across encoded display 0…1. Measured on the gray ramp, the estimate is within
-    /// 0.003 stops of the exact one at 1024 steps (0.03 at 256, 0.08 at 128), for a 12 KB table.
+    /// 0.005 stops of the exact one at 1024 steps, for a 12 KB table. Coarser tables did worse with
+    /// the earlier default stock (0.03 stops at 256, 0.08 at 128).
     static let steps = 1024
     private let table: Data
     /// P3 → working · sensitivity⁻¹ · working → P3, as `CIColorMatrix` rows: the curve's

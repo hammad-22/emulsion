@@ -1,17 +1,28 @@
 {
-  "formatVersion" : 1,
+  "formatVersion" : 2,
   "name" : "Emulsion Default, fitted negative",
   "negative" : {
-    "densityRange" : 2.222308296475786,
-    "exposureOffset" : [
-      0.5000459941901119,
-      0.3032987165623694,
-      0.3024051667378556
-    ],
     "gamma" : [
-      0.5113240679403331,
-      0.6438986498372185,
-      0.6109847317243459
+      0.515715434454273,
+      0.5593416077628636,
+      0.548511689293821
+    ],
+    "printingDensity" : [
+      [
+        0.919196994292927,
+        0.0788653187074474,
+        -0.002090404486266947
+      ],
+      [
+        0.11159323048697525,
+        0.8510690063634652,
+        0.09444893394371391
+      ],
+      [
+        0.052854779421249345,
+        0.07341489171972246,
+        0.8497219808888771
+      ]
     ],
     "sensitivity" : [
       [
@@ -29,6 +40,26 @@
         -0.07,
         1.08
       ]
+    ],
+    "shoulderExposure" : [
+      2.1034739434772467,
+      2.2625157469389072,
+      2.1247982086723014
+    ],
+    "shoulderWidth" : [
+      0.40194820864609043,
+      0.3226830202061449,
+      0.35380299993427367
+    ],
+    "toeExposure" : [
+      -1.4708378583874335,
+      -1.4271129503141482,
+      -1.4463650443196432
+    ],
+    "toeWidth" : [
+      0.2635532209359079,
+      0.2692683974200564,
+      0.2096562354820459
     ]
   },
   "print" : {
@@ -51,9 +82,9 @@
       ]
     ],
     "gamma" : [
-      2.2,
-      2.15,
-      2.05
+      2.5724834935000165,
+      2.2719702004317437,
+      2.488751645941025
     ],
     "minimumDensity" : 0.06,
     "shape" : 0.5
@@ -61,25 +92,35 @@
   "provenance" : {
     "fitDate" : "2026-11-12",
     "fitResiduals" : {
-      "blue.maxAbsDensity" : 0.04724025776889629,
-      "blue.rmsDensity" : 0.02487769991854581,
-      "green.maxAbsDensity" : 0.05395481456507545,
-      "green.rmsDensity" : 0.027625041318836162,
-      "maxAbsDensity" : 0.05395481456507545,
-      "red.maxAbsDensity" : 0.04788515767649648,
-      "red.rmsDensity" : 0.02565251201727329,
-      "rmsDensity" : 0.02607741189804547
+      "blue.dyeAmount.rms" : 0.0041496950727925854,
+      "blue.statusM.maxAbs" : 0.011165222201102276,
+      "blue.statusM.rms" : 0.003975384458269524,
+      "green.dyeAmount.rms" : 0.0024641245749032407,
+      "green.statusM.maxAbs" : 0.007943189615607471,
+      "green.statusM.rms" : 0.002625705991284961,
+      "printingDensity.blue.lattice.rms" : 0.012257275499183625,
+      "printingDensity.blue.neutralScale.maxAbs" : 0.0024012051267140455,
+      "printingDensity.green.lattice.rms" : 0.02387799991564937,
+      "printingDensity.green.neutralScale.maxAbs" : 0.006289553572770945,
+      "printingDensity.red.lattice.rms" : 0.006209644542399052,
+      "printingDensity.red.neutralScale.maxAbs" : 0.004140171671868531,
+      "red.dyeAmount.rms" : 0.0024170733918608463,
+      "red.statusM.maxAbs" : 0.006414092849738262,
+      "red.statusM.rms" : 0.002256236020695616
     },
     "notes" : [
       "Chart conditions: Exposure: 5500 K Daylight, 1/50 sec; Process: ECN-2; Densitometry: Status M.",
-      "Only the negative characteristic curves (gamma, densityRange, exposureOffset) were fitted, to the digitized characteristic chart; every other parameter is the hand-tuned value of \"Emulsion Default\".",
-      "Minimum densities (base + fog + mask) were fitted (red 0.000, green 0.457, blue 0.688) but are not stored: the engine's calibrated printer lights absorb a constant per-layer density.",
-      "Exposure offsets are relative to mid-gray at log10 exposure -1.2995 lux-seconds on the chart, an approximate anchor (see the fit report).",
-      "fitResiduals are measured − fitted density over the traced samples; they exclude the digitizing error.",
-      "red: fitted minimum density 0.000 sits on its bound, so it is not a reading of the film's base density (the logistic's long toe absorbs it); the lowest traced density is 0.175."
+      "Fitted: the negative curves (gamma, toeExposure, toeWidth, shoulderExposure, shoulderWidth, per layer) to the neutral scale's dye amounts, computed from the digitized characteristic and spectral dye density charts (sha256 59e3ae0b1cf6b26e60d4269dbdb34e4d8d0f33c41792b29d80303e4708b8fe69, 95255edd0edcb11e8b4acf707c1a773743d2ae3fbe08465acc59cd703c129fb9) through ISO 5-3 Status M; and printingDensity, PD = P·c + b through SMPTE ST 2065-2 APD, fitted on the neutral scale (weighted 10) and a lattice of dye amounts.",
+      "Not stored: the fitted per-layer dye-amount offsets and the printing-density offset b (+0.0027, +0.0033, +0.0010); the calibrated printer lights absorb a constant per-layer density.",
+      "shoulderExposure lies -0.98, -0.46, -0.91 stops from the last traced sample (at +7.97 stops; negative = inside the traced range). The curve beyond the last traced sample, its flat top, is extrapolated.",
+      "Exposures are relative to mid-gray at log10 exposure -1.2995 lux-seconds on the chart, an approximate anchor (see the fit report).",
+      "Print gamma rebalanced per channel to 1.3300 / (printingDensity · gamma): a print stock's layer contrasts are matched to the printing-density contrasts of the negatives it prints (SMPTE RP 180-1999 Introduction); without it the gray scale turns green/magenta away from mid-gray. The overall level, the product of print and negative contrast, is carried over from \"Emulsion Default\" and is artistic (MOV-5).",
+      "Hand-tuned, from \"Emulsion Default\": sensitivity, the print's minimum density, density range, shape and dyes, and the rendering choices.",
+      "fitResiduals: measured − fitted Status M density and dye amount per layer over the traced samples, and the printing-density matrix's residuals; they exclude the digitizing error."
     ],
     "source" : "Eastman Kodak Company H-1-5207, \"KODAK VISION3 250D Color Negative Film 5207 / 7207\", March 2026 (as printed in the PDF: 'MARCH 2026', footer 'Revised 3-26'). https://www.kodak.com/content/products-brochures/motion-picture/KODAK-VISION3-250D-5207-7207-technical-information.pdf",
     "sourceSHA256" : "59e3ae0b1cf6b26e60d4269dbdb34e4d8d0f33c41792b29d80303e4708b8fe69",
+    "sourceStock" : "kodak-vision3-250d-5207",
     "tool" : "emulsion-fit 0.1.0"
   },
   "rendering" : {

@@ -7,10 +7,11 @@ import Testing
 /// `EMULSION_STANDARDS_DIR`, else their defaults); CI skips them. Numbers are computed from the digitized datasheet,
 /// not measured on film.
 struct DyeSetDataTests {
-    static let stock = "kodak-vision3-250d-5207"
+    static let stock = NegativeFitReport.targetStock
     static let standardsDirectory = StandardsTables.defaultDirectory
-    static let available =
-        StockDataTests.referenceDataAvailable && standardsDirectory.isExistingDirectory && StockDataTests.presentStocks.contains(stock)
+    /// Both local folders exist; a file in them that doesn't load then fails its test.
+    static let standardsAvailable = StockDataTests.referenceDataAvailable && standardsDirectory.isExistingDirectory
+    static let available = standardsAvailable && StockDataTests.presentStocks.contains(stock)
 
     /// Built once: the report takes seconds in a debug build.
     static let outcome = Result<NegativeDyeSetReport, any Error> {

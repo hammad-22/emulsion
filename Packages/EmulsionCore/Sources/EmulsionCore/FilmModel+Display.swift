@@ -66,30 +66,44 @@ extension FilmModel {
     }
 
     /// The inverse of `sceneEstimate`, in closed form. The neutral print is clamped to what the
-    /// soft ends produce for display 0…1, so the result stays in 0…1 for any scene.
+    /// soft ends produce for display 0…1, so the result stays in 0…1 for any scene (the final clamp
+    /// only removes rounding at the ends).
     func display(fromSceneEstimate scene: SIMD3<Double>) -> SIMD3<Double> {
         let ends = softEnds
         let (lo, hi) = (ends.compress(0), ends.compress(1))
-        let exposure = simd_max(sensitivity * scene, SIMD3(repeating: 1e-7))
-        return SIMD3((0..<3).map { ends.expand(min(hi, max(lo, neutralPrint(exposure[$0])))) })
+        let exposure = simd_max(sensitivity * scene, SIMD3(repeating: Self.layerExposureFloor))
+        return SIMD3((0..<3).map { min(1, max(0, ends.expand(min(hi, max(lo, neutralPrint(exposure[$0])))))) })
     }
 
     /// Display-linear print of a display-referred photo under edits, before gamut mapping.
     /// `estimate` is the photo's scene estimate; `edited` is the scene the edits print (the
     /// estimate with exposure and halation applied: `render` does not apply exposure).
-    /// Per channel, the edited print's ratio to the zero-edit print is applied to the photo. Where
-    /// the photo is darker than its print (gain < 1) and the edit brightens the channel, (1 − gain)²
-    /// of the print's increase is added on top, so a zero channel can still rise (desaturation)
-    /// and the response has no slope jump at zero edits.
+    /// Per channel, the edited print e's ratio to the zero-edit print b is applied to the photo:
+    /// out = e·g with g = photo/b. Where the photo is darker than its print (g < 1) a lift is added,
+    /// so a zero channel can still rise (desaturation): with d = e − b,
+    ///   lift = (1 − g)²·d                  when the edit brightens (d ≥ 0),
+    ///   lift = (1 − g)²·t·d·e/b            when it darkens, t = min(1, g/(1 − g)²).
+    /// Zero edits reproduce the photo (d = 0). For g ≥ (3 − √5)/2 ≈ 0.382 (t = 1) the slope through
+    /// zero edits is g + (1 − g)² both ways; below that the kink shrinks continuously to the one a
+    /// zero channel must have (it can rise but not fall below zero). When darkening, out is never
+    /// negative and never falls as e rises: it is a convex quadratic in e with slope
+    /// g − (1 − g)²·t ≥ 0 at e = 0.
     func renderRelative(estimate: SIMD3<Double>, edited: SIMD3<Double>, lights: SIMD3<Double>, saturation: Double) -> SIMD3<Double> {
         let base = render(estimate)
         let print = render(edited, lights: lights, saturation: saturation)
         let photo = display(fromSceneEstimate: estimate)
-        return SIMD3(
-            (0..<3).map { c -> Double in
-                let gain = photo[c] / max(base[c], 1e-6)
-                let lift = gain < 1 ? (1 - gain) * (1 - gain) * max(print[c] - base[c], 0) : 0
-                return print[c] * gain + lift
-            })
+        return SIMD3((0..<3).map { c in Self.relative(print: print[c], base: base[c], photo: photo[c]) })
+    }
+
+    /// One channel of `renderRelative`: the edited print `print`, the zero-edit print `base` and the photo.
+    static func relative(print e: Double, base b: Double, photo: Double) -> Double {
+        let bb = max(b, 1e-6)
+        let g = photo / bb
+        guard g < 1 else { return e * g }
+        let shortfall = (1 - g) * (1 - g)
+        let d = e - bb
+        let t = shortfall > g ? g / shortfall : 1
+        let lift = d >= 0 ? shortfall * d : shortfall * t * d * e / bb
+        return e * g + lift
     }
 }

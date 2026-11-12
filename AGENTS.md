@@ -35,7 +35,7 @@ sh Tools/build-kernels.sh                                    # after any .metal 
 (cd Packages/EmulsionCore && EMULSION_PERF=1 swift test --filter PerformanceProbe)  # Mac timings
 (cd Packages/EmulsionCore && EMULSION_UPDATE_GOLDENS=1 swift test --filter VisualRegression)  # accept an intended look change (Tests/AGENTS.md)
 (cd Packages/EmulsionCore && swift run emulsion-fit dyes --stock <id> --out <dir>)  # dye set + printing density (MOV-88; local standards tables, `--standards`)
-(cd Packages/EmulsionCore && swift run emulsion-fit negative --stock kodak-vision3-250d-5207 --out /tmp/fit)  # fit a stock; also `list`, `check`
+(cd Packages/EmulsionCore && swift run emulsion-fit negative --stock kodak-vision3-250d-5207 --out /tmp/fit)  # fit a stock (needs the standards tables, as `dyes`); also `list`, `check`
 swift format lint --recursive Packages Apps Tools            # style (config: .swift-format)
 ```
 Stock-data checks and `emulsion-fit` read the local reference data (traced curves, never committed) from `EMULSION_REFERENCE_DATA`, else `~/Documents/Emulsion Research/datasheet-tracings`; `swift test` skips those checks when the folder is missing.

@@ -40,6 +40,20 @@ final class FilmModelTests: EmulsionTestCase {
         }
     }
 
+    /// The same agreement from deep shadow to far highlight, where the float softplus works at its extremes.
+    func testGPUMatchesSwiftFromMinusTwelveToPlusTenStops() throws {
+        let tints: [SIMD3<Float>] = [[1.0, 0.8, 0.7], [0.7, 1.0, 0.8], [0.75, 0.8, 1.0], [1.0, 1.0, 1.0]]
+        let colors = stride(from: -12.0, through: 10.0, by: 1.0).flatMap { stops in tints.map { $0 * Float(0.18 * pow(2, stops)) } }
+        let gpu = codes(try render(Fixtures.row(colors, space: SceneFixtures.linearP3)))
+        for (i, c) in colors.enumerated() {
+            let ref = FilmLook.stock.render(SIMD3(Double(c.x), Double(c.y), Double(c.z)))
+            for k in 0..<3 {
+                let refCode = Double(Fixtures.encode(Float(min(1, ref[k])))) * 255
+                XCTAssertEqual(gpu[i][k], refCode, accuracy: 0.6, "color \(i) channel \(k)")
+            }
+        }
+    }
+
     func testSkinStaysInItsHueFamilyAcrossExposure() {
         let skin = SIMD3<Double>(0.40, 0.20, 0.13)
         let hues = stride(from: -2.0, through: 1.0, by: 0.5).map { Fixtures.hue(p3ToLab(FilmLook.stock.render(skin * pow(2, $0)))) }
@@ -55,7 +69,9 @@ final class FilmModelTests: EmulsionTestCase {
             for (a, b) in zip(chroma, chroma.dropFirst()) where a > 0.02 {
                 XCTAssertGreaterThan(b / a, 0.72, "abrupt desaturation for \(color): \(chroma)")
             }
-            XCTAssertLessThan(chroma.last!, chroma.first!, "very bright colors should approach white")
+            // Higher print contrast can push the chroma peak to +2…+3 stops; by +5 every color has faded at
+            // least 10% from its peak (measured: 13% for the green, the least).
+            XCTAssertLessThan(chroma.last!, 0.9 * chroma.max()!, "very bright colors should approach white")
         }
     }
 }
