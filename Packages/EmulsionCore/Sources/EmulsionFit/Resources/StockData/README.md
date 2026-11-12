@@ -23,6 +23,12 @@ The output is byte-identical to what the manifests pin. `swift test` then also r
 the curves; the loader rejects a CSV whose SHA-256 differs from its manifest. Where the folder is
 missing only the manifest checks run.
 
+The camera negatives' folders also hold `negative-fit.stock.json`: the engine's negative
+characteristic parameters fitted to the traced curves by `emulsion-fit negative --fit-date 2026-11-12`,
+with provenance and residual statistics measured against the traced curves (no samples). Neither
+the engine nor the apps load them: the bundled default stock is unchanged, and bundling fitted
+stocks under neutral ids is MOV-25.
+
 ## Sources
 
 | Folder | Document | Revision (as printed) | PDF SHA-256 | URL |
