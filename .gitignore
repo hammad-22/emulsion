@@ -6,3 +6,6 @@ xcuserdata/
 .swiftpm/
 .venv/
 __pycache__/
+# Traced datasheet curves stay local until the MOV-94 review (docs/DECISIONS.md).
+Packages/EmulsionCore/Sources/EmulsionFit/Resources/StockData/**/*.csv
+Tools/stock-digitizing/crosscheck/tracing-b/**/*.csv
