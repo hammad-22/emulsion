@@ -23,3 +23,5 @@ Read [AGENTS.md](AGENTS.md) for the engineering rules (they apply to humans and 
 ## License
 
 Apache License 2.0. See [LICENSE](LICENSE) and [NOTICE](NOTICE).
+
+Film stock names are trademarks of their owners; Emulsion is not affiliated with or endorsed by them.

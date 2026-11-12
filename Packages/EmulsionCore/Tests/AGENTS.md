@@ -11,6 +11,7 @@
 - RAW files whose DNG profile brightens through a gain table (48 MP ProRAW) are tested with `SyntheticDNG.Profile` (a uniform ProfileGainTableMap and a ProfileToneCurve, which `CIRAWFilter` applies): `ExposureAnchorDevelopTests`.
 - Real-file RAW checks are opt-in and real samples never enter the repo: `EMULSION_RAW_SAMPLES=<dir>:<dir>` runs `RAWDevelopRealFileTests` and `ExposureAnchorRealFileTests` (and the probe's real-file pass), `EMULSION_RAW_PROBE=1` runs the `RAWDevelopProbe` measurements, and `EMULSION_PROOF_DIR=<dir>` writes before/after PNGs (only `*_CC0.dng` samples are rendered).
 - Timing lives in `PerformanceProbe` and runs only when `EMULSION_PERF=1` is set (RAW develop timings also need `EMULSION_RAW_SAMPLES`).
+- Local reference data (the traced stock curves) lives outside the repo, in `EMULSION_REFERENCE_DATA` or else `~/Documents/Emulsion Research/datasheet-tracings`. Tests that need it are `.enabled(if: StockDataTests.referenceDataAvailable)` (the folder exists), so CI skips them; when the folder exists, a stock that doesn't load or whose digest differs from its manifest fails. Never commit the data.
 - Suites that read video with AVAssetReader are `.serialized`: its blocking reads starve the Swift concurrency pool when many run in parallel.
 
 ## Visual regression (MOV-37)

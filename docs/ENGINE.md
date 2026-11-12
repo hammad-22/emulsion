@@ -63,6 +63,14 @@ What it is: an estimate that places the tones the file's own profile renders at 
 
 **Sub-black policy.** Decoding keeps sub-black signals (legal-range footroom, compression undershoot) as negative light; clipping is the film model's job. Where a specification defines values below its range, the engine follows it: Apple Log holds at R₀, and the log curves' toes and sRGB's linear segment extend linearly. Where it doesn't (BT.2100 HLG, BT.1886 gamma 2.4), the curve is extended oddly (mirrored), so every decode stays monotonic through black. colour-science mirrors HLG the same way; for BT.1886, which colour-science clamps, the reference generator applies the engine's convention.
 
+## Digitized stock data
+
+The offline `EmulsionFit` target (never linked into an app, not a library product) holds a manifest per digitized stock in `Sources/EmulsionFit/Resources/StockData/<stock>/`, naming the PDF (with its SHA-256), page, conditions, axis calibration, the per-point reading error and the SHA-256 of each traced CSV. The traced curve CSVs are not in the repository (`docs/DECISIONS.md`, 12 Nov 2026): anyone with the public PDF can re-trace them with `Tools/stock-digitizing/digitize.py`. They are local reference data, read from `EMULSION_REFERENCE_DATA` or else `~/Documents/Emulsion Research/datasheet-tracings`; the loader refuses any CSV whose digest differs from its manifest. Where that folder is missing, only the manifest checks run. `docs/STOCK-DATA.md` ("Digitized curves") covers the method, the error estimates and the cross-check.
+
+- **Manifest checks on load:** the manifest's `stock` must match its directory, and grid steps, pixel scales, uncertainties, x ranges, spans and the camera-stop anchor must be finite and in range, or loading fails naming the field.
+- **Audit:** samples sit on the manifest's grid and inside each curve's traced extent, and characteristic curves never fall by more than one chart pixel of density.
+- **Dye-sum check** (MOV-17): the yellow, magenta and cyan dye spectra, with non-negative least-squares scales, against the sheet's neutral; target max |residual| ≤ 0.05 D. Dye densities are used as drawn, negative lobes included (the negatives' magenta dye dips below zero near 445 nm). Negatives: the acceptance compares neutral − minimum density, because the dye curves are drawn "D-mins subtracted" while the neutral and minimum-density spectra are drawn as measured; the unsubtracted comparison is reported as a diagnostic. Print film: the acceptance compares the visual neutral over 400–700 nm, where the three image dyes account for it; the full overlap and the scales-fixed-to-1 residual (with its mean) are diagnostics. With scales fixed to 1 the neutral sits above the plain dye sum by a roughly flat amount over 400–700 nm and rises steeply below 400 nm; the chart does not say what the extra density is.
+
 ## Verified behavior (synthetic tests, `swift test`)
 
 Tests, all passing:
