@@ -21,6 +21,22 @@ public struct SyntheticDNG: Sendable {
     public let asShotNeutral: SIMD3<Double>
     /// XYZ → camera, DNG ColorMatrix1 for CalibrationIlluminant1 = D65.
     public let cameraFromXYZ: simd_double3x3
+    /// Rendering hints of the file's DNG profile; nil writes none.
+    public let profile: Profile?
+
+    /// A DNG profile's rendering hints, the tags Apple's 48 MP ProRAW uses to brighten its image.
+    public struct Profile: Sendable {
+        /// ProfileGainTableMap (DNG 1.6) holding one gain everywhere: every pixel, whatever its level.
+        public let gainTableGain: Float
+        /// ProfileToneCurve: (input, output) pairs from (0, 0) to (1, 1), linear in and out;
+        /// identity by default.
+        public let toneCurve: [SIMD2<Float>]
+
+        public init(gainTableGain: Float, toneCurve: [SIMD2<Float>] = [SIMD2(0, 0), SIMD2(1, 1)]) {
+            self.gainTableGain = gainTableGain
+            self.toneCurve = toneCurve
+        }
+    }
 
     /// 16-bit codes with no black offset: code 0 is no light, 65535 sensor white.
     private static let blackLevel = 0
@@ -28,7 +44,7 @@ public struct SyntheticDNG: Sendable {
 
     public init(
         mosaic: Mosaic, width: Int, height: Int, baselineExposureStops: Double = 0, asShotNeutral: SIMD3<Double>,
-        cameraFromXYZ: simd_double3x3
+        cameraFromXYZ: simd_double3x3, profile: Profile? = nil
     ) {
         precondition(width > 0 && height > 0 && width.isMultiple(of: 2) && height.isMultiple(of: 2), "DNG size must be even")
         self.mosaic = mosaic
@@ -37,6 +53,7 @@ public struct SyntheticDNG: Sendable {
         self.baselineExposureStops = baselineExposureStops
         self.asShotNeutral = asShotNeutral
         self.cameraFromXYZ = cameraFromXYZ
+        self.profile = profile
     }
 
     /// The file, padded with trailing zeros to `minimumFileSize`. `camera(x, y)` gives the
@@ -88,7 +105,8 @@ public struct SyntheticDNG: Sendable {
             .short(.samplesPerPixel, [UInt16(samples)]),
             .long(.rowsPerStrip, [UInt32(height)]),
             .long(.stripByteCounts, [UInt32(stripByteCount)]),
-            .bytes(.dngVersion, [1, 4, 0, 0]),
+            // ProfileGainTableMap is DNG 1.6.
+            .bytes(.dngVersion, profile == nil ? [1, 4, 0, 0] : [1, 6, 0, 0]),
             .bytes(.dngBackwardVersion, mosaic == .bayerRGGB ? [1, 1, 0, 0] : [1, 3, 0, 0]),
             .ascii(.uniqueCameraModel, "Emulsion Synthetic"),
             .long(.blackLevel, Array(repeating: UInt32(Self.blackLevel), count: samples)),
@@ -104,7 +122,35 @@ public struct SyntheticDNG: Sendable {
                 .bytes(.cfaPattern, [0, 1, 1, 2]),
             ]
         }
+        if let profile {
+            entries += [
+                .undefined(.profileGainTableMap, Self.gainTableMap(gain: profile.gainTableGain)),
+                .float(.profileToneCurve, profile.toneCurve.flatMap { [$0.x, $0.y] }),
+                .long(.defaultBlackRender, [Self.defaultBlackRenderNone]),
+            ]
+        }
         return entries
+    }
+
+    /// DefaultBlackRender 1: no automatic black subtraction, as in iPhone ProRAW.
+    private static let defaultBlackRenderNone: UInt32 = 1
+
+    /// ProfileGainTableMap stream in the file's byte order (DNG SDK `dng_gain_table_map::GetStream`):
+    /// MapPointsV, MapPointsH (u32); MapSpacingV, MapSpacingH, MapOriginV, MapOriginH (f64);
+    /// MapPointsN (u32); five MapInputWeights (f32); then the gains (f32), N innermost.
+    private static func gainTableMap(gain: Float) -> [UInt8] {
+        let points = 2
+        let tablePoints = 2
+        let spacing = 1.0
+        let origin = 0.0
+        // Weights of R, G, B, min and max: any choice gives the same uniform gain.
+        let weights: [Float] = [0.25, 0.5, 0.25, 0, 0]
+        var bytes = UInt32(points).littleEndianBytes + UInt32(points).littleEndianBytes
+        bytes += [spacing, spacing, origin, origin].flatMap(\.bitPattern.littleEndianBytes)
+        bytes += UInt32(tablePoints).littleEndianBytes
+        bytes += weights.flatMap(\.bitPattern.littleEndianBytes)
+        bytes += Array(repeating: gain, count: points * points * tablePoints).flatMap(\.bitPattern.littleEndianBytes)
+        return bytes
     }
 
     /// EXIF LightSource code for D65.
@@ -186,6 +232,9 @@ extension SyntheticDNG {
     /// D65 white point as the colour standards round it (sRGB, Rec. 709/2020, Display P3), the
     /// value `InputColorSpace.d65` uses.
     public static let d65Chromaticity = SIMD2<Double>(0.3127, 0.3290)
+
+    /// Colour temperature of CIE standard illuminant A, a tungsten lamp: 2856 K (CIE 15:2004).
+    public static let illuminantAKelvin = 2856.0
 }
 
 // MARK: TIFF encoding
@@ -214,6 +263,9 @@ private enum TIFFTag: UInt16 {
     case asShotNeutral = 50728
     case baselineExposure = 50730
     case calibrationIlluminant1 = 50778
+    case profileToneCurve = 50940
+    case defaultBlackRender = 51110
+    case profileGainTableMap = 52525
 }
 
 private struct TIFFEntry {
@@ -235,6 +287,12 @@ private struct TIFFEntry {
     }
     static func long(_ tag: TIFFTag, _ values: [UInt32]) -> TIFFEntry {
         TIFFEntry(tag: tag, type: 4, count: values.count, payload: values.flatMap(\.littleEndianBytes))
+    }
+    static func undefined(_ tag: TIFFTag, _ values: [UInt8]) -> TIFFEntry {
+        TIFFEntry(tag: tag, type: 7, count: values.count, payload: values)
+    }
+    static func float(_ tag: TIFFTag, _ values: [Float]) -> TIFFEntry {
+        TIFFEntry(tag: tag, type: 11, count: values.count, payload: values.flatMap(\.bitPattern.littleEndianBytes))
     }
     static func rational(_ tag: TIFFTag, _ values: [Double]) -> TIFFEntry {
         let words = values.flatMap { [UInt32(($0 * Double(rationalDenominator)).rounded()), UInt32(rationalDenominator)] }

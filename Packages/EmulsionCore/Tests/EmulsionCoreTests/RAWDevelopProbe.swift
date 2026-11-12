@@ -24,10 +24,6 @@ struct RAWDevelopProbe {
         }
     }
 
-    static func filter(_ data: Data) throws -> CIRAWFilter {
-        try #require(CIRAWFilter(imageData: data, identifierHint: Developer.dngTypeIdentifier))
-    }
-
     static func apply(_ s: Settings, _ raw: CIRAWFilter) {
         RAWDevelopSupport.applyPreMOV79Develop(raw)
         if let decoder = s.decoder { raw.decoderVersion = decoder }
@@ -79,7 +75,7 @@ struct RAWDevelopProbe {
         for mosaic in SyntheticDNG.Mosaic.allCases {
             for stops in [0.0, 2.0] {
                 let data = RAWDevelopChart.dng(mosaic, chart: chart, baselineStops: stops)
-                let raw = try Self.filter(data)
+                let raw = try RAWDevelopSupport.filter(data)
                 print("\n== \(mosaic) BaselineExposure tag=\(stops) bytes=\(data.count) Developer.isRAW=\(Developer.isRAW(data))")
                 var decoders =
                     "  supportedDecoderVersions=\(raw.supportedDecoderVersions.map(\.rawValue)) default decoderVersion=\(raw.decoderVersion.rawValue)"
@@ -104,7 +100,7 @@ struct RAWDevelopProbe {
 
                 let midIndex = try #require(RAWDevelopChart.wedgeStops.firstIndex(of: 0))
                 func midGray(_ configure: (CIRAWFilter) -> Void) throws -> SIMD3<Double> {
-                    let raw = try Self.filter(data)
+                    let raw = try RAWDevelopSupport.filter(data)
                     RAWDevelopSupport.applyPreMOV79Develop(raw)
                     configure(raw)
                     return Self.means(try #require(Self.read(raw)), chart: chart)[midIndex]
@@ -144,16 +140,16 @@ struct RAWDevelopProbe {
                 Self.report(
                     Self.read(try RAWDevelopTests.developer.develop(data).image), chart: chart, cameras: cameras, scale: scale, rows: true)
                 print("\n== wedge \(mosaic) BE=\(stops) pre-MOV-79 settings")
-                let preMOV79 = try RAWDevelopSupport.preMOV79Negative(Self.filter(data))
+                let preMOV79 = try RAWDevelopSupport.preMOV79Negative(RAWDevelopSupport.filter(data))
                 Self.report(Self.read(preMOV79.image), chart: chart, cameras: cameras, scale: scale, rows: true)
 
-                for version in try Self.filter(data).supportedDecoderVersions {
+                for version in try RAWDevelopSupport.filter(data).supportedDecoderVersions {
                     var first = true
                     for edr in [Float(0), 1, 2] {
                         for gamut in [true, false] {
                             for hr in [true, false] {
                                 let settings = Settings(edr: edr, gamutMapping: gamut, highlightRecovery: hr, decoder: version)
-                                let raw = try Self.filter(data)
+                                let raw = try RAWDevelopSupport.filter(data)
                                 Self.apply(settings, raw)
                                 print("\n== wedge \(mosaic) BE=\(stops) \(settings) (HR supported=\(raw.isHighlightRecoverySupported))")
                                 guard let out = Self.read(raw) else {
@@ -245,7 +241,7 @@ struct RAWDevelopProbe {
             for stops in [0.0, 2.0] {
                 let data = RAWDevelopChart.dng(mosaic, chart: chart, baselineStops: stops)
                 for bias: Float? in [nil, 0] {
-                    let raw = try Self.filter(data)
+                    let raw = try RAWDevelopSupport.filter(data)
                     Self.apply(Settings(edr: 2, gamutMapping: false, highlightRecovery: true), raw)
                     let defaultBias = raw.shadowBias
                     if let bias { raw.shadowBias = bias }
@@ -275,7 +271,7 @@ struct RAWDevelopProbe {
         print("\n#### RAW probe: decoder versions x CIContext (pre-MOV-79 settings, EDR 0)")
         for mosaic in SyntheticDNG.Mosaic.allCases {
             let data = RAWDevelopChart.dng(mosaic, chart: chart)
-            let fresh = try Self.filter(data)
+            let fresh = try RAWDevelopSupport.filter(data)
             print(
                 "\n== \(mosaic) default decoderVersion on a new filter: \(fresh.decoderVersion.rawValue) of \(fresh.supportedDecoderVersions.map(\.rawValue))"
             )
@@ -283,7 +279,7 @@ struct RAWDevelopProbe {
             for version in fresh.supportedDecoderVersions {
                 var engine: [SIMD3<Double>]?
                 for (name, context) in contexts {
-                    let raw = try Self.filter(data)
+                    let raw = try RAWDevelopSupport.filter(data)
                     Self.apply(Settings(decoder: version), raw)
                     let start = ContinuousClock.now
                     guard let image = raw.outputImage, !image.extent.isInfinite, !image.extent.isEmpty else {
@@ -371,7 +367,7 @@ struct RAWDevelopProbe {
                 let daylight = file(underD65, neutral: d65Neutral)
 
                 func gray(_ data: Data, _ configure: (CIRAWFilter) -> Void = { _ in }) throws -> (rgb: SIMD3<Double>, raw: CIRAWFilter) {
-                    let raw = try Self.filter(data)
+                    let raw = try RAWDevelopSupport.filter(data)
                     RAWDevelopSupport.applyPreMOV79Develop(raw)
                     configure(raw)
                     return (Self.means(try #require(Self.read(raw)), chart: chart)[0], raw)
@@ -380,7 +376,7 @@ struct RAWDevelopProbe {
                 for (name, data) in [
                     ("2856 K scene, correctly tagged", correct), ("2856 K scene, tagged D65", wrong), ("D65 scene, tagged D65", daylight),
                 ] {
-                    let raw = try Self.filter(data)
+                    let raw = try RAWDevelopSupport.filter(data)
                     print(
                         "  \(Self.pad(name, 32)) as-shot temp=\(raw.neutralTemperature) tint=\(raw.neutralTint) xy=\(raw.neutralChromaticity) | \(Self.grayLine(try gray(data).rgb))"
                     )
@@ -436,7 +432,6 @@ extension RAWDevelopProbe {
         let frame: RAWDevelopSupport.FrameStats
         let max: SIMD3<Double>
         let min: Double
-        let medianLuminance: Double
         let mean: SIMD3<Double>
         /// Mean R/G and B/G of the brightest 0.1 % of pixels by luminance: the colour of clipped highlights.
         let highlightRatios: SIMD2<Double>
@@ -446,8 +441,6 @@ extension RAWDevelopProbe {
             self.frame = frame
             max = pixels.reduce(SIMD3(repeating: -.infinity)) { simd_max($0, $1) }
             min = pixels.map { $0.min() }.min() ?? .nan
-            let sortedLuminance = pixels.map(RAWDevelopSupport.luminance).sorted()
-            medianLuminance = sortedLuminance[sortedLuminance.count / 2]
             mean = RAWDevelopProbe.mean(pixels)
             let brightest = pixels.filter { RAWDevelopSupport.luminance($0) >= frame.p999 }
             let brightMean = brightest.reduce(SIMD3<Double>.zero, +) / Double(Swift.max(brightest.count, 1))
@@ -456,7 +449,7 @@ extension RAWDevelopProbe {
 
         var line: String {
             "max \(max.fourDigits) p99.9 lum \(frame.p999.fourDigits) >1 \(frame.over1.fourDigits) >2 \(frame.over2.fourDigits)"
-                + " >4 \(frame.over4.fourDigits) median lum \(medianLuminance.fourDigits) min \(min.fourDigits)"
+                + " >4 \(frame.over4.fourDigits) median lum \(frame.medianLuminance.fourDigits) min \(min.fourDigits)"
                 + " top-0.1% R/G \(highlightRatios.x.fourDigits) B/G \(highlightRatios.y.fourDigits)"
         }
     }
@@ -570,7 +563,7 @@ extension RAWDevelopProbe {
                 let stats = DetailedStats(out.pixels)
                 print(
                     "  decoder \(version.rawValue) EDR 2 GM off HR on \(out.milliseconds.fourDigits) ms: max \(stats.max.fourDigits)"
-                        + " median lum \(stats.medianLuminance.fourDigits) mean RGB \(stats.mean.fourDigits)")
+                        + " median lum \(stats.frame.medianLuminance.fourDigits) mean RGB \(stats.mean.fourDigits)")
             }
         }
         try realFullSize(scaledMaxima.sorted { $0.max > $1.max }.prefix(Self.fullSizeFileCount).map(\.url))
