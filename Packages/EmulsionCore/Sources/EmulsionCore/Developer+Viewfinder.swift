@@ -33,20 +33,23 @@ struct ViewfinderEstimate {
     /// Table steps across encoded display 0…1. Measured on the gray ramp, the estimate is within
     /// 0.003 stops of the exact one at 1024 steps (0.03 at 256, 0.08 at 128), for a 12 KB table.
     static let steps = 1024
-    let table: Data
+    private let table: Data
     /// P3 → working · sensitivity⁻¹ · working → P3, as `CIColorMatrix` rows: the curve's
     /// per-layer exposures become the scene estimate in the working space.
-    let rows: [CIVector]
+    private let rows: [CIVector]
 
     private static let filterSpace = CGColorSpace(name: CGColorSpace.extendedDisplayP3)!
 
-    init(model: FilmModel, steps: Int = Self.steps) {
+    init(model: FilmModel) {
         let ends = model.softEnds
-        let exposures = (0..<steps).map { model.layerExposure(fromDisplay: Self.decode(Double($0) / Double(steps - 1)), ends: ends) }
+        let display = InputColorSpace.displayP3
+        let exposures = (0..<Self.steps).map {
+            model.layerExposure(fromDisplay: display.decode(signal: Double($0) / Double(Self.steps - 1)), ends: ends)
+        }
         table = exposures.map { Float(Self.encode($0)) }.flatMap { [$0, $0, $0] }.withUnsafeBytes { Data($0) }
         let toWorking = InputColorSpace.displayP3.toWorking
         let m = toWorking * model.sensitivity.inverse * toWorking.inverse
-        rows = (0..<3).map { r in CIVector(x: m[0, r], y: m[1, r], z: m[2, r], w: 0) }
+        rows = CIVector.rows(of: m)
     }
 
     func apply(to image: CIImage) -> CIImage {
@@ -66,11 +69,9 @@ struct ViewfinderEstimate {
     }
 
     /// The sRGB transfer function (IEC 61966-2-1), which extended Display P3 uses.
-    static func encode(_ linear: Double) -> Double {
+    /// The engine decodes it (`InputColorSpace.displayP3`) but never encodes, so this is the one
+    /// encoder.
+    private static func encode(_ linear: Double) -> Double {
         linear <= 0.0031308 ? 12.92 * linear : 1.055 * pow(linear, 1 / 2.4) - 0.055
-    }
-
-    static func decode(_ encoded: Double) -> Double {
-        encoded <= 0.04045 ? encoded / 12.92 : pow((encoded + 0.055) / 1.055, 2.4)
     }
 }

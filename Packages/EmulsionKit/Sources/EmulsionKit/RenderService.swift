@@ -1,13 +1,20 @@
 import CoreGraphics
+import CoreImage
 import EmulsionCore
 import Foundation
 import ImageIO
+import Synchronization
 
-/// All developing and rendering happens off the main actor, through one Renderer.
-/// Developed previews are cached so slider moves only re-run the look.
+/// All developing and rendering happens off the main actor, through one Renderer. Library
+/// renders run on this actor, which caches developed previews so slider moves only re-run the
+/// look; viewfinder frames run beside it (`viewfinderImage`), so they never wait behind a library
+/// render.
 public actor RenderService {
     public static let shared = RenderService()
     private var renderer: Renderer?
+    /// The same renderer once `prepareViewfinder` has run, for frames rendered off the actor.
+    /// `Renderer` is immutable apart from its `CIContext`, which is thread-safe.
+    private nonisolated let viewfinderRenderer = Mutex<Renderer?>(nil)
     private var previews: [String: Negative] = [:]
     /// Least recently developed first; the oldest preview is dropped past `maxCachedPreviews`.
     private var lruKeys: [String] = []
@@ -97,16 +104,50 @@ public actor RenderService {
         return image
     }
 
-    /// A viewfinder frame upright and fitted within `maxDimension`, as the camera delivered
-    /// it: the one place the live film look will be applied (MOV-121). Each frame is read
-    /// back into a CGImage; zero-copy Metal presentation is MOV-12.
-    public func viewfinderImage(_ frame: CameraFrame, maxDimension: CGFloat) throws -> CGImage {
+    /// A viewfinder frame, upright and fitted within `maxDimension`, with the film look.
+    ///
+    /// It previews the RAW render; it isn't the same develop. The camera's processed,
+    /// display-referred video frame gets an approximate preview of the scene estimate
+    /// (`Developer.viewfinderNegative(from:)`), which is printed absolutely, like a RAW capture;
+    /// the saved photo is developed from RAW by `Developer`. After that both run the identical
+    /// look. Differences come from Apple's video processing (tone mapping, white balance, noise
+    /// reduction, highlight clipping) and are unmeasured until device testing (MOV-121).
+    /// Each frame is read back into a CGImage; zero-copy Metal presentation is MOV-12.
+    /// Runs off this actor, so it never queues behind a library render.
+    @concurrent public nonisolated func viewfinderImage(
+        _ frame: CameraFrame, _ adjustments: Adjustments, maxDimension: CGFloat
+    ) async throws -> CGImage {
+        let renderer = try await preparedViewfinderRenderer()
+        let negative = renderer.developer.viewfinderNegative(from: Self.fitted(frame.uprightImage, maxDimension: maxDimension))
+        return try renderer.cgImage(renderer.render(negative, adjustments))
+    }
+
+    /// Loads the renderer and samples the viewfinder's preview inverse, so the first frame
+    /// doesn't wait for either.
+    public func prepareViewfinder() throws {
         let renderer = try engine()
-        let image = frame.uprightImage
-        let upright = image.transformed(by: CGAffineTransform(translationX: -image.extent.minX, y: -image.extent.minY))
-        let scale = min(1, maxDimension / max(upright.extent.width, upright.extent.height))
-        let fitted = upright.transformed(by: CGAffineTransform(scaleX: scale, y: scale))
-        return try renderer.cgImage(fitted.cropped(to: CGRect(origin: .zero, size: fitted.extent.size).integral))
+        let pixel = CIImage(color: .black).cropped(to: CGRect(x: 0, y: 0, width: 1, height: 1))
+        _ = renderer.developer.viewfinderNegative(from: pixel)
+        viewfinderRenderer.withLock { $0 = renderer }
+    }
+
+    private nonisolated func preparedViewfinderRenderer() async throws -> Renderer {
+        if let renderer = viewfinderRenderer.withLock({ $0 }) { return renderer }
+        try await prepareViewfinder()
+        guard let renderer = viewfinderRenderer.withLock({ $0 }) else { throw EmulsionError.renderFailed }
+        return renderer
+    }
+
+    /// The image moved to the origin and scaled down to fit within `maxDimension`. A plain affine
+    /// scale, not Lanczos like `Renderer.resized`: cheaper, for the 30 fps path.
+    private static func fitted(_ image: CIImage, maxDimension: CGFloat) -> CIImage {
+        let atOrigin = image.transformed(by: CGAffineTransform(translationX: -image.extent.minX, y: -image.extent.minY))
+        let scale = min(1, maxDimension / max(atOrigin.extent.width, atOrigin.extent.height))
+        let fitted = atOrigin.transformed(by: CGAffineTransform(scaleX: scale, y: scale))
+        // Floored from the exact scaled size, as `Renderer.resized` does: no partly covered edge
+        // row or column (the transformed extent itself is already rounded outward).
+        let size = CGSize(width: (atOrigin.extent.width * scale).rounded(.down), height: (atOrigin.extent.height * scale).rounded(.down))
+        return fitted.cropped(to: CGRect(origin: .zero, size: size))
     }
 
     /// Full-resolution develop and encode, look baked in.

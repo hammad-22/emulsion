@@ -2,16 +2,19 @@ import EmulsionKit
 import EmulsionUI
 import SwiftUI
 
-/// Lenses, the shutter and the library. A row under the viewfinder in portrait; a
-/// vertical rail, with the format bar at its top, beside it when wide.
+/// Lenses, the shutter, the library and the recipe. A row under the viewfinder in portrait; a
+/// vertical rail beside it when wide, with the format bar at its top and the library and recipe
+/// at its foot.
 struct CameraControls: View {
     let model: CameraModel
     let axis: Axis
     @Binding var showsLibrary: Bool
     let transition: Namespace.ID
+    let isShowingRecipes: Bool
+    /// Nil where the recipe strip is always visible.
+    let toggleRecipes: (() -> Void)?
 
     @Environment(PhotoStore.self) private var store
-    @Environment(AppSettings.self) private var settings
 
     var body: some View {
         controls
@@ -31,13 +34,11 @@ struct CameraControls: View {
         } else {
             VStack(spacing: FilmLabLayout.space) {
                 lenses
+                // Equal flexible sides keep the shutter centred.
                 HStack {
-                    library
-                    Spacer()
+                    library.frame(maxWidth: .infinity, alignment: .leading)
                     shutter
-                    Spacer()
-                    // Balances the library button so the shutter sits centred.
-                    Color.clear.frame(width: LibraryButton.size, height: LibraryButton.size)
+                    recipe.frame(maxWidth: .infinity, alignment: .trailing)
                 }
             }
         }
@@ -45,25 +46,35 @@ struct CameraControls: View {
 
     private var rail: some View {
         VStack(spacing: FilmLabLayout.gap) {
-            CaptureFormatBar(capabilities: model.capabilities, axis: .vertical)
-            Spacer(minLength: FilmLabLayout.gap)
+            // Everything but the shutter lies across the rail, so it fits a phone's landscape
+            // height (about 350 pt inside the safe area and margins on iPhone 17 Pro).
+            CaptureFormatBar(capabilities: model.capabilities)
+            Spacer(minLength: 0)
             lenses
             shutter
-            Spacer(minLength: FilmLabLayout.gap)
-            library
+            Spacer(minLength: 0)
+            HStack(spacing: FilmLabLayout.compact) {
+                library
+                recipe
+            }
         }
     }
 
     @ViewBuilder private var lenses: some View {
         if let capabilities = model.capabilities, capabilities.lenses.count > 1 {
-            LensPicker(capabilities: capabilities, axis: axis) { lens in Task { await model.select(lens) } }
+            LensPicker(capabilities: capabilities) { lens in Task { await model.select(lens) } }
+                .disabled(model.isCapturing)
         }
     }
 
     private var shutter: some View {
         ShutterButton(isEnabled: model.status == .running && !model.isCapturing, captureCount: model.captureCount) {
-            Task { await model.capture(resolution: settings.resolution) }
+            Task { await model.capture() }
         }
+    }
+
+    private var recipe: some View {
+        RecipeButton(recipe: model.recipe, isShowingRecipes: isShowingRecipes, toggle: toggleRecipes)
     }
 
     private var library: some View {

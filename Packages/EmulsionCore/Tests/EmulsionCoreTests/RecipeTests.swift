@@ -63,6 +63,18 @@ struct RecipeTests {
         }
     }
 
+    /// MOV-92: no film brand or stock names in the product.
+    @Test func curatedLooksNameNoFilmBrandOrStock() {
+        let banned = [
+            "kodak", "fuji", "portra", "ektar", "velvia", "provia", "cinestill", "ilford", "agfa", "tri-x", "gold", "superia",
+            "vision3",
+        ]
+        for recipe in CuratedLooks.recipes {
+            let text = (recipe.name + " " + recipe.summary).lowercased()
+            #expect(!banned.contains { text.contains($0) }, "\(recipe.name)")
+        }
+    }
+
     @Test func compatibilityAndCorruptionAreExplicit() throws {
         let data = try Recipe(name: "Test", adjustments: Adjustments()).encoded()
         let json = String(decoding: data, as: UTF8.self)

@@ -8,10 +8,8 @@ public struct CameraCapabilities: Sendable, Equatable {
     /// True when this lens can capture at 48 MP as well as 12 MP.
     public let supportsFullResolution: Bool
 
-    public init(lenses: [LensOption], lens: CameraLens, rawFormat: RAWFormat, supportsFullResolution: Bool) {
-        self.lenses = lenses
-        self.lens = lens
-        self.rawFormat = rawFormat
-        self.supportsFullResolution = supportsFullResolution
+    /// The resolution a capture gets: lenses without 48 MP capture at 12 MP.
+    public func resolution(for requested: AppSettings.Resolution) -> AppSettings.Resolution {
+        supportsFullResolution ? requested : .standard
     }
 }
