@@ -46,4 +46,66 @@ final class PerformanceProbe: XCTestCase {
             print(String(format: "%dx%d %@%@: median %.1f ms (first %.1f)", w, h, kind, label, times.dropFirst().sorted()[2], times[0]))
         }
     }
+
+    /// RAW develop with and without the exposure anchor (MOV-134), developed and materialized,
+    /// for the first DNG of each native size in EMULSION_RAW_SAMPLES. Opt-in: EMULSION_PERF=1.
+    func testRAWDevelopTimings() throws {
+        try XCTSkipUnless(ProcessInfo.processInfo.environment["EMULSION_PERF"] != nil, "set EMULSION_PERF=1 to run")
+        try XCTSkipUnless(RAWDevelopSupport.samplesFolders != nil, "set EMULSION_RAW_SAMPLES to run")
+        let r = try Renderer()
+        var seenSizes = Set<String>()
+        var files: [(url: URL, size: CGSize)] = []
+        for url in try RAWDevelopSupport.sampleURLs() {
+            guard let raw = CIRAWFilter(imageURL: url) else { continue }
+            if seenSizes.insert("\(raw.nativeSize)").inserted { files.append((url, raw.nativeSize)) }
+        }
+        print("| File | Native size | Long edge | Variant | Median ms | First ms | Anchor |")
+        print("| --- | --- | ---: | --- | ---: | ---: | ---: |")
+        for (url, size) in files {
+            let data = try Data(contentsOf: url)
+            for edge in [CGFloat(1024), 1600, nil] {
+                for variant in RAWVariant.allCases where edge != nil || !variant.isDraftOnly {
+                    var times = [Double]()
+                    var anchor = 0.0
+                    for _ in 0..<4 {
+                        let start = ContinuousClock.now
+                        let negative = try variant.develop(data, maxDimension: edge, with: r)
+                        _ = try r.materialize(negative)
+                        times.append((ContinuousClock.now - start).milliseconds)
+                        anchor = negative.exposureAnchorStops
+                    }
+                    let median = times.dropFirst().sorted()[1]
+                    print(
+                        "| \(url.lastPathComponent) | \(Int(size.width))×\(Int(size.height)) | \(edge.map { "\(Int($0))" } ?? "full")"
+                            + " | \(variant.rawValue) | \(String(format: "%.0f", median)) | \(String(format: "%.0f", times[0]))"
+                            + " | \(String(format: "%+.3f", anchor)) |")
+                }
+            }
+        }
+    }
+
+    /// Develop orders compared for the draft-mode decision.
+    private enum RAWVariant: String, CaseIterable {
+        case before = "before: no anchor, draft on"
+        case beforeDraftOff = "no anchor, draft off"
+        case after = "after: anchor, draft off"
+        case afterDraftOn = "anchor, then draft on for the output"
+
+        /// Draft mode only differs below full size.
+        var isDraftOnly: Bool { self == .beforeDraftOff || self == .afterDraftOn }
+
+        func develop(_ data: Data, maxDimension: CGFloat?, with r: Renderer) throws -> Negative {
+            switch self {
+            case .before: return try r.developer.develop(data, maxDimension: maxDimension, anchorsExposure: false)
+            case .after: return try r.developer.develop(data, maxDimension: maxDimension)
+            case .beforeDraftOff, .afterDraftOn:
+                let raw = try XCTUnwrap(CIRAWFilter(imageData: data, identifierHint: Developer.dngTypeIdentifier))
+                Developer.bypassAppleRendering(raw)
+                let anchor = self == .afterDraftOn && raw.isLocalToneMapSupported ? ExposureAnchor.stops(of: raw, context: r.context) : 0
+                Developer.applyPreviewScale(raw, maxDimension: maxDimension, allowsDraftMode: self == .afterDraftOn)
+                let output = try XCTUnwrap(raw.outputImage).applyingFilter("CIExposureAdjust", parameters: [kCIInputEVKey: anchor])
+                return Negative(image: Developer.normalized(output), contract: .sceneReferred, exposureAnchorStops: anchor)
+            }
+        }
+    }
 }

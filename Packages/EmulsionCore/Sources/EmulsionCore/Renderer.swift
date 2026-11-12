@@ -14,15 +14,15 @@ public final class Renderer: @unchecked Sendable {
     static let workingSpace = CGColorSpace(name: CGColorSpace.extendedLinearSRGB)!
     private let kernels: Kernels
     public let developer: Developer
-    private let context: CIContext
+    let context: CIContext
 
     public init() throws {
         kernels = try Kernels()
-        developer = Developer(kernels: kernels)
         context = CIContext(options: [
             .workingColorSpace: Self.workingSpace, .workingFormat: CIFormat.RGBAh,
             .outputColorSpace: Self.outputSpace, .cacheIntermediates: false,
         ])
+        developer = Developer(kernels: kernels, context: context)
     }
 
     /// Scene light → display light (in the working space), look applied. Display-referred
@@ -93,7 +93,7 @@ public final class Renderer: @unchecked Sendable {
         }
         context.render(negative.image, to: buffer, bounds: negative.image.extent, colorSpace: Self.workingSpace)
         let image = CIImage(cvPixelBuffer: buffer, options: [.colorSpace: Self.workingSpace])
-        return Negative(image: image, contract: negative.contract)
+        return Negative(image: image, contract: negative.contract, exposureAnchorStops: negative.exposureAnchorStops)
     }
 
     public func resized(_ negative: Negative, longestEdge: CGFloat) -> Negative {
@@ -101,7 +101,8 @@ public final class Renderer: @unchecked Sendable {
         guard scale < 1 else { return negative }
         let image = negative.image.lanczosScaled(by: scale)
         let e = CGRect(x: 0, y: 0, width: floor(negative.size.width * scale), height: floor(negative.size.height * scale))
-        return Negative(image: image.cropped(to: e), contract: negative.contract)
+        return Negative(
+            image: image.cropped(to: e), contract: negative.contract, exposureAnchorStops: negative.exposureAnchorStops)
     }
 
     public func cgImage(_ image: CIImage) throws -> CGImage {

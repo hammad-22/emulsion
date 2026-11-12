@@ -39,11 +39,13 @@ public enum RAWDevelopChart {
     }
 
     /// A DNG of `chart` (scene values in linear sRGB) as `camera` records it under D65.
-    public static func dng(_ mosaic: SyntheticDNG.Mosaic, chart: PatchChart, baselineStops: Double = 0) -> Data {
+    public static func dng(
+        _ mosaic: SyntheticDNG.Mosaic, chart: PatchChart, baselineStops: Double = 0, profile: SyntheticDNG.Profile? = nil
+    ) -> Data {
         let sensor = PatchChart(cameraValues(chart.patches), cell: chart.cell, columns: chart.columns)
         return SyntheticDNG(
             mosaic: mosaic, width: chart.width, height: chart.height, baselineExposureStops: baselineStops,
-            asShotNeutral: SyntheticDNG.daylightNeutral, cameraFromXYZ: camera
+            asShotNeutral: SyntheticDNG.daylightNeutral, cameraFromXYZ: camera, profile: profile
         ).data { sensor.value(x: $0, y: $1) }
     }
 }
