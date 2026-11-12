@@ -41,6 +41,7 @@ public struct AdjustmentPanel: View {
                     .frame(minHeight: FilmLabLayout.minimumControlHeight)
             }
             .accessibilityLabel("Adjustment group")
+            .accessibilityValue(group.title)
             Spacer()
             Button("Reset Adjustment", systemImage: "arrow.counterclockwise") {
                 adjustments[keyPath: selectedControl.keyPath] = Adjustments()[keyPath: selectedControl.keyPath]
@@ -63,6 +64,7 @@ public struct AdjustmentPanel: View {
                             .padding(.horizontal, FilmLabLayout.gap)
                             .frame(minHeight: FilmLabLayout.minimumControlHeight)
                             .background(control.id == selectedControl.id ? Color.primary.opacity(0.12) : Color.clear, in: .capsule)
+                            .contentShape(.capsule)
                     }
                     .buttonStyle(.plain)
                     .accessibilityAddTraits(control.id == selectedControl.id ? .isSelected : [])

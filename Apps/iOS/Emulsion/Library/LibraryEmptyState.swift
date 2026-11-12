@@ -8,7 +8,7 @@ struct LibraryEmptyState: View {
     @Binding var error: String?
 
     @Environment(PhotoStore.self) private var store
-    /// Both actions share one width, wide enough for the longer title at large text sizes.
+    /// Both actions share a scaled width, constrained by the available canvas.
     @ScaledMetric private var buttonWidth: CGFloat = 260
 
     var body: some View {
@@ -19,7 +19,6 @@ struct LibraryEmptyState: View {
                     Text("Make room for light")
                         .font(.largeTitle.weight(.semibold))
                     Text("Import a photo, or try a sample, to develop it as a film negative and print.")
-                        .foregroundStyle(.secondary)
                 }
                 .multilineTextAlignment(.center)
                 GlassEffectContainer {
