@@ -65,21 +65,27 @@ struct ViewfinderTests {
         }
     }
 
-    /// Viewfinder frames don't queue behind library renders on the service's actor.
-    @Test func viewfinderRendersWhileTheServiceIsBusy() async throws {
+    /// Viewfinder frames don't queue behind library renders on the service's actor: the frame
+    /// has to finish while the actor is occupied, however long it takes. A frame stuck behind
+    /// the actor never finishes, so the time limit cancels the test, which frees the actor and
+    /// fails the expectation instead of hanging.
+    @Test(.timeLimit(.minutes(5)))
+    func viewfinderRendersWhileTheServiceIsBusy() async throws {
         let library = TestLibrary()
         let frame = try Self.frame(width: 640, height: 480)
         try await library.renderService.prepareViewfinder()
-        let released = DispatchSemaphore(value: 0)
+        let hold = ActorHold()
+        defer { hold.release() }
+        Task { await library.renderService.occupy(until: hold) }
+        await hold.waitUntilOccupied()
 
-        // Holds the actor until the viewfinder frame is done, or gives up after a timeout far
-        // longer than a frame takes: only a viewfinder stuck behind the actor reaches it.
-        let busy = Task.detached { await library.renderService.hold(until: released, timeout: .seconds(10)) }
-        await library.renderService.waitUntilHeld()
-        _ = try await library.renderService.viewfinderImage(frame, .neutral, maxDimension: 320)
-        released.signal()
+        _ = try await withTaskCancellationHandler {
+            try await library.renderService.viewfinderImage(frame, .neutral, maxDimension: 320)
+        } onCancel: {
+            hold.release()
+        }
 
-        #expect(await busy.value, "the frame finished while the actor was still busy")
+        #expect(hold.isOccupying, "the frame waited for the actor to be free")
     }
 
     @Test func viewfinderImageIsTurnedUpright() async throws {
@@ -223,18 +229,33 @@ struct ViewfinderPerformanceProbe {
 }
 
 extension RenderService {
-    /// Occupies the actor, as a long library render would, until `released` is signalled.
-    /// Returns false if it timed out instead.
-    func hold(until released: DispatchSemaphore, timeout: Duration) -> Bool {
-        isHeld.withLock { $0 = true }
-        let seconds = timeout / .seconds(1)
-        return released.wait(timeout: .now() + seconds) == .success
-    }
-
-    /// Waits (off the actor) until `hold` has the actor.
-    nonisolated func waitUntilHeld() async {
-        while !isHeld.withLock({ $0 }) { await Task.yield() }
+    /// Occupies the actor, as a long library render would, until `hold` is released. It blocks
+    /// rather than awaits, because an actor is free to run other work at every suspension.
+    fileprivate func occupy(until hold: ActorHold) {
+        hold.occupy()
     }
 }
 
-private let isHeld = Mutex(false)
+/// Keeps an actor occupied from `occupy()` until `release()`.
+private final class ActorHold: Sendable {
+    private let released = DispatchSemaphore(value: 0)
+    private let occupying = Mutex(false)
+    private let (occupied, signalOccupied) = AsyncStream<Void>.makeStream()
+
+    var isOccupying: Bool { occupying.withLock { $0 } }
+
+    func waitUntilOccupied() async {
+        for await _ in occupied { return }
+    }
+
+    func release() {
+        released.signal()
+    }
+
+    func occupy() {
+        occupying.withLock { $0 = true }
+        signalOccupied.yield()
+        released.wait()
+        occupying.withLock { $0 = false }
+    }
+}
