@@ -1,7 +1,8 @@
 /// What a negative's values mean, and what the engine may claim about them (docs/ENGINE.md,
 /// "Input contracts").
 public enum InputContract: Sendable {
-    /// Scene light by a published decode: RAW developed with Apple's look off, camera log, linear.
+    /// Scene light by a published decode: RAW developed with Apple's look off (scaled by its
+    /// BaselineExposure and the exposure anchor), camera log, linear.
     case sceneReferred
     /// Scene-referred by its standard but usually rendered by the camera before encoding (HLG).
     /// Decoded as scene light; not claimed to be the scene.
