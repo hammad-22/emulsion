@@ -1,35 +1,35 @@
 import EmulsionKit
+import EmulsionUI
 import SwiftUI
 
 /// What the shutter will write: the RAW format, and 12 or 48 MP where the lens offers both.
 struct CaptureFormatBar: View {
     let capabilities: CameraCapabilities?
-    let axis: Axis
 
     @Environment(AppSettings.self) private var settings
 
     var body: some View {
-        let layout = axis == .vertical ? AnyLayout(VStackLayout()) : AnyLayout(HStackLayout())
         GlassEffectContainer {
-            layout {
+            HStack {
                 if let capabilities {
                     Text(capabilities.rawFormat.title)
                         .font(.caption.weight(.bold))
-                        .padding(.horizontal, 12)
+                        .padding(.horizontal, FilmLabLayout.gap)
                         .frame(minHeight: 34)
                         .glassEffect(.regular, in: .capsule)
                         .accessibilityLabel("Format: \(capabilities.rawFormat.title)")
-                    resolution(supportsFull: capabilities.supportsFullResolution)
+                    resolution(capabilities)
                 }
             }
         }
-        .frame(minHeight: 44)
+        .frame(minHeight: FilmLabLayout.minimumControlHeight)
         .dynamicTypeSize(...DynamicTypeSize.accessibility1)
         .accessibilityShowsLargeContentViewer()
     }
 
-    private func resolution(supportsFull: Bool) -> some View {
-        let shown = supportsFull ? settings.resolution : .standard
+    private func resolution(_ capabilities: CameraCapabilities) -> some View {
+        let shown = capabilities.resolution(for: settings.resolution)
+        let supportsFull = capabilities.supportsFullResolution
         return Button {
             settings.resolution = settings.resolution == .full ? .standard : .full
         } label: {

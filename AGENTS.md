@@ -15,9 +15,9 @@ iOS 26 / macOS 26 only, iPhone 17 Pro and iPhone Duo as targets. Swift 6.4 toolc
   - `Sources/EmulsionCore/`: film math (`FilmModel`), input transforms (`ColorSpaces`), develop (`Developer`), render graph and export (`Renderer`), stock and texture constants (`FilmLook`), kernel argument packing (`FilmModel+Kernel`).
   - `Kernels/Emulsion.ci.metal`: GPU kernels; must match the Swift mirror. Compiled `.metallib`s are checked in under `Resources/Kernels/`.
   - `Sources/EmulsionFixtures/`: synthetic test images. `Tests/`: the test suite, with visual regression goldens in `Tests/EmulsionCoreTests/Goldens/` and frozen CC0 photos in `Scenes/`.
-- `Packages/EmulsionKit/`: shared app logic for iOS and Mac (library, `RenderService`, editor controls, settings, export, sample photos). No UI.
+- `Packages/EmulsionKit/`: shared app logic for iOS and Mac (library, `RenderService`, camera capture, editor controls, settings, export, sample photos). No UI.
 - `Packages/EmulsionUI/`: shared SwiftUI components (rendered photo, sliders, photo import).
-- `Apps/iOS/`: the iOS app (`Emulsion.xcodeproj`, sources in `Emulsion/`, UI walkthrough in `EmulsionUITests/`). Library → editor today; the camera comes with MOV-60.
+- `Apps/iOS/`: the iOS app (`Emulsion.xcodeproj`, sources in `Emulsion/`, UI walkthrough in `EmulsionUITests/`). Opens on the camera; the library and editor are behind it.
 - `Apps/macOS/`: minimal native Mac shell on the same packages (`Emulsion.xcodeproj`); library, edit and compare.
 - `Tools/`: `build-kernels.sh` rebuilds the metallibs; `make-sample-photos.swift` regenerates the bundled sample photos; `color-references/` generates the colour-science test references (offline Python, never shipped).
 

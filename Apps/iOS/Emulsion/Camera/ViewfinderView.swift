@@ -3,9 +3,11 @@ import SwiftUI
 import UIKit
 
 /// The live camera picture, aspect-fit. Frames go straight into a layer, so 30 frames a
-/// second never pass through SwiftUI. Tap to focus and expose there.
-struct ViewfinderView: View {
+/// second never pass through SwiftUI. Tap to focus and expose there. `accessory` is laid over
+/// the picture's bottom edge (the recipe strip), outside the picture's own accessibility element.
+struct ViewfinderView<Accessory: View>: View {
     let model: CameraModel
+    @ViewBuilder let accessory: Accessory
 
     @Environment(\.displayScale) private var displayScale
     @Environment(\.verticalSizeClass) private var verticalSizeClass
@@ -29,12 +31,13 @@ struct ViewfinderView: View {
             }
             .contentShape(.rect)
             .onTapGesture { focus(at: $0) }
-            .frame(maxWidth: .infinity, maxHeight: .infinity)
             .accessibilityElement()
             .accessibilityLabel("Viewfinder")
             .accessibilityHint("Double-tap to focus and expose on the centre")
             .accessibilityAction { focus(at: CGPoint(x: size.width / 2, y: size.height / 2)) }
             .accessibilityIdentifier("viewfinder")
+            .overlay(alignment: .bottom) { accessory }
+            .frame(maxWidth: .infinity, maxHeight: .infinity)
             .task { await model.attachViewfinder(ViewfinderLayer(display.view.layer)) }
             .task(id: pixels) { await showFrames(maxDimension: pixels) }
     }

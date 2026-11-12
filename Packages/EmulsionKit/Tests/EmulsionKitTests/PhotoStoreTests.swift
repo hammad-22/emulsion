@@ -69,6 +69,21 @@ struct PhotoStoreTests {
         #expect(Set(library.reopened().photos.map(\.id)) == Set(photos.map(\.id)))
     }
 
+    /// Switching a captured photo to another recipe (or any edit) never touches its original.
+    @Test func changingTheEditLeavesTheOriginalUntouched() async throws {
+        let library = TestLibrary()
+        let photo = try await library.store.add(TestPhoto.jpeg, fileExtension: "jpg", look: TestLooks.curated(3).adjustments)
+        let original = try Data(contentsOf: library.store.url(for: photo))
+        #expect(original == TestPhoto.jpeg)
+
+        var cool = try TestLooks.curated(2).adjustments
+        cool.seed = photo.adjustments.seed
+        library.store.update(photo.id, adjustments: cool)
+
+        #expect(library.store.photo(photo.id)?.adjustments == cool)
+        #expect(try Data(contentsOf: library.store.url(for: photo)) == original)
+    }
+
     @Test func editsPersistAcrossLaunches() async throws {
         let library = TestLibrary()
         let photo = try await library.store.add(TestPhoto.jpeg, fileExtension: "jpg")

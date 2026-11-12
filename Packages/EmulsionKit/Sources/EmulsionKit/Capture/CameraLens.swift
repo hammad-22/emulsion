@@ -22,7 +22,7 @@ public struct LensOption: Sendable, Equatable, Identifiable {
     public let magnification: Double
     public var id: CameraLens { lens }
 
-    public init(lens: CameraLens, magnification: Double) {
+    init(lens: CameraLens, magnification: Double) {
         self.lens = lens
         self.magnification = magnification
     }
@@ -30,15 +30,16 @@ public struct LensOption: Sendable, Equatable, Identifiable {
     /// The magnification as the system Camera shows it: "0.5", "1", "4", with "×" on the
     /// selected lens.
     public func title(isSelected: Bool) -> String {
-        let number = displayedMagnification.formatted(.number.precision(.fractionLength(0...1)))
+        let number = formattedMagnification
         return isSelected ? String(localized: "\(number)×", bundle: .module, comment: "Selected lens magnification") : number
     }
 
     /// For VoiceOver: "Ultra Wide, 0.5×".
     public var accessibilityLabel: String {
-        let number = displayedMagnification.formatted(.number.precision(.fractionLength(0...1)))
-        return String(localized: "\(lens.title), \(number)×", bundle: .module, comment: "Lens name and magnification")
+        String(localized: "\(lens.title), \(formattedMagnification)×", bundle: .module, comment: "Lens name and magnification")
     }
+
+    private var formattedMagnification: String { displayedMagnification.formatted(.number.precision(.fractionLength(0...1))) }
 
     /// Lenses below 1× read in tenths (0.5); longer ones in halves, so a 100 mm lens on a
     /// 24 mm wide reads 4, not 4.2, like the system Camera's labels.

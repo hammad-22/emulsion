@@ -9,4 +9,7 @@ public enum InputContract: Sendable {
     /// A finished picture made for a display (JPEG, HEIC, Rec.709, Display P3). Its scene light
     /// can't be recovered: the engine re-renders it from an estimate.
     case displayReferred
+    /// A display-referred source whose scene estimate is printed absolutely, to preview a
+    /// scene-referred capture (the camera viewfinder). Preview only: never exported or stored.
+    case previewEstimate
 }

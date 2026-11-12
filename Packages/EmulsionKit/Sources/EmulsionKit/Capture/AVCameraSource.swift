@@ -40,11 +40,14 @@
             try await authorize()
             try configure()
             if input == nil { try use(lens) }
+            if subjectAreaChanges == nil { subjectAreaChanges = Task { await self.followSubjectAreaChanges() } }
             if !session.isRunning { session.startRunning() }
             return capabilities
         }
 
         public func stop() {
+            subjectAreaChanges?.cancel()
+            subjectAreaChanges = nil
             if session.isRunning { session.stopRunning() }
         }
 
@@ -140,34 +143,62 @@
             session.addOutput(videoOutput)
             photoOutput.maxPhotoQualityPrioritization = .quality
             isConfigured = true
-            subjectAreaChanges = Task { await self.followSubjectAreaChanges() }
         }
 
         /// Swaps the input to `lens` (or the wide lens), then re-applies what depends on the
-        /// device: RAW formats and photo sizes belong to its active format.
+        /// device: RAW formats and photo sizes belong to its active format. If the new lens has
+        /// no RAW format, the previous input goes back (or none stays, so `start` retries), and
+        /// `input`, `lens` and the RAW state always describe what the session runs.
         private func use(_ requested: CameraLens) throws(CameraError) {
-            guard let (lens, device) = devices[requested].map({ (requested, $0) }) ?? devices[.wide].map({ (.wide, $0) })
-            else { throw .unavailable }
+            let lens = devices[requested] == nil ? .wide : requested
+            guard let device = devices[lens] else { throw .unavailable }
             let newInput: AVCaptureDeviceInput
             do { newInput = try AVCaptureDeviceInput(device: device) } catch { throw .unavailable }
+            let previous = input
+            guard swapInput(from: previous, to: newInput) else { throw .unavailable }
+            do {
+                try configureRAW(for: device)
+            } catch {
+                rawPixelFormat = 0
+                restore(previous, replacing: newInput)
+                throw error
+            }
+            self.lens = lens
+            trackRotation(of: device)
+        }
+
+        /// After a failed switch: the previous input back with its RAW state, or no input at all
+        /// (`rawPixelFormat` stays 0), so a later `start` sets the camera up again.
+        private func restore(_ previous: AVCaptureDeviceInput?, replacing failed: AVCaptureDeviceInput) {
+            if let previous, swapInput(from: failed, to: previous), (try? configureRAW(for: previous.device)) != nil {
+                trackRotation(of: previous.device)
+                return
+            }
             session.beginConfiguration()
             if let input { session.removeInput(input) }
-            guard session.canAddInput(newInput) else {
-                if let input { session.addInput(input) }
-                session.commitConfiguration()
-                throw .unavailable
+            session.commitConfiguration()
+            input = nil
+        }
+
+        /// Replaces `old` with `new` in the session; on failure the session keeps `old`. Sets
+        /// `input` to whichever the session runs.
+        private func swapInput(from old: AVCaptureDeviceInput?, to new: AVCaptureDeviceInput) -> Bool {
+            session.beginConfiguration()
+            defer { session.commitConfiguration() }
+            if let old { session.removeInput(old) }
+            guard session.canAddInput(new) else {
+                if let old { session.addInput(old) }
+                input = old
+                return false
             }
-            session.addInput(newInput)
+            session.addInput(new)
             // Frames stay in sensor orientation; each carries the rotation that turns it
             // upright (CameraFrame), so rotating the interface never rebuilds the pipeline.
             if let connection = videoOutput.connection(with: .video), connection.isVideoRotationAngleSupported(0) {
                 connection.videoRotationAngle = 0
             }
-            session.commitConfiguration()
-            input = newInput
-            self.lens = lens
-            try configureRAW(for: device)
-            trackRotation(of: device)
+            input = new
+            return true
         }
 
         /// ProRAW when supported (it must be enabled after the input is added, since RAW

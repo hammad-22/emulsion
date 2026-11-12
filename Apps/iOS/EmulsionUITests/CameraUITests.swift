@@ -1,8 +1,8 @@
 import XCTest
 
 /// The camera as the app opens on it, in the Simulator's stand-in camera (the sample
-/// photos as a live viewfinder): switch lens, tap to focus, take a photo, find it in the
-/// library, delete it and come back. Screenshots are kept in the result bundle as PR proof.
+/// photos as a live viewfinder): switch lens, pick a recipe, tap to focus, take a photo, find
+/// it in the library, delete it and come back. Screenshots are kept in the result bundle as PR proof.
 final class CameraUITests: XCTestCase {
     @MainActor
     func testCaptureAppearsInLibrary() throws {
@@ -26,6 +26,20 @@ final class CameraUITests: XCTestCase {
         sleep(1)
         keepScreenshot(app, named: "Camera 2 Ultra Wide")
         app.buttons["Wide, 1×"].tap()
+
+        let recipe = app.buttons["Recipe"]
+        XCTAssertEqual(recipe.value as? String, "Everyday")
+        recipe.tap()
+        let warm = app.buttons["Warm Light"]
+        XCTAssertTrue(warm.waitForExistence(timeout: 2))
+        XCTAssertTrue(app.buttons["Everyday"].isSelected)
+        sleep(1)
+        keepScreenshot(app, named: "Camera 2a Recipe strip")
+        warm.tap()
+        XCTAssertTrue(warm.isSelected)
+        XCTAssertEqual(recipe.value as? String, "Warm Light")
+        sleep(1)
+        keepScreenshot(app, named: "Camera 2b Warm Light")
 
         viewfinder.coordinate(withNormalizedOffset: CGVector(dx: 0.3, dy: 0.4)).tap()
         XCTAssertTrue(app.descendants(matching: .any)["focus-reticle"].waitForExistence(timeout: 1))
@@ -51,6 +65,12 @@ final class CameraUITests: XCTestCase {
         app.buttons["Camera"].tap()
         XCTAssertTrue(viewfinder.waitForExistence(timeout: 5))
         XCTAssertTrue(app.buttons["Take Photo"].isEnabled, "the camera runs again")
+        XCTAssertEqual(recipe.value as? String, "Warm Light", "the recipe is kept")
+
+        // Back to Everyday, so the next run starts where this one did.
+        if !app.buttons["Everyday"].exists { recipe.tap() }
+        app.buttons["Everyday"].tap()
+        XCTAssertEqual(recipe.value as? String, "Everyday")
     }
 
     /// Opens the library to count what's already there, then returns to the camera.
@@ -62,13 +82,5 @@ final class CameraUITests: XCTestCase {
         let count = photos.count
         app.buttons["Camera"].tap()
         return count
-    }
-
-    @MainActor
-    private func keepScreenshot(_ app: XCUIApplication, named name: String) {
-        let attachment = XCTAttachment(screenshot: app.screenshot())
-        attachment.name = name
-        attachment.lifetime = .keepAlways
-        add(attachment)
     }
 }

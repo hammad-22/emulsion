@@ -63,9 +63,11 @@ public final class PhotoStore {
         try await insert([.data(data, fileExtension: nil)])[0]
     }
 
+    /// Adds an original with `look` as its starting edit (a camera recipe), given this photo's
+    /// own grain seed. The file itself is stored untouched.
     @discardableResult
-    public func add(_ data: Data, fileExtension: String) async throws -> PhotoRecord {
-        try await insert([.data(data, fileExtension: fileExtension)])[0]
+    public func add(_ data: Data, fileExtension: String, look: Adjustments = Adjustments()) async throws -> PhotoRecord {
+        try await insert([.data(data, fileExtension: fileExtension)], look: look)[0]
     }
 
     /// Adds all bundled synthetic samples with one index commit.
@@ -108,9 +110,10 @@ public final class PhotoStore {
     }
 
     @discardableResult
-    private func insert(_ originals: [OriginalImporter.Original]) async throws -> [PhotoRecord] {
+    private func insert(_ originals: [OriginalImporter.Original], look: Adjustments = Adjustments()) async throws -> [PhotoRecord] {
         guard canWriteIndex else { throw EmulsionError.librarySaveFailed }
-        let added = try await importer.prepare(originals, in: folder)
+        var added = try await importer.prepare(originals, in: folder)
+        for index in added.indices { added[index].adjustments = .defaults(for: added[index].id, look: look) }
         do {
             try Task.checkCancellation()
             // No suspension between reading the current photos, committing, and publishing:
@@ -192,11 +195,15 @@ private struct RecoverablePhotoRecord: Decodable {
 }
 
 extension Adjustments {
-    /// The starting edit for a photo: the default look, with a grain seed derived from the
-    /// photo's ID so re-renders, exports and resets match, and photos differ. Whole numbers
-    /// 0…1023 keep float precision exact in the grain kernel.
-    static func defaults(for id: UUID) -> Adjustments {
-        var adjustments = Adjustments()
+    /// Grain seeds are whole numbers below this: small whole numbers keep float precision exact
+    /// in the grain kernel.
+    static let grainSeedCount = 1024
+
+    /// The starting edit for a photo: `look` (the default look unless a recipe was chosen), with
+    /// a grain seed (0 ..< `grainSeedCount`) derived from the photo's ID so re-renders, exports
+    /// and resets match, and photos differ.
+    static func defaults(for id: UUID, look: Adjustments = Adjustments()) -> Adjustments {
+        var adjustments = look
         adjustments.seed = Double(id.uuid.0) * 4 + Double(id.uuid.1 % 4)
         return adjustments
     }
