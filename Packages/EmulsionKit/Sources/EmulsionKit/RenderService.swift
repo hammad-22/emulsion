@@ -16,7 +16,8 @@ public actor RenderService {
     /// `Renderer` is immutable apart from its `CIContext`, which is thread-safe.
     private nonisolated let viewfinderRenderer = Mutex<Renderer?>(nil)
     /// One develop per photo and size, with the RAW white balance it was developed at: another
-    /// white balance replaces it, so dragging the temperature doesn't fill the cache.
+    /// white balance replaces it, so dragging the temperature doesn't fill the cache. A photo that
+    /// isn't RAW (no `asShotWhiteBalance`) is never developed again for a white balance.
     private var previews: [String: (negative: Negative, whiteBalance: CameraWhiteBalance?)] = [:]
     /// Least recently used first; the oldest preview is dropped past `maxCachedPreviews`.
     private var lruKeys: [String] = []
@@ -51,7 +52,7 @@ public actor RenderService {
     private func negative(_ url: URL, maxDimension requested: CGFloat, whiteBalance: CameraWhiteBalance?) throws -> Negative {
         let maxDimension = (requested / previewSizeStep).rounded(.up) * previewSizeStep
         let key = "\(url.absoluteString)@\(Int(maxDimension))"
-        if let cached = previews[key], cached.whiteBalance == whiteBalance {
+        if let cached = previews[key], cached.negative.asShotWhiteBalance == nil || cached.whiteBalance == whiteBalance {
             markUsed(key)
             return cached.negative
         }

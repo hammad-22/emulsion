@@ -85,24 +85,13 @@ struct ExposureAnchorDevelopTests {
     static let fortyEightDarkened = SyntheticDNG.Profile(gainTableGain: Float(pow(2, gainStops)), toneCurve: darkeningCurve)
     static let twelve = SyntheticDNG.Profile(gainTableGain: 1)
 
-    struct Developed {
-        var negative: Negative
-        var pixels: [SIMD3<Double>]
-        var means: [SIMD3<Double>]
-
-        init(_ negative: Negative) {
-            self.negative = negative
-            pixels = Fixtures.linear(negative.image)
-            means = chart.means(of: pixels, width: Int(negative.size.width), height: Int(negative.size.height))
-        }
-    }
-
     static func develop(
         _ mosaic: SyntheticDNG.Mosaic, baselineStops: Double, profile: SyntheticDNG.Profile?, maxDimension: CGFloat? = nil,
         anchor: ExposureAnchor.Choice = .measured
-    ) throws -> Developed {
-        let data = RAWDevelopChart.dng(mosaic, chart: chart, baselineStops: baselineStops, profile: profile)
-        return Developed(try developer.develop(data, maxDimension: maxDimension, anchor: anchor))
+    ) throws -> RAWDevelopSupport.Developed {
+        try RAWDevelopSupport.develop(
+            RAWDevelopChart.dng(mosaic, chart: chart, baselineStops: baselineStops, profile: profile), chart: chart,
+            maxDimension: maxDimension, anchor: anchor)
     }
 
     // MARK: Tolerances (about 2× the worst value measured on macOS 27.2, Bayer and linear files)
@@ -130,14 +119,8 @@ struct ExposureAnchorDevelopTests {
         let fortyEightAnchor = fortyEight.negative.exposureAnchorStops
         #expect(abs(twelveAnchor) < Self.identityAnchorTolerance, "12 MP-like anchor \(twelveAnchor)")
         #expect(abs(fortyEightAnchor - twelveAnchor - Self.gainStops) < Self.pairAnchorTolerance, "48 MP-like anchor \(fortyEightAnchor)")
-        var worstPair = 0.0
-        var worstScene = 0.0
-        for index in Self.scene.indices {
-            let a = fortyEight.means[index]
-            let b = twelve.means[index]
-            worstPair = max(worstPair, (abs(a - b) / max(abs(b), SIMD3(repeating: 0.01))).max())
-            worstScene = max(worstScene, (abs(a - Self.scene[index]) / max(abs(Self.scene[index]), SIMD3(repeating: 1))).max())
-        }
+        let worstPair = RAWDevelopSupport.worstRelativeDifference(fortyEight.means, twelve.means, floor: 0.01)
+        let worstScene = RAWDevelopSupport.worstRelativeDifference(fortyEight.means, Self.scene, floor: 1)
         #expect(worstPair < Self.pairValueTolerance, "worst relative difference between the files \(worstPair)")
         #expect(worstScene < Self.sceneTolerance, "worst difference from the scene \(worstScene)")
     }
@@ -234,10 +217,10 @@ struct ExposureAnchorDevelopTests {
         let data = RAWDevelopChart.dng(
             mosaic, chart: Self.chart, baselineStops: Self.fortyEightBaselineStops, profile: Self.fortyEight)
         for maxDimension in [nil, CGFloat(Self.chart.width / 2)] {
-            let measured = Developed(try Self.developer.develop(data, maxDimension: maxDimension))
+            let measured = RAWDevelopSupport.Developed(chart: Self.chart, try Self.developer.develop(data, maxDimension: maxDimension))
             let anchor = measured.negative.exposureAnchorStops
             #expect(anchor != 0)
-            let given = Developed(try Self.developer.develop(data, maxDimension: maxDimension, exposureAnchorStops: anchor))
+            let given = RAWDevelopSupport.Developed(chart: Self.chart, try Self.developer.develop(data, maxDimension: maxDimension, exposureAnchorStops: anchor))
             #expect(given.negative.exposureAnchorStops == anchor)
             if maxDimension == nil {
                 #expect(given.pixels == measured.pixels)
@@ -254,9 +237,9 @@ struct ExposureAnchorDevelopTests {
     func givenAnchorIsAppliedAsGiven(_ mosaic: SyntheticDNG.Mosaic) throws {
         let data = RAWDevelopChart.dng(
             mosaic, chart: Self.chart, baselineStops: Self.fortyEightBaselineStops, profile: Self.fortyEight)
-        let measured = Developed(try Self.developer.develop(data))
+        let measured = RAWDevelopSupport.Developed(chart: Self.chart, try Self.developer.develop(data))
         let brighter = measured.negative.exposureAnchorStops + 1
-        let given = Developed(try Self.developer.develop(data, exposureAnchorStops: brighter))
+        let given = RAWDevelopSupport.Developed(chart: Self.chart, try Self.developer.develop(data, exposureAnchorStops: brighter))
         #expect(given.negative.exposureAnchorStops == brighter)
         #expect(given.pixels == measured.pixels.map { $0 * 2 })
     }

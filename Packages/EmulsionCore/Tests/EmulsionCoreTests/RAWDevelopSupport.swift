@@ -5,7 +5,7 @@ import simd
 
 @testable import EmulsionCore
 
-/// Helpers shared by `RAWDevelopTests` and `RAWDevelopProbe`.
+/// Helpers shared by the RAW develop, exposure anchor and white balance tests and `RAWDevelopProbe`.
 enum RAWDevelopSupport {
     /// ":"-separated folders of real DNGs (opt-in; real samples never enter the repo).
     static let samplesFolders = ProcessInfo.processInfo.environment["EMULSION_RAW_SAMPLES"]
@@ -35,6 +35,36 @@ enum RAWDevelopSupport {
             throw EmulsionError.unsupportedPhoto
         }
         return raw
+    }
+
+    /// A synthetic chart developed by the shared renderer: its pixels (linear sRGB) and patch means.
+    struct Developed {
+        var negative: Negative
+        var pixels: [SIMD3<Double>]
+        var means: [SIMD3<Double>]
+
+        init(chart: PatchChart, _ negative: Negative) {
+            self.negative = negative
+            pixels = Fixtures.linear(negative.image)
+            means = chart.means(of: pixels, width: Int(negative.size.width), height: Int(negative.size.height))
+        }
+    }
+
+    static func develop(
+        _ data: Data, chart: PatchChart, maxDimension: CGFloat? = nil, whiteBalance: CameraWhiteBalance? = nil,
+        anchor: ExposureAnchor.Choice = .measured
+    ) throws -> Developed {
+        Developed(
+            chart: chart,
+            try RAWDevelopTests.developer.develop(data, maxDimension: maxDimension, whiteBalance: whiteBalance, anchor: anchor))
+    }
+
+    /// Largest channel difference between `a` and the reference `b`, relative to the larger of
+    /// `floor` and the reference value.
+    static func worstRelativeDifference(
+        _ a: some Sequence<SIMD3<Double>>, _ b: some Sequence<SIMD3<Double>>, floor: Double
+    ) -> Double {
+        zip(a, b).map { (abs($0 - $1) / max(abs($1), SIMD3(repeating: floor))).max() }.max() ?? .nan
     }
 
     /// Rec. 709 / sRGB luminance (Y) of linear sRGB.

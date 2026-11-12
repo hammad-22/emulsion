@@ -17,8 +17,8 @@ public struct Adjustments: Codable, Equatable, Sendable {
     public var halation: Double = 0.35
     /// Grain pattern seed, fixed per photo so re-renders and exports match.
     public var seed: Double = 0
-    /// RAW white balance, applied when the photo is developed (nil: as shot). Photos that aren't
-    /// RAW ignore it; the printer lights above act at print.
+    /// RAW white balance, applied when the photo is developed (nil: as shot); the printer lights
+    /// above act at print.
     public var whiteBalance: CameraWhiteBalance?
 
     public init() {}

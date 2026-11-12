@@ -232,6 +232,9 @@ extension SyntheticDNG {
     /// D65 white point as the colour standards round it (sRGB, Rec. 709/2020, Display P3), the
     /// value `InputColorSpace.d65` uses.
     public static let d65Chromaticity = SIMD2<Double>(0.3127, 0.3290)
+
+    /// Colour temperature of CIE standard illuminant A, a tungsten lamp: 2856 K (CIE 15:2004).
+    public static let illuminantAKelvin = 2856.0
 }
 
 // MARK: TIFF encoding

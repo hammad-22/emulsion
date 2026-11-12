@@ -13,8 +13,7 @@ struct CameraWhiteBalanceTests {
     static var renderer: Renderer { EmulsionTestCase.sharedRenderer }
     static var developer: Developer { renderer.developer }
 
-    /// The colour temperature of CIE illuminant A, a tungsten lamp.
-    static let tungstenKelvin = 2856.0
+    static let tungstenKelvin = SyntheticDNG.illuminantAKelvin
     static let tungsten = SyntheticDNG.planckianChromaticity(kelvin: tungstenKelvin)
     static let d65 = SyntheticDNG.d65Chromaticity
     /// D65 at its CCT, 6504 K (CIE 15:2004).
@@ -30,30 +29,18 @@ struct CameraWhiteBalanceTests {
         RAWDevelopChart.dng(mosaic, chart: chart, light: tungsten, taggedLight: taggedLight)
     }
 
-    struct Developed {
-        var negative: Negative
-        var pixels: [SIMD3<Double>]
-        var means: [SIMD3<Double>]
-    }
-
     static func develop(
         _ data: Data, _ whiteBalance: CameraWhiteBalance? = nil, chart: PatchChart = chart, maxDimension: CGFloat? = nil
-    ) throws -> Developed {
-        let negative = try developer.develop(data, maxDimension: maxDimension, whiteBalance: whiteBalance)
-        let pixels = Fixtures.linear(negative.image)
-        return Developed(
-            negative: negative, pixels: pixels,
-            means: chart.means(of: pixels, width: Int(negative.size.width), height: Int(negative.size.height)))
+    ) throws -> RAWDevelopSupport.Developed {
+        try RAWDevelopSupport.develop(data, chart: chart, maxDimension: maxDimension, whiteBalance: whiteBalance)
     }
 
     static func worstNeutralError(_ means: [SIMD3<Double>]) -> Double {
         neutralIndices.map { RAWDevelopSupport.neutralError(means[$0]) }.max() ?? .nan
     }
 
-    /// Largest channel difference relative to the larger of 0.01 and the reference value.
-    static func worstRelativeDifference(_ a: [SIMD3<Double>], _ b: [SIMD3<Double>], _ indices: Range<Int>) -> Double {
-        indices.map { (abs(a[$0] - b[$0]) / max(abs(b[$0]), SIMD3(repeating: 0.01))).max() }.max() ?? .nan
-    }
+    /// Relative to the larger of this and the reference value: chromatic patches have channels near 0.
+    static let relativeFloor = 0.01
 
     // MARK: Tolerances (about 2× the worst value measured on macOS 27.2, Bayer and linear files)
 
@@ -95,23 +82,29 @@ struct CameraWhiteBalanceTests {
     @Test(arguments: SyntheticDNG.Mosaic.allCases)
     func asShotWhiteBalanceReadsTheTaggedLight(_ mosaic: SyntheticDNG.Mosaic) throws {
         for (tag, kelvin) in [(Self.tungsten, Self.tungstenKelvin), (Self.d65, Self.d65Kelvin)] {
-            let asShot = try #require(Developer.asShotWhiteBalance(of: Self.tungstenScene(mosaic, taggedLight: tag)))
-            print(
-                "as shot, tagged \(kelvin) K: \(asShot.temperature) K, tint \(asShot.tint), expected tint \(Self.tintPerDuv * Self.duv(tag, kelvin: kelvin))"
-            )
+            let data = Self.tungstenScene(mosaic, taggedLight: tag)
+            let asShot = try #require(try Self.developer.develop(data).asShotWhiteBalance)
+            let balanced = try Self.developer.develop(data, whiteBalance: CameraWhiteBalance(temperature: 4000, tint: 20))
+            #expect(balanced.asShotWhiteBalance == asShot, "reports the file's white balance, not the one it was developed at")
             #expect(abs(asShot.temperature - kelvin) < Self.asShotTemperatureTolerance, "\(asShot.temperature) K for \(kelvin) K")
             let expectedTint = Self.tintPerDuv * Self.duv(tag, kelvin: kelvin)
             #expect(abs(asShot.tint - expectedTint) < Self.asShotTintTolerance, "tint \(asShot.tint), expected \(expectedTint)")
         }
         let jpeg = try Self.renderer.export(SceneFixtures.flat(0.18, width: 64, height: 64), format: .jpeg)
-        #expect(Developer.asShotWhiteBalance(of: jpeg) == nil)
+        #expect(try Self.developer.develop(jpeg).asShotWhiteBalance == nil)
+    }
+
+    @Test func resizingAndMaterializingKeepTheAsShotWhiteBalance() throws {
+        let negative = try Self.developer.develop(Self.tungstenScene(.linearRGB, taggedLight: Self.tungsten))
+        let asShot = try #require(negative.asShotWhiteBalance)
+        #expect(Self.renderer.resized(negative, longestEdge: 64).asShotWhiteBalance == asShot)
+        #expect(try Self.renderer.materialize(negative).asShotWhiteBalance == asShot)
     }
 
     @Test(arguments: SyntheticDNG.Mosaic.allCases)
     func asShotDevelopIsNeutralWhenTheTagIsRight(_ mosaic: SyntheticDNG.Mosaic) throws {
         let developed = try Self.develop(Self.tungstenScene(mosaic, taggedLight: Self.tungsten))
         let worst = Self.worstNeutralError(developed.means)
-        print("correctly tagged, as shot: worst neutral error \(worst)")
         #expect(worst < Self.taggedNeutralTolerance, "worst neutral error \(worst)")
     }
 
@@ -127,14 +120,13 @@ struct CameraWhiteBalanceTests {
         let reference = try Self.develop(Self.tungstenScene(mosaic, taggedLight: Self.tungsten))
         let cast = Self.worstNeutralError(asShot.means)
         let neutral = Self.worstNeutralError(corrected.means)
-        let grayMatch = Self.worstRelativeDifference(corrected.means, reference.means, Self.neutralIndices)
-        let chromaticMatch = Self.worstRelativeDifference(corrected.means, reference.means, Self.chromaticIndices)
-        let readBack = try #require(Developer.asShotWhiteBalance(of: Self.tungstenScene(mosaic, taggedLight: Self.tungsten)))
+        let grayMatch = RAWDevelopSupport.worstRelativeDifference(
+            corrected.means[Self.neutralIndices], reference.means[Self.neutralIndices], floor: Self.relativeFloor)
+        let chromaticMatch = RAWDevelopSupport.worstRelativeDifference(
+            corrected.means[Self.chromaticIndices], reference.means[Self.chromaticIndices], floor: Self.relativeFloor)
+        let readBack = try #require(reference.negative.asShotWhiteBalance)
         let matched = try Self.develop(wrong, readBack)
-        let readBackMatch = Self.worstRelativeDifference(matched.means, reference.means, Self.scene.indices)
-        print(
-            "\(mosaic) wrong tag: as shot \(cast), corrected \(neutral), gray match \(grayMatch), chromatic match \(chromaticMatch),"
-                + " read-back neutral \(Self.worstNeutralError(matched.means)) match \(readBackMatch)")
+        let readBackMatch = RAWDevelopSupport.worstRelativeDifference(matched.means, reference.means, floor: Self.relativeFloor)
         #expect(cast > Self.wrongTagCast, "as-shot neutral error \(cast)")
         #expect(neutral < Self.correctedNeutralTolerance, "corrected neutral error \(neutral)")
         #expect(grayMatch < Self.correctedMatchTolerance, "gray patches differ from the correct tag by \(grayMatch)")
@@ -150,7 +142,6 @@ struct CameraWhiteBalanceTests {
         let grays = try Self.sweepKelvins.map { kelvin in
             try Self.develop(data, CameraWhiteBalance(temperature: kelvin, tint: 0)).means[2]
         }
-        print("sweep R/G: \(grays.map { ($0.x / $0.y).fourDigits }) B/G: \(grays.map { ($0.z / $0.y).fourDigits })")
         for (cooler, warmer) in zip(grays, grays.dropFirst()) {
             #expect(warmer.x / warmer.y > cooler.x / cooler.y, "R/G \(cooler) → \(warmer)")
             #expect(warmer.z / warmer.y < cooler.z / cooler.y, "B/G \(cooler) → \(warmer)")
@@ -173,11 +164,9 @@ struct CameraWhiteBalanceTests {
     func settingTheAsShotValuesChangesNothing(_ mosaic: SyntheticDNG.Mosaic) throws {
         for tag in [Self.tungsten, Self.d65] {
             let data = Self.tungstenScene(mosaic, taggedLight: tag)
-            let asShot = try #require(Developer.asShotWhiteBalance(of: data))
             let plain = try Self.develop(data)
-            let explicit = try Self.develop(data, asShot)
+            let explicit = try Self.develop(data, try #require(plain.negative.asShotWhiteBalance))
             let worst = zip(plain.pixels, explicit.pixels).map { abs($0 - $1).max() }.max() ?? .nan
-            print("as-shot values set explicitly: worst difference \(worst)")
             #expect(worst < Self.asShotRepeatTolerance, "worst difference \(worst)")
         }
     }
@@ -208,8 +197,7 @@ struct CameraWhiteBalanceTests {
         let full = try Self.develop(data, whiteBalance)
         let preview = try Self.develop(data, whiteBalance, maxDimension: CGFloat(Self.chart.width / 2))
         #expect(preview.negative.size.width < full.negative.size.width)
-        let worst = zip(preview.means, full.means).map { abs($0 - $1).max() / max(1, abs($1).max()) }.max() ?? .nan
-        print("preview vs full with white balance: \(worst)")
+        let worst = RAWDevelopSupport.worstRelativeDifference(preview.means, full.means, floor: 1)
         #expect(worst < Self.previewTolerance, "worst difference \(worst)")
     }
 
@@ -234,7 +222,6 @@ struct CameraWhiteBalanceTests {
             let developed = try Self.develop(data, whiteBalance, chart: chart)
             #expect(developed.negative.exposureAnchorStops == anchor, "\(whiteBalance): \(developed.negative.exposureAnchorStops)")
             let top = developed.means[brightest]
-            print("\(whiteBalance): anchor \(developed.negative.exposureAnchorStops), brightest neutral \(top)")
             #expect(top.y > 1 && top.max() > 1.5, "\(whiteBalance): brightest neutral \(top) clipped at 1.0")
         }
     }
@@ -291,8 +278,8 @@ struct CameraWhiteBalanceRealFileTests {
         for url in urls {
             let name = url.lastPathComponent
             let data = try Data(contentsOf: url)
-            let asShot = try #require(Developer.asShotWhiteBalance(of: data), "\(name) is not RAW")
             let plain = try developer.develop(data, maxDimension: edge)
+            let asShot = try #require(plain.asShotWhiteBalance, "\(name) is not RAW")
             let explicit = try developer.develop(data, maxDimension: edge, whiteBalance: asShot)
             let cool = try developer.develop(
                 data, maxDimension: edge, whiteBalance: CameraWhiteBalance(temperature: Self.cool, tint: asShot.tint))
@@ -341,7 +328,7 @@ extension RAWDevelopProofRenders {
         for url in try Self.cc0Samples() {
             let name = url.deletingPathExtension().lastPathComponent
             let data = try Data(contentsOf: url)
-            let asShot = try #require(Developer.asShotWhiteBalance(of: data))
+            let asShot = try #require(try developer.develop(data, maxDimension: Self.longEdge).asShotWhiteBalance)
             for (label, factor) in [("as-shot", 1.0), ("cooler", 0.75), ("warmer", 1.35)] {
                 let whiteBalance = CameraWhiteBalance(temperature: asShot.temperature * factor, tint: asShot.tint)
                 print("\(name) \(label): \(whiteBalance.temperature) K, tint \(whiteBalance.tint)")

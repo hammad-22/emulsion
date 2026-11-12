@@ -16,12 +16,16 @@ public struct Negative: @unchecked Sendable {
     /// pixels, so it follows the scene (two shots from one camera can differ); an estimate, not a
     /// metered level. 0 when Apple can't apply a gain table for the file, or it isn't RAW.
     public let exposureAnchorStops: Double
+    /// The white balance the RAW file reports (DNG AsShotNeutral), whatever it was developed at;
+    /// nil when the photo isn't RAW, so white balance doesn't apply to it.
+    public let asShotWhiteBalance: CameraWhiteBalance?
     public var size: CGSize { image.extent.size }
 
-    init(image: CIImage, contract: InputContract, exposureAnchorStops: Double = 0) {
+    init(image: CIImage, contract: InputContract, exposureAnchorStops: Double = 0, asShotWhiteBalance: CameraWhiteBalance? = nil) {
         self.image = image
         self.contract = contract
         self.exposureAnchorStops = exposureAnchorStops
+        self.asShotWhiteBalance = asShotWhiteBalance
     }
 }
 
@@ -93,6 +97,7 @@ public struct Developer {
             }
             // Draft mode stays off after the anchor's thumbnails: switching it on decodes the file again.
             Self.applyPreviewScale(raw, maxDimension: maxDimension, allowsDraftMode: !measuresAnchor)
+            let asShot = CameraWhiteBalance(temperature: Double(raw.neutralTemperature), tint: Double(raw.neutralTint))
             // After the anchor, which stays measured as shot whatever the white balance. Setting it
             // here doesn't make the filter decode the file again (measured, MOV-10).
             if let whiteBalance { Self.apply(whiteBalance, to: raw) }
@@ -102,7 +107,9 @@ public struct Developer {
             if anchorStops != 0 {
                 output = output.applyingFilter("CIExposureAdjust", parameters: [kCIInputEVKey: anchorStops])
             }
-            return Negative(image: Self.normalized(output), contract: .sceneReferred, exposureAnchorStops: anchorStops)
+            return Negative(
+                image: Self.normalized(output), contract: .sceneReferred, exposureAnchorStops: anchorStops,
+                asShotWhiteBalance: asShot)
         }
         // Known limitation: HDR stills are read as their SDR rendition (a gain map is ignored,
         // PQ/HLG stills are tone-mapped by Core Image), so HDR headroom is discarded until MOV-49.
@@ -118,12 +125,6 @@ public struct Developer {
         return try sceneFromDisplay(Self.normalized(image))
     }
 
-    /// The white balance Apple's RAW decoder reads from the file (DNG AsShotNeutral), before any
-    /// change; nil when `data` isn't RAW.
-    public static func asShotWhiteBalance(of data: Data) -> CameraWhiteBalance? {
-        rawFilter(data).map { CameraWhiteBalance(temperature: Double($0.neutralTemperature), tint: Double($0.neutralTint)) }
-    }
-
     /// Apple's RAW decoder for `data`, or nil when it isn't RAW.
     private static func rawFilter(_ data: Data) -> CIRAWFilter? {
         rawTypeIdentifier(of: data).flatMap { CIRAWFilter(imageData: data, identifierHint: $0) }
@@ -131,7 +132,7 @@ public struct Developer {
 
     /// Sets the decoder's neutral from a temperature and tint, which Apple converts to a camera
     /// neutral and applies in the camera's colour space.
-    static func apply(_ whiteBalance: CameraWhiteBalance, to raw: CIRAWFilter) {
+    private static func apply(_ whiteBalance: CameraWhiteBalance, to raw: CIRAWFilter) {
         let clamped = whiteBalance.clamped()
         raw.neutralTemperature = Float(clamped.temperature)
         raw.neutralTint = Float(clamped.tint)
@@ -152,7 +153,7 @@ public struct Developer {
     /// sharpening, lens correction and the decoder version stay at the file's defaults (the
     /// opt-in RAW decoder 9 is deliberately not used: docs/ENGINE.md, MOV-10). Measured on
     /// synthetic DNGs and 25 real files (MOV-79, `RAWDevelopTests`).
-    static func bypassAppleRendering(_ raw: CIRAWFilter) {
+    private static func bypassAppleRendering(_ raw: CIRAWFilter) {
         raw.boostAmount = 0
         // 1 is neutral (below 1 darkens the shadows; the file default is 0.9). It has no effect
         // while boost is 0 (pixel-identical develop, MOV-134) and only matters for the exposure

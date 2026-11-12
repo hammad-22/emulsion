@@ -1,4 +1,5 @@
 import EmulsionCore
+import EmulsionFixtures
 import Foundation
 import ImageIO
 import Testing
@@ -138,7 +139,7 @@ extension RenderServiceTests {
 extension RenderServiceTests {
     static var tungstenWhiteBalance: Adjustments {
         var adjustments = Adjustments.neutral
-        adjustments.whiteBalance = CameraWhiteBalance(temperature: TestRAW.tungstenKelvin, tint: 0)
+        adjustments.whiteBalance = CameraWhiteBalance(temperature: SyntheticDNG.illuminantAKelvin, tint: 0)
         return adjustments
     }
 
@@ -161,6 +162,22 @@ extension RenderServiceTests {
         }
         #expect(await service.cachedPreviewKeys == [key], "a temperature drag doesn't fill the cache")
         #expect(await service.developCount == 5)
+    }
+
+    /// Only a RAW photo develops again for a new white balance; the developer ignores it on others.
+    @Test func whiteBalanceRedevelopsOnlyRAWPhotos() async throws {
+        let library = TestLibrary()
+        let jpeg = library.store.url(for: try await library.store.add(TestPhoto.jpeg, fileExtension: "jpg"))
+        let raw = library.store.url(for: try await library.store.add(TestRAW.tungstenTaggedAsDaylight, fileExtension: "dng"))
+        let service = library.renderService
+
+        _ = try await service.image(jpeg, .neutral, maxDimension: 900)
+        _ = try await service.image(jpeg, Self.tungstenWhiteBalance, maxDimension: 900)
+        #expect(await service.developCount == 1, "a JPEG isn't developed again for a white balance")
+
+        _ = try await service.image(raw, .neutral, maxDimension: 900)
+        _ = try await service.image(raw, Self.tungstenWhiteBalance, maxDimension: 900)
+        #expect(await service.developCount == 3, "a RAW photo is")
     }
 
     @Test func sameWhiteBalanceReusesTheCachedDevelop() async throws {

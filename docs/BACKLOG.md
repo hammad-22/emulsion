@@ -48,7 +48,7 @@ The product strategy is **Easy now, Pro later, same engine.** Every engine contr
 | IO2 | HDR outputs: Rec.2100 PQ and HLG with highlight "unroll" to a nit target | P1 → IO1 | 1000-nit target; SDR/HDR consistency test at mid-gray |
 | IO3 | More camera inputs: RED Log3G10/RWG, Canon Log 2/3, BMD Film Gen5, Fuji F-Log2, DJI D-Log, Nikon N-Log, Samsung Log, ACEScg | P2 | Published mid-gray tests per curve (like current suite) |
 | IO4 | Gain-map HDR stills (Apple + ISO 21496-1) as scene-light input | P1 | Synthetic gain-map fixture: headroom recovered; SDR identity at zero edit |
-| IO5 | ProRAW/DNG: true RAW white balance (Kelvin/tint in camera space), RAW 9 decoder when available | P0 | Fixture tests; white balance moves the camera neutral, not printer lights. **Engine done (MOV-10):** `CameraWhiteBalance` at develop, tested on synthetic tungsten charts and 25 real files; UI control pending. RAW 9 not used: opt-in and shifts colour/exposure (docs/ENGINE.md) |
+| IO5 | ProRAW/DNG: true RAW white balance (Kelvin/tint in camera space), RAW 9 decoder when available | P0 | Fixture tests; white balance moves the camera neutral, not printer lights. **Engine done (MOV-10):** `CameraWhiteBalance` at develop, tested on synthetic tungsten charts and 25 real files; UI control pending. RAW 9 not used: see [RAW white balance](ENGINE.md#raw-white-balance) |
 | IO6 | Gamut compression on input (wide-gamut log, e.g. neon in S-Gamut3) before film | P2 | No hue flips on out-of-gamut test patches |
 
 ## ENG-G · Grading controls (engine API; easy UI shows a subset)
