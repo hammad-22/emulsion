@@ -28,6 +28,15 @@ enum RAWDevelopSupport {
         }
     }
 
+    /// A CIRAWFilter for `data` with the DNG type hint the Developer uses (ImageIO types many
+    /// ProRAW files read from memory as plain TIFF).
+    static func filter(_ data: Data) throws -> CIRAWFilter {
+        guard let raw = CIRAWFilter(imageData: data, identifierHint: Developer.dngTypeIdentifier) else {
+            throw EmulsionError.unsupportedPhoto
+        }
+        return raw
+    }
+
     /// Rec. 709 / sRGB luminance (Y) of linear sRGB.
     static func luminance(_ c: SIMD3<Double>) -> Double { (SyntheticDNG.xyzFromLinearSRGB * c).y }
 
@@ -40,7 +49,8 @@ enum RAWDevelopSupport {
     /// Highlight statistics of a developed frame (linear sRGB pixels).
     struct FrameStats {
         let maxValue: Double
-        /// 99.9th percentile of luminance.
+        /// 50th and 99.9th percentiles of luminance.
+        let medianLuminance: Double
         let p999: Double
         /// Fractions of pixels whose brightest channel exceeds 1, 2 and 4.
         let over1: Double
@@ -52,6 +62,7 @@ enum RAWDevelopSupport {
             let sortedLuminance = pixels.map(luminance).sorted()
             let count = Double(pixels.count)
             maxValue = RAWDevelopSupport.maxValue(pixels)
+            medianLuminance = sortedLuminance[sortedLuminance.count / 2]
             p999 = sortedLuminance[min(sortedLuminance.count - 1, Int(count * 0.999))]
             over1 = Double(pixels.count(where: { $0.max() > 1 })) / count
             over2 = Double(pixels.count(where: { $0.max() > 2 })) / count
@@ -74,7 +85,7 @@ enum RAWDevelopSupport {
     /// A negative developed with the pre-MOV-79 configuration.
     static func preMOV79Negative(_ raw: CIRAWFilter, maxDimension: CGFloat? = nil) throws -> Negative {
         applyPreMOV79Develop(raw)
-        Developer.applyPreviewScale(raw, maxDimension: maxDimension)
+        Developer.applyPreviewScale(raw, maxDimension: maxDimension, allowsDraftMode: true)
         guard let output = raw.outputImage, !output.extent.isEmpty, !output.extent.isInfinite else {
             throw EmulsionError.unsupportedPhoto
         }

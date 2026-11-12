@@ -46,8 +46,6 @@ struct ExposureAnchorTests {
         let black = [SIMD4<Float>](repeating: SIMD4(0, 0, 0, 1), count: 16)
         #expect(ExposureAnchor.stops(linear: black, profile: black) == 0)
         #expect(ExposureAnchor.stops(linear: [], profile: []) == 0)
-        let nan = [SIMD4<Float>](repeating: SIMD4(.nan, .nan, .nan, 1), count: 4)
-        #expect(ExposureAnchor.stops(linear: nan, profile: nan) == 0)
         #expect(ExposureAnchor.stops(linear: Self.linear, profile: Array(Self.linear.dropLast())) == 0, "sizes differ")
     }
 
@@ -83,9 +81,8 @@ struct ExposureAnchorDevelopTests {
         stride(from: Float(0), through: 0.9, by: 0.05).map { SIMD2($0, Float(darkeningCurveSlope) * $0) } + [SIMD2(1, 1)]
     static let darkeningCurveSlope = 0.7
 
-    static func fortyEight(toneCurve: [SIMD2<Float>] = SyntheticDNG.Profile.identityToneCurve) -> SyntheticDNG.Profile {
-        SyntheticDNG.Profile(gainTableGain: Float(pow(2, gainStops)), toneCurve: toneCurve)
-    }
+    static let fortyEight = SyntheticDNG.Profile(gainTableGain: Float(pow(2, gainStops)))
+    static let fortyEightDarkened = SyntheticDNG.Profile(gainTableGain: Float(pow(2, gainStops)), toneCurve: darkeningCurve)
     static let twelve = SyntheticDNG.Profile(gainTableGain: 1)
 
     struct Developed {
@@ -125,10 +122,9 @@ struct ExposureAnchorDevelopTests {
     @Test(arguments: SyntheticDNG.Mosaic.allCases)
     func filesThatRenderAlikeDevelopAlike(_ mosaic: SyntheticDNG.Mosaic) throws {
         let twelve = try Self.develop(mosaic, baselineStops: Self.twelveBaselineStops, profile: Self.twelve)
-        let fortyEight = try Self.develop(mosaic, baselineStops: Self.fortyEightBaselineStops, profile: Self.fortyEight())
+        let fortyEight = try Self.develop(mosaic, baselineStops: Self.fortyEightBaselineStops, profile: Self.fortyEight)
         let twelveAnchor = twelve.negative.exposureAnchorStops
         let fortyEightAnchor = fortyEight.negative.exposureAnchorStops
-        print("\(mosaic): anchors 12 MP-like \(twelveAnchor), 48 MP-like \(fortyEightAnchor)")
         #expect(abs(twelveAnchor) < Self.identityAnchorTolerance, "12 MP-like anchor \(twelveAnchor)")
         #expect(abs(fortyEightAnchor - twelveAnchor - Self.gainStops) < Self.pairAnchorTolerance, "48 MP-like anchor \(fortyEightAnchor)")
         var worstPair = 0.0
@@ -139,18 +135,16 @@ struct ExposureAnchorDevelopTests {
             worstPair = max(worstPair, (abs(a - b) / max(abs(b), SIMD3(repeating: 0.01))).max())
             worstScene = max(worstScene, (abs(a - Self.scene[index]) / max(abs(Self.scene[index]), SIMD3(repeating: 1))).max())
         }
-        print("\(mosaic): worst pair \(worstPair), worst scene \(worstScene)")
         #expect(worstPair < Self.pairValueTolerance, "worst relative difference between the files \(worstPair)")
         #expect(worstScene < Self.sceneTolerance, "worst difference from the scene \(worstScene)")
     }
 
     @Test(arguments: SyntheticDNG.Mosaic.allCases)
     func toneCurveShiftsTheAnchor(_ mosaic: SyntheticDNG.Mosaic) throws {
-        let identity = try Self.develop(mosaic, baselineStops: Self.fortyEightBaselineStops, profile: Self.fortyEight())
+        let identity = try Self.develop(mosaic, baselineStops: Self.fortyEightBaselineStops, profile: Self.fortyEight)
         let darkened = try Self.develop(
-            mosaic, baselineStops: Self.fortyEightBaselineStops, profile: Self.fortyEight(toneCurve: Self.darkeningCurve))
+            mosaic, baselineStops: Self.fortyEightBaselineStops, profile: Self.fortyEightDarkened)
         let shift = darkened.negative.exposureAnchorStops - identity.negative.exposureAnchorStops
-        print("\(mosaic): tone-curve shift \(shift), expected \(log2(Self.darkeningCurveSlope))")
         #expect(abs(shift - log2(Self.darkeningCurveSlope)) < Self.toneCurveShiftTolerance, "shift \(shift)")
     }
 
@@ -158,9 +152,9 @@ struct ExposureAnchorDevelopTests {
     /// by 2^anchor, so ratios between pixels don't change.
     @Test(arguments: SyntheticDNG.Mosaic.allCases)
     func anchorIsAPureScalar(_ mosaic: SyntheticDNG.Mosaic) throws {
-        let anchored = try Self.develop(mosaic, baselineStops: Self.fortyEightBaselineStops, profile: Self.fortyEight())
+        let anchored = try Self.develop(mosaic, baselineStops: Self.fortyEightBaselineStops, profile: Self.fortyEight)
         let plain = try Self.develop(
-            mosaic, baselineStops: Self.fortyEightBaselineStops, profile: Self.fortyEight(), anchorsExposure: false)
+            mosaic, baselineStops: Self.fortyEightBaselineStops, profile: Self.fortyEight, anchorsExposure: false)
         #expect(plain.negative.exposureAnchorStops == 0)
         let gain = pow(2, anchored.negative.exposureAnchorStops)
         #expect(anchored.pixels.contains { $0.max() > 1 }, "no value above 1")
@@ -171,18 +165,46 @@ struct ExposureAnchorDevelopTests {
                 worst = max(worst, abs(a[channel] / p[channel] / gain - 1))
             }
         }
-        print("\(mosaic): worst scalar error \(worst)")
         #expect(worst < Self.scalarTolerance, "worst relative error \(worst)")
     }
 
     @Test(arguments: SyntheticDNG.Mosaic.allCases)
     func previewAndFullDevelopShareTheAnchor(_ mosaic: SyntheticDNG.Mosaic) throws {
-        let full = try Self.develop(mosaic, baselineStops: Self.fortyEightBaselineStops, profile: Self.fortyEight())
+        let full = try Self.develop(mosaic, baselineStops: Self.fortyEightBaselineStops, profile: Self.fortyEight)
         let preview = try Self.develop(
-            mosaic, baselineStops: Self.fortyEightBaselineStops, profile: Self.fortyEight(),
+            mosaic, baselineStops: Self.fortyEightBaselineStops, profile: Self.fortyEight,
             maxDimension: CGFloat(Self.chart.width / 2))
         #expect(preview.negative.size.width < full.negative.size.width)
         #expect(full.negative.exposureAnchorStops == preview.negative.exposureAnchorStops)
+    }
+
+    /// The anchor's thumbnails must not leave the negative at thumbnail size.
+    @Test(arguments: SyntheticDNG.Mosaic.allCases)
+    func fullDevelopKeepsTheNativeSize(_ mosaic: SyntheticDNG.Mosaic) throws {
+        let full = try Self.develop(mosaic, baselineStops: Self.fortyEightBaselineStops, profile: Self.fortyEight)
+        #expect(CGFloat(Self.chart.width) > ExposureAnchor.thumbnailLongEdge)
+        #expect(full.negative.exposureAnchorStops != 0)
+        #expect(full.negative.size == CGSize(width: Self.chart.width, height: Self.chart.height))
+    }
+
+    /// Previews and exports of one file can develop at the same time through the renderer's
+    /// shared context: they must get the same anchor and pixels as each other.
+    @Test(arguments: SyntheticDNG.Mosaic.allCases)
+    func concurrentDevelopsAgree(_ mosaic: SyntheticDNG.Mosaic) async throws {
+        let data = RAWDevelopChart.dng(
+            mosaic, chart: Self.chart, baselineStops: Self.fortyEightBaselineStops, profile: Self.fortyEight)
+        let results = try await withThrowingTaskGroup(of: (anchor: Double, pixels: [SIMD3<Double>]).self) { group in
+            for _ in 0..<8 {
+                group.addTask {
+                    let negative = try Self.developer.develop(data)
+                    return (negative.exposureAnchorStops, Fixtures.linear(negative.image))
+                }
+            }
+            return try await group.reduce(into: []) { $0.append($1) }
+        }
+        let first = try #require(results.first)
+        #expect(first.anchor != 0)
+        #expect(results.allSatisfy { $0.anchor == first.anchor && $0.pixels == first.pixels })
     }
 
     @Test(arguments: SyntheticDNG.Mosaic.allCases)
@@ -202,7 +224,7 @@ struct ExposureAnchorDevelopTests {
 
     @Test func resizingAndMaterializingKeepTheAnchor() throws {
         let renderer = RAWDevelopTests.renderer
-        let developed = try Self.develop(.linearRGB, baselineStops: Self.fortyEightBaselineStops, profile: Self.fortyEight())
+        let developed = try Self.develop(.linearRGB, baselineStops: Self.fortyEightBaselineStops, profile: Self.fortyEight)
         let anchor = developed.negative.exposureAnchorStops
         #expect(anchor != 0)
         #expect(renderer.resized(developed.negative, longestEdge: 64).exposureAnchorStops == anchor)

@@ -27,13 +27,12 @@ public struct SyntheticDNG: Sendable {
     /// A DNG profile's rendering hints, the tags Apple's 48 MP ProRAW uses to brighten its image.
     public struct Profile: Sendable {
         /// ProfileGainTableMap (DNG 1.6) holding one gain everywhere: every pixel, whatever its level.
-        public var gainTableGain: Float
-        /// ProfileToneCurve: (input, output) pairs from (0, 0) to (1, 1), linear in and out.
-        public var toneCurve: [SIMD2<Float>]
+        public let gainTableGain: Float
+        /// ProfileToneCurve: (input, output) pairs from (0, 0) to (1, 1), linear in and out;
+        /// identity by default.
+        public let toneCurve: [SIMD2<Float>]
 
-        public static let identityToneCurve: [SIMD2<Float>] = [SIMD2(0, 0), SIMD2(1, 1)]
-
-        public init(gainTableGain: Float, toneCurve: [SIMD2<Float>] = identityToneCurve) {
+        public init(gainTableGain: Float, toneCurve: [SIMD2<Float>] = [SIMD2(0, 0), SIMD2(1, 1)]) {
             self.gainTableGain = gainTableGain
             self.toneCurve = toneCurve
         }

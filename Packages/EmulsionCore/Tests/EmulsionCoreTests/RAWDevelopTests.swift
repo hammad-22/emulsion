@@ -222,13 +222,12 @@ struct ExposureAnchorRealFileTests {
     static let anchorRepeatTolerance = 1e-6
 
     static func medianLuminance(_ image: CIImage) -> Double {
-        let sorted = Fixtures.linear(image).map(RAWDevelopSupport.luminance).sorted()
-        return sorted[sorted.count / 2]
+        RAWDevelopSupport.FrameStats(Fixtures.linear(image)).medianLuminance
     }
 
     /// Apple's default render (every CIRAWFilter default) at the preview size.
     static func appleDefault(_ data: Data, maxDimension: CGFloat) throws -> CIImage {
-        let raw = try #require(CIRAWFilter(imageData: data, identifierHint: Developer.dngTypeIdentifier))
+        let raw = try RAWDevelopSupport.filter(data)
         Developer.applyPreviewScale(raw, maxDimension: maxDimension, allowsDraftMode: false)
         return try #require(raw.outputImage)
     }
@@ -244,7 +243,7 @@ struct ExposureAnchorRealFileTests {
         for url in urls {
             let name = url.lastPathComponent
             let data = try Data(contentsOf: url)
-            let raw = try #require(CIRAWFilter(imageData: data, identifierHint: Developer.dngTypeIdentifier))
+            let raw = try RAWDevelopSupport.filter(data)
             let megapixels = Double(raw.nativeSize.width * raw.nativeSize.height) / 1e6
             let before = try developer.develop(data, maxDimension: edge, anchorsExposure: false)
             let after = try developer.develop(data, maxDimension: edge)

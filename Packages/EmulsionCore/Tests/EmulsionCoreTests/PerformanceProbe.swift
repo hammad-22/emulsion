@@ -36,12 +36,9 @@ final class PerformanceProbe: XCTestCase {
 
     private func time(_ r: Renderer, _ neg: Negative, _ kind: String, full a: Adjustments, _ w: Int, _ h: Int) throws {
         for (label, adj) in [("look only", Adjustments.neutral), ("full", a)] {
-            var times = [Double]()
-            for _ in 0..<5 {
-                let t = Date()
+            let times = try Self.milliseconds(runs: 5) {
                 let cg = try r.cgImage(try r.render(neg, adj))
                 _ = cg.dataProvider?.data
-                times.append(Date().timeIntervalSince(t) * 1000)
             }
             print(String(format: "%dx%d %@%@: median %.1f ms (first %.1f)", w, h, kind, label, times.dropFirst().sorted()[2], times[0]))
         }
@@ -54,58 +51,39 @@ final class PerformanceProbe: XCTestCase {
         try XCTSkipUnless(RAWDevelopSupport.samplesFolders != nil, "set EMULSION_RAW_SAMPLES to run")
         let r = try Renderer()
         var seenSizes = Set<String>()
-        var files: [(url: URL, size: CGSize)] = []
+        var files: [(url: URL, data: Data, size: CGSize)] = []
         for url in try RAWDevelopSupport.sampleURLs() {
-            guard let raw = CIRAWFilter(imageURL: url) else { continue }
-            if seenSizes.insert("\(raw.nativeSize)").inserted { files.append((url, raw.nativeSize)) }
+            let data = try Data(contentsOf: url)
+            let size = try RAWDevelopSupport.filter(data).nativeSize
+            if seenSizes.insert("\(size)").inserted { files.append((url, data, size)) }
         }
         print("| File | Native size | Long edge | Variant | Median ms | First ms | Anchor |")
         print("| --- | --- | ---: | --- | ---: | ---: | ---: |")
-        for (url, size) in files {
-            let data = try Data(contentsOf: url)
+        for (url, data, size) in files {
             for edge in [CGFloat(1024), 1600, nil] {
-                for variant in RAWVariant.allCases where edge != nil || !variant.isDraftOnly {
-                    var times = [Double]()
+                for anchorsExposure in [false, true] {
                     var anchor = 0.0
-                    for _ in 0..<4 {
-                        let start = ContinuousClock.now
-                        let negative = try variant.develop(data, maxDimension: edge, with: r)
+                    let times = try Self.milliseconds(runs: 4) {
+                        let negative = try r.developer.develop(data, maxDimension: edge, anchorsExposure: anchorsExposure)
                         _ = try r.materialize(negative)
-                        times.append((ContinuousClock.now - start).milliseconds)
                         anchor = negative.exposureAnchorStops
                     }
                     let median = times.dropFirst().sorted()[1]
                     print(
                         "| \(url.lastPathComponent) | \(Int(size.width))×\(Int(size.height)) | \(edge.map { "\(Int($0))" } ?? "full")"
-                            + " | \(variant.rawValue) | \(String(format: "%.0f", median)) | \(String(format: "%.0f", times[0]))"
-                            + " | \(String(format: "%+.3f", anchor)) |")
+                            + " | \(anchorsExposure ? "after" : "before") | \(String(format: "%.0f", median))"
+                            + " | \(String(format: "%.0f", times[0])) | \(String(format: "%+.3f", anchor)) |")
                 }
             }
         }
     }
 
-    /// Develop orders compared for the draft-mode decision.
-    private enum RAWVariant: String, CaseIterable {
-        case before = "before: no anchor, draft on"
-        case beforeDraftOff = "no anchor, draft off"
-        case after = "after: anchor, draft off"
-        case afterDraftOn = "anchor, then draft on for the output"
-
-        /// Draft mode only differs below full size.
-        var isDraftOnly: Bool { self == .beforeDraftOff || self == .afterDraftOn }
-
-        func develop(_ data: Data, maxDimension: CGFloat?, with r: Renderer) throws -> Negative {
-            switch self {
-            case .before: return try r.developer.develop(data, maxDimension: maxDimension, anchorsExposure: false)
-            case .after: return try r.developer.develop(data, maxDimension: maxDimension)
-            case .beforeDraftOff, .afterDraftOn:
-                let raw = try XCTUnwrap(CIRAWFilter(imageData: data, identifierHint: Developer.dngTypeIdentifier))
-                Developer.bypassAppleRendering(raw)
-                let anchor = self == .afterDraftOn && raw.isLocalToneMapSupported ? ExposureAnchor.stops(of: raw, context: r.context) : 0
-                Developer.applyPreviewScale(raw, maxDimension: maxDimension, allowsDraftMode: self == .afterDraftOn)
-                let output = try XCTUnwrap(raw.outputImage).applyingFilter("CIExposureAdjust", parameters: [kCIInputEVKey: anchor])
-                return Negative(image: Developer.normalized(output), contract: .sceneReferred, exposureAnchorStops: anchor)
-            }
+    /// Wall-clock milliseconds of each of `runs` calls of `body`.
+    private static func milliseconds(runs: Int, _ body: () throws -> Void) rethrows -> [Double] {
+        try (0..<runs).map { _ in
+            let start = ContinuousClock.now
+            try body()
+            return (ContinuousClock.now - start).milliseconds
         }
     }
 }

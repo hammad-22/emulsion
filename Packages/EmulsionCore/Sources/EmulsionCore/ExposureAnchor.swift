@@ -8,26 +8,20 @@ import Foundation
 enum ExposureAnchor {
     /// Long edge of the two thumbnails compared. Fixed, so previews and exports get the same anchor.
     static let thumbnailLongEdge: CGFloat = 256
-    static let midGray = 0.18
+    private static let midGray = 0.18
     /// Pixels whose profile render is within ±1 stop of mid-gray choose the anchor.
-    static let windowStops = 1.0
+    private static let windowStops = 1.0
     /// Below this share of valid pixels in the window, every valid pixel counts instead.
-    static let minimumWindowShare = 0.01
+    private static let minimumWindowShare = 0.01
     /// Luminance at or below this has no usable ratio.
-    static let luminanceFloor = 1e-6
+    private static let luminanceFloor = 1e-6
     /// Measured −0.56…+2.95 stops on 25 real DNGs; the clamp only stops a broken profile or a
     /// near-black frame from throwing the develop far off.
     static let range = -2.0...5.0
 
-    /// Measures the anchor of `raw`, which must have Apple's rendering bypassed and supports
-    /// local tone mapping. Renders two thumbnails through `context` (draft mode off, so the decode
-    /// is reused; use the context that renders the develop, which shares Apple's cache): the
-    /// linear develop and the profile render (local tone map and boost at 1). `raw` is left with
-    /// local tone map and boost back at 0 and the thumbnail scale set.
+    /// The anchor of `raw`, which needs Apple's rendering bypassed, the thumbnail scale set and
+    /// draft mode off. Leaves local tone map and boost back at 0.
     static func stops(of raw: CIRAWFilter, context: CIContext) -> Double {
-        let native = raw.nativeSize
-        raw.isDraftModeEnabled = false
-        raw.scaleFactor = Float(min(1, thumbnailLongEdge / max(native.width, native.height)))
         let linear = pixels(raw.outputImage, context: context)
         // Only these two: changing boostShadowAmount or contrastAmount too forces a new decode.
         raw.localToneMapAmount = 1
@@ -68,7 +62,7 @@ enum ExposureAnchor {
     }
 
     /// Rec. 709 luminance of linear sRGB.
-    static func luminance(_ c: SIMD4<Float>) -> Double {
+    private static func luminance(_ c: SIMD4<Float>) -> Double {
         let (kr, kb) = YCbCrMatrix.bt709.weights
         return kr * Double(c.x) + (1 - kr - kb) * Double(c.y) + kb * Double(c.z)
     }

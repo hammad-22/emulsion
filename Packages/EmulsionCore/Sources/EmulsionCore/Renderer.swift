@@ -14,7 +14,7 @@ public final class Renderer: @unchecked Sendable {
     static let workingSpace = CGColorSpace(name: CGColorSpace.extendedLinearSRGB)!
     private let kernels: Kernels
     public let developer: Developer
-    let context: CIContext
+    private let context: CIContext
 
     public init() throws {
         kernels = try Kernels()
