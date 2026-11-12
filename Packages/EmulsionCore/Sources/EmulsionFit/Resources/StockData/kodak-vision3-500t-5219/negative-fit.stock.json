@@ -1,0 +1,89 @@
+{
+  "formatVersion" : 1,
+  "name" : "Emulsion Default, fitted negative",
+  "negative" : {
+    "densityRange" : 2.2535056767295236,
+    "exposureOffset" : [
+      0.5278881315630126,
+      0.30731088363196746,
+      0.3174096274066384
+    ],
+    "gamma" : [
+      0.49178329153057215,
+      0.6159220604660227,
+      0.5898980204424766
+    ],
+    "sensitivity" : [
+      [
+        1.07,
+        -0.05,
+        -0.02
+      ],
+      [
+        -0.04,
+        1.08,
+        -0.04
+      ],
+      [
+        -0.01,
+        -0.07,
+        1.08
+      ]
+    ]
+  },
+  "print" : {
+    "densityRange" : 3.3,
+    "dyes" : [
+      [
+        0.94,
+        0.05,
+        0.01
+      ],
+      [
+        0.04,
+        0.9,
+        0.06
+      ],
+      [
+        0.01,
+        0.07,
+        0.92
+      ]
+    ],
+    "gamma" : [
+      2.2,
+      2.15,
+      2.05
+    ],
+    "minimumDensity" : 0.06,
+    "shape" : 0.5
+  },
+  "provenance" : {
+    "fitDate" : "2026-11-12",
+    "fitResiduals" : {
+      "blue.maxAbsDensity" : 0.04760362687784103,
+      "blue.rmsDensity" : 0.02481821764489025,
+      "green.maxAbsDensity" : 0.048772522441484334,
+      "green.rmsDensity" : 0.026579883767116858,
+      "maxAbsDensity" : 0.048772522441484334,
+      "red.maxAbsDensity" : 0.04588382240954503,
+      "red.rmsDensity" : 0.024098741446451345,
+      "rmsDensity" : 0.02518718912096316
+    },
+    "notes" : [
+      "Chart conditions: Exposure: 3200K Tungsten 1/50 sec; Process: ECN-2; Densitometry: ECN-2.",
+      "Only the negative characteristic curves (gamma, densityRange, exposureOffset) were fitted, to the digitized characteristic chart; every other parameter is the hand-tuned value of \"Emulsion Default\".",
+      "Minimum densities (base + fog + mask) were fitted (red 0.000, green 0.449, blue 0.677) but are not stored: the engine's calibrated printer lights absorb a constant per-layer density.",
+      "Exposure offsets are relative to mid-gray at log10 exposure -1.485 lux-seconds on the chart, an approximate anchor (see the fit report).",
+      "fitResiduals are measured − fitted density over the traced samples; they exclude the digitizing error.",
+      "red: fitted minimum density 0.000 sits on its bound, so it is not a reading of the film's base density (the logistic's long toe absorbs it); the lowest traced density is 0.189."
+    ],
+    "source" : "Eastman Kodak Company H-1-5219, \"KODAK VISION3 500T Color Negative Film 5219 / 7219\", March 2026 (as printed in the PDF: 'MARCH 2026', footer 'Revised 3-26'). https://www.kodak.com/content/products-brochures/motion-picture/KODAK-VISION3-5219-7219-technical-information.pdf",
+    "sourceSHA256" : "f0b637d7a6b080a2d15ecac63716db503a78de3a0662824d32ab3e8856d79f53",
+    "tool" : "emulsion-fit 0.1.0"
+  },
+  "rendering" : {
+    "highlightChromaRetention" : 0.6,
+    "middleGrayOut" : 0.17
+  }
+}
