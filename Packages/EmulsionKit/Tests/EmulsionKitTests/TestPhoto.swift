@@ -15,6 +15,11 @@ enum TestPhoto {
         return CIContext(options: [.useSoftwareRenderer: true])
             .jpegRepresentation(of: SceneFixtures.patches(), colorSpace: space)!
     }()
+
+    /// A synthetic DNG (384 × 144) whose profile brightens through a gain table, as 48 MP ProRAW
+    /// does, so its develop measures an exposure anchor (about 2 stops).
+    static let anchoredRAW = RAWDevelopChart.dng(
+        .bayerRGGB, chart: RAWDevelopChart.chart(), baselineStops: 0.5, profile: SyntheticDNG.Profile(gainTableGain: 4))
 }
 
 /// A throwaway library: its own folder and render service, removed when the test ends,

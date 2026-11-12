@@ -44,7 +44,8 @@ final class PerformanceProbe: XCTestCase {
         }
     }
 
-    /// RAW develop with and without the exposure anchor (MOV-134), developed and materialized,
+    /// RAW develop without the exposure anchor (before), measuring it (after) and given the
+    /// anchor an earlier develop reported (known anchor, MOV-134), developed and materialized,
     /// for the first DNG of each native size in EMULSION_RAW_SAMPLES. Opt-in: EMULSION_PERF=1.
     func testRAWDevelopTimings() throws {
         try XCTSkipUnless(ProcessInfo.processInfo.environment["EMULSION_PERF"] != nil, "set EMULSION_PERF=1 to run")
@@ -60,18 +61,22 @@ final class PerformanceProbe: XCTestCase {
         print("| File | Native size | Long edge | Variant | Median ms | First ms | Anchor |")
         print("| --- | --- | ---: | --- | ---: | ---: | ---: |")
         for (url, data, size) in files {
+            let measured = try r.developer.develop(data, maxDimension: ExposureAnchor.thumbnailLongEdge).exposureAnchorStops
+            let variants: [(name: String, anchor: ExposureAnchor.Choice)] = [
+                ("before", .none), ("after", .measured), ("known anchor", .known(stops: measured)),
+            ]
             for edge in [CGFloat(1024), 1600, nil] {
-                for anchorsExposure in [false, true] {
+                for variant in variants {
                     var anchor = 0.0
                     let times = try Self.milliseconds(runs: 4) {
-                        let negative = try r.developer.develop(data, maxDimension: edge, anchorsExposure: anchorsExposure)
+                        let negative = try r.developer.develop(data, maxDimension: edge, anchor: variant.anchor)
                         _ = try r.materialize(negative)
                         anchor = negative.exposureAnchorStops
                     }
                     let median = times.dropFirst().sorted()[1]
                     print(
                         "| \(url.lastPathComponent) | \(Int(size.width))×\(Int(size.height)) | \(edge.map { "\(Int($0))" } ?? "full")"
-                            + " | \(anchorsExposure ? "after" : "before") | \(String(format: "%.0f", median))"
+                            + " | \(variant.name) | \(String(format: "%.0f", median))"
                             + " | \(String(format: "%.0f", times[0])) | \(String(format: "%+.3f", anchor)) |")
                 }
             }

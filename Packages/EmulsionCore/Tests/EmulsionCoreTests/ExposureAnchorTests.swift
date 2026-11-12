@@ -89,17 +89,20 @@ struct ExposureAnchorDevelopTests {
         var negative: Negative
         var pixels: [SIMD3<Double>]
         var means: [SIMD3<Double>]
+
+        init(_ negative: Negative) {
+            self.negative = negative
+            pixels = Fixtures.linear(negative.image)
+            means = chart.means(of: pixels, width: Int(negative.size.width), height: Int(negative.size.height))
+        }
     }
 
     static func develop(
         _ mosaic: SyntheticDNG.Mosaic, baselineStops: Double, profile: SyntheticDNG.Profile?, maxDimension: CGFloat? = nil,
-        anchorsExposure: Bool = true
+        anchor: ExposureAnchor.Choice = .measured
     ) throws -> Developed {
         let data = RAWDevelopChart.dng(mosaic, chart: chart, baselineStops: baselineStops, profile: profile)
-        let negative = try developer.develop(data, maxDimension: maxDimension, anchorsExposure: anchorsExposure)
-        let pixels = Fixtures.linear(negative.image)
-        let means = chart.means(of: pixels, width: Int(negative.size.width), height: Int(negative.size.height))
-        return Developed(negative: negative, pixels: pixels, means: means)
+        return Developed(try developer.develop(data, maxDimension: maxDimension, anchor: anchor))
     }
 
     // MARK: Tolerances (about 2× the worst value measured on macOS 27.2, Bayer and linear files)
@@ -154,7 +157,7 @@ struct ExposureAnchorDevelopTests {
     func anchorIsAPureScalar(_ mosaic: SyntheticDNG.Mosaic) throws {
         let anchored = try Self.develop(mosaic, baselineStops: Self.fortyEightBaselineStops, profile: Self.fortyEight)
         let plain = try Self.develop(
-            mosaic, baselineStops: Self.fortyEightBaselineStops, profile: Self.fortyEight, anchorsExposure: false)
+            mosaic, baselineStops: Self.fortyEightBaselineStops, profile: Self.fortyEight, anchor: .none)
         #expect(plain.negative.exposureAnchorStops == 0)
         let gain = pow(2, anchored.negative.exposureAnchorStops)
         #expect(anchored.pixels.contains { $0.max() > 1 }, "no value above 1")
@@ -211,7 +214,7 @@ struct ExposureAnchorDevelopTests {
     func filesWithoutAProfileAreUnchanged(_ mosaic: SyntheticDNG.Mosaic) throws {
         for maxDimension in [nil, CGFloat(Self.chart.width / 2)] {
             let anchored = try Self.develop(mosaic, baselineStops: 1, profile: nil, maxDimension: maxDimension)
-            let plain = try Self.develop(mosaic, baselineStops: 1, profile: nil, maxDimension: maxDimension, anchorsExposure: false)
+            let plain = try Self.develop(mosaic, baselineStops: 1, profile: nil, maxDimension: maxDimension, anchor: .none)
             #expect(anchored.negative.exposureAnchorStops == 0)
             #expect(anchored.pixels == plain.pixels)
         }
@@ -220,6 +223,49 @@ struct ExposureAnchorDevelopTests {
     @Test func displayReferredPhotosHaveNoAnchor() throws {
         let data = try RAWDevelopTests.renderer.export(SceneFixtures.flat(0.18, width: 64, height: 64), format: .jpeg)
         #expect(try Self.developer.develop(data).exposureAnchorStops == 0)
+    }
+
+    /// A develop given the anchor an earlier develop reported (`RenderService` reuses it per file)
+    /// skips the thumbnails: full size it matches the measuring develop exactly; a preview may
+    /// then decode in draft mode, which the measuring develop doesn't (measured worst 0 on these
+    /// files, macOS 27.2), so it gets the draft preview's tolerance.
+    @Test(arguments: SyntheticDNG.Mosaic.allCases)
+    func givenAnchorReproducesTheMeasuredDevelop(_ mosaic: SyntheticDNG.Mosaic) throws {
+        let data = RAWDevelopChart.dng(
+            mosaic, chart: Self.chart, baselineStops: Self.fortyEightBaselineStops, profile: Self.fortyEight)
+        for maxDimension in [nil, CGFloat(Self.chart.width / 2)] {
+            let measured = Developed(try Self.developer.develop(data, maxDimension: maxDimension))
+            let anchor = measured.negative.exposureAnchorStops
+            #expect(anchor != 0)
+            let given = Developed(try Self.developer.develop(data, maxDimension: maxDimension, exposureAnchorStops: anchor))
+            #expect(given.negative.exposureAnchorStops == anchor)
+            if maxDimension == nil {
+                #expect(given.pixels == measured.pixels)
+            } else {
+                let worst = zip(given.means, measured.means).map { abs($0 - $1).max() / max(1, abs($1).max()) }.max() ?? .nan
+                #expect(worst < RAWDevelopTests.previewTolerance, "worst difference \(worst)")
+            }
+        }
+    }
+
+    /// A given anchor is applied as given, without measuring: one stop more than the measured
+    /// anchor develops exactly twice as bright.
+    @Test(arguments: SyntheticDNG.Mosaic.allCases)
+    func givenAnchorIsAppliedAsGiven(_ mosaic: SyntheticDNG.Mosaic) throws {
+        let data = RAWDevelopChart.dng(
+            mosaic, chart: Self.chart, baselineStops: Self.fortyEightBaselineStops, profile: Self.fortyEight)
+        let measured = Developed(try Self.developer.develop(data))
+        let brighter = measured.negative.exposureAnchorStops + 1
+        let given = Developed(try Self.developer.develop(data, exposureAnchorStops: brighter))
+        #expect(given.negative.exposureAnchorStops == brighter)
+        #expect(given.pixels == measured.pixels.map { $0 * 2 })
+    }
+
+    @Test func displayReferredPhotosIgnoreAGivenAnchor() throws {
+        let data = try RAWDevelopTests.renderer.export(SceneFixtures.flat(0.18, width: 64, height: 64), format: .jpeg)
+        let given = try Self.developer.develop(data, exposureAnchorStops: 2)
+        #expect(given.exposureAnchorStops == 0)
+        #expect(Fixtures.linear(given.image) == Fixtures.linear(try Self.developer.develop(data).image))
     }
 
     @Test func resizingAndMaterializingKeepTheAnchor() throws {

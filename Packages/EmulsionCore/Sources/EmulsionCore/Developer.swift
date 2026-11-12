@@ -58,26 +58,33 @@ public struct Developer {
     }
 
     /// `maxDimension` develops a smaller image for fast previews. RAW files whose DNG profile
-    /// brightens through a gain table get the same `exposureAnchorStops` at any size.
-    public func develop(_ data: Data, maxDimension: CGFloat? = nil) throws -> Negative {
-        try develop(data, maxDimension: maxDimension, anchorsExposure: true)
+    /// brightens through a gain table get the same `exposureAnchorStops` at any size. nil
+    /// `exposureAnchorStops` measures it; a caller that already developed this file passes the
+    /// anchor that develop reported, which skips the measurement. Non-RAW data ignores it.
+    public func develop(_ data: Data, maxDimension: CGFloat? = nil, exposureAnchorStops: Double? = nil) throws -> Negative {
+        try develop(data, maxDimension: maxDimension, anchor: exposureAnchorStops.map { .known(stops: $0) } ?? .measured)
     }
 
-    /// `anchorsExposure: false` skips the exposure anchor, for tests and timings.
-    func develop(_ data: Data, maxDimension: CGFloat?, anchorsExposure: Bool) throws -> Negative {
+    func develop(_ data: Data, maxDimension: CGFloat?, anchor: ExposureAnchor.Choice) throws -> Negative {
         if let type = Self.rawTypeIdentifier(of: data), let raw = CIRAWFilter(imageData: data, identifierHint: type) {
             Self.bypassAppleRendering(raw)
+            var anchorStops = 0.0
+            var measuresAnchor = false
+            switch anchor {
             // isLocalToneMapSupported: Apple can apply a gain table (ProfileGainTableMap) for this
             // file. Deliberately excluded, anchor 0: a DNG with a tone curve but no gain table, and
             // non-DNG RAW, where Apple's boost is its own look curve rather than the file's profile.
-            let anchors = anchorsExposure && raw.isLocalToneMapSupported
-            var anchorStops = 0.0
-            if anchors {
+            case .measured where raw.isLocalToneMapSupported:
                 Self.applyPreviewScale(raw, maxDimension: ExposureAnchor.thumbnailLongEdge, allowsDraftMode: false)
                 anchorStops = ExposureAnchor.stops(of: raw, context: context)
+                measuresAnchor = true
+            case .known(let stops):
+                anchorStops = stops
+            case .measured, .none:
+                break
             }
-            // Draft mode stays off after the anchor: switching it on decodes the file again.
-            Self.applyPreviewScale(raw, maxDimension: maxDimension, allowsDraftMode: !anchors)
+            // Draft mode stays off after the anchor's thumbnails: switching it on decodes the file again.
+            Self.applyPreviewScale(raw, maxDimension: maxDimension, allowsDraftMode: !measuresAnchor)
             guard var output = raw.outputImage, !output.extent.isEmpty, !output.extent.isInfinite else {
                 throw EmulsionError.unsupportedPhoto
             }

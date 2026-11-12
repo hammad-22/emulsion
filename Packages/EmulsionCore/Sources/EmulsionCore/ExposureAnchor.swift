@@ -6,6 +6,14 @@ import Foundation
 /// 48 MP ProRAW carries 2–3 stops of its brightening in the gain table, which the linear develop
 /// bypasses. The anchor is an estimate that follows the profile, not a measurement of the scene.
 enum ExposureAnchor {
+    /// How a develop gets its anchor: measured from the file, a value already known for it, or
+    /// none (tests and timings).
+    enum Choice {
+        case measured
+        case known(stops: Double)
+        case none
+    }
+
     /// Long edge of the two thumbnails compared. Fixed, so previews and exports get the same anchor.
     static let thumbnailLongEdge: CGFloat = 256
     private static let midGray = 0.18

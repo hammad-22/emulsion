@@ -245,7 +245,7 @@ struct ExposureAnchorRealFileTests {
             let data = try Data(contentsOf: url)
             let raw = try RAWDevelopSupport.filter(data)
             let megapixels = Double(raw.nativeSize.width * raw.nativeSize.height) / 1e6
-            let before = try developer.develop(data, maxDimension: edge, anchorsExposure: false)
+            let before = try developer.develop(data, maxDimension: edge, anchor: .none)
             let after = try developer.develop(data, maxDimension: edge)
             let again = try developer.develop(data, maxDimension: Self.secondPreviewLongEdge)
             let anchor = after.exposureAnchorStops
@@ -329,7 +329,7 @@ struct RAWDevelopProofRenders {
             let name = url.deletingPathExtension().lastPathComponent
             let data = try Data(contentsOf: url)
             try Self.write(
-                developer.develop(data, maxDimension: Self.longEdge, anchorsExposure: false),
+                developer.develop(data, maxDimension: Self.longEdge, anchor: .none),
                 to: folder.appendingPathComponent("\(name)-anchor-before.png"))
             let anchored = try developer.develop(data, maxDimension: Self.longEdge)
             print("\(name): exposure anchor \(String(format: "%+.3f", anchored.exposureAnchorStops)) stops")
