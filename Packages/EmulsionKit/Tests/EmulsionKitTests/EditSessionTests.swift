@@ -40,6 +40,18 @@ struct EditSessionTests {
         #expect(session.adjustments == photo.adjustments)
     }
 
+    @Test func resetReturnsTheWhiteBalanceToAsShot() async throws {
+        let library = TestLibrary()
+        let photo = try await library.store.add(TestRAW.tungstenTaggedAsDaylight, fileExtension: "dng")
+        let session = EditSession(photo: photo, store: library.store)
+        session.adjustments.whiteBalance = CameraWhiteBalance(temperature: 3200, tint: 0)
+        #expect(session.isEdited)
+
+        session.reset()
+
+        #expect(session.adjustments.whiteBalance == nil)
+    }
+
     @Test func aSessionIsEditedUntilReset() async throws {
         let library = TestLibrary()
         let photo = try await library.store.add(TestPhoto.jpeg, fileExtension: "jpg")
