@@ -113,7 +113,7 @@ public struct FilmModel: Sendable, Equatable {
         let exposure = simd_max(sensitivity * light, .zero)
         let halated = Halation.exposureWithHalation(exposure, glow: simd_max(glow, .zero), layerReturn: k)
         // The light the layers see, with the halation's change of exposure (for chroma retention).
-        let s = light + sensitivity.inverse * (halated - exposure)
+        let s = light + sensitivity.inverse * simd_max(halated - exposure, .zero)
         let perLayer = system(logExposure: Self.logExposure(halated), lights: lights, grain: grain)
         let m = max(s.max(), 1e-7)
         let w = highlightChromaRetention * Self.smoothstep(1.5, 4.0, log2(m / 0.18))

@@ -106,7 +106,9 @@ LayerExposure exposeLayers(float3 p, float3 glow, float3 k, float3 i0, float3 i1
     float3 q=exposedLight(p,negOff,misc);
     float3 E=max(layerExposure(q,m0,m1,m2),0.0);
     float3 halated=exposureWithHalation(E,max(glow,0.0)*exp2(negOff.w),k);
-    float3 dE=halated-E;
+    // Only the light halation adds is carried to q: where it lowers a layer's exposure (the core of
+    // a small source), chroma retention would otherwise tint a clipped highlight.
+    float3 dE=max(halated-E,0.0);
     return {q+float3(dot(i0,dE),dot(i1,dE),dot(i2,dE)),logExposure(halated)};
 }
 
