@@ -17,7 +17,8 @@ Derivation (both files):
 EMULSION_REGENERATE_SCENES=<folder with the originals> swift test --filter regeneratesFrozenScenes
 ```
 
-run from `Packages/EmulsionCore`: `Developer.develop(data, maxDimension: 960)`, then
+run from `Packages/EmulsionCore`: `Developer.develop(data, maxDimension: 960)` (exposure anchor
+included since MOV-134: +1.01 stops on the iPhone file, +0.52 on the Pixel file), then
 `Renderer.resized` (Lanczos) to a long edge of 240 px with an integral extent, rendered to half
 float in the working space. The test prints sizes and SHA-256 of source and output.
 
@@ -27,8 +28,8 @@ float in the working space. The test prints sizes and SHA-256 of source and outp
 | `pixel8pro-dng.tiff` | `Pixel8Pro_CC0.dng` (45,101,750 bytes) | https://raw.pixls.us, id 7751 | CC0 | `45420c595401547cca950ae58d552bc82b32d31ce1d58c082df33004016197f5` | 240×180 | Look on a non-Apple phone DNG: default look and a graded edit |
 
 Derived file SHA-256 (macOS 27.2.1, Apple M4 Max): `iphone12pro-proraw.tiff`
-`8be2eaf60c8acd7d7d77479876f1e60bb10918ccf3c1a64c25dd8d205af3ca64`, `pixel8pro-dng.tiff`
-`a8f08531ffa4400a3b63441f549c68a2a62ddc7a852fcc0b6f5426a05dec7617`.
+`b2f84a777b08a54a6a613d2dc35ba7708b58a602f17d00972155d4600d02ee92`, `pixel8pro-dng.tiff`
+`576bb7c2450d0123702485deb592d5607c24c45499e1a6c2175a8dcce86efd33`.
 
 Notes:
 

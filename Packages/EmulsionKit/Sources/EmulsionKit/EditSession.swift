@@ -28,7 +28,7 @@ public final class EditSession {
     /// True while there is something for `reset()` to undo.
     public var isEdited: Bool { adjustments != .defaults(for: photo.id) }
 
-    /// Back to the default look; the photo keeps its grain pattern.
+    /// Back to the default look, with the RAW white balance as shot; the photo keeps its grain pattern.
     public func reset() {
         adjustments = .defaults(for: photo.id)
     }
