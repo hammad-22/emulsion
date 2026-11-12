@@ -87,3 +87,31 @@ enum TestLooks {
         try #require(CuratedLooks.recipes.dropFirst(index).first)
     }
 }
+
+/// A synthetic DNG of a mid-gray and a red patch lit by a 2856 K tungsten light, which the
+/// camera tagged as daylight (D65): as shot it develops with a strong cast.
+enum TestRAW {
+    static let tungstenKelvin = 2856.0
+    static let chart = PatchChart([SIMD3(repeating: 0.18), SIMD3(0.4, 0.05, 0.03)])
+    static let grayCentre = (x: chart.cell / 2, y: chart.cell / 2)
+    static let tungstenTaggedAsDaylight = RAWDevelopChart.dng(
+        .linearRGB, chart: chart, light: SyntheticDNG.planckianChromaticity(kelvin: tungstenKelvin),
+        taggedLight: SyntheticDNG.d65Chromaticity)
+
+    /// 8-bit RGB of the pixel at (x, y), y = 0 the top row.
+    static func pixel(_ image: CGImage, x: Int, y: Int) throws -> SIMD3<Int> {
+        var rgba = [UInt8](repeating: 0, count: 4)
+        let context = try #require(
+            CGContext(
+                data: &rgba, width: 1, height: 1, bitsPerComponent: 8, bytesPerRow: 4, space: CGColorSpace(name: CGColorSpace.displayP3)!,
+                bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue))
+        context.draw(image, in: CGRect(x: -x, y: y - image.height + 1, width: image.width, height: image.height))
+        return SIMD3(Int(rgba[0]), Int(rgba[1]), Int(rgba[2]))
+    }
+
+    /// How far the gray patch is from neutral: the largest difference between its channels, in codes.
+    static func grayCast(_ image: CGImage) throws -> Int {
+        let gray = try pixel(image, x: grayCentre.x, y: grayCentre.y)
+        return gray.max() - gray.min()
+    }
+}

@@ -42,10 +42,38 @@ public enum RAWDevelopChart {
     public static func dng(
         _ mosaic: SyntheticDNG.Mosaic, chart: PatchChart, baselineStops: Double = 0, profile: SyntheticDNG.Profile? = nil
     ) -> Data {
-        let sensor = PatchChart(cameraValues(chart.patches), cell: chart.cell, columns: chart.columns)
+        file(
+            mosaic, chart: chart, sensor: cameraValues(chart.patches), asShotNeutral: SyntheticDNG.daylightNeutral,
+            baselineStops: baselineStops, profile: profile)
+    }
+
+    /// Camera values of `scene` (linear sRGB reflectances) lit by a light of chromaticity `light`
+    /// instead of D65, at the same luminance: each D65 value scaled per channel by the ratio of
+    /// the two lights in camera space (von Kries in camera space). Exact for neutral patches; for
+    /// chromatic ones a simple model, not a spectral simulation.
+    public static func cameraValues(_ scene: [SIMD3<Double>], light: SIMD2<Double>) -> [SIMD3<Double>] {
+        let lightRatio =
+            SyntheticDNG.camera(chromaticity: light, cameraFromXYZ: camera)
+            / SyntheticDNG.camera(chromaticity: SyntheticDNG.d65Chromaticity, cameraFromXYZ: camera)
+        return cameraValues(scene).map { $0 * lightRatio }
+    }
+
+    /// A DNG of `chart` lit by a light of chromaticity `light`, whose AsShotNeutral is the camera
+    /// neutral of `taggedLight`: the light the camera believed it saw.
+    public static func dng(_ mosaic: SyntheticDNG.Mosaic, chart: PatchChart, light: SIMD2<Double>, taggedLight: SIMD2<Double>) -> Data {
+        file(
+            mosaic, chart: chart, sensor: cameraValues(chart.patches, light: light),
+            asShotNeutral: SyntheticDNG.neutral(chromaticity: taggedLight, cameraFromXYZ: camera))
+    }
+
+    private static func file(
+        _ mosaic: SyntheticDNG.Mosaic, chart: PatchChart, sensor values: [SIMD3<Double>], asShotNeutral: SIMD3<Double>,
+        baselineStops: Double = 0, profile: SyntheticDNG.Profile? = nil
+    ) -> Data {
+        let sensor = PatchChart(values, cell: chart.cell, columns: chart.columns)
         return SyntheticDNG(
             mosaic: mosaic, width: chart.width, height: chart.height, baselineExposureStops: baselineStops,
-            asShotNeutral: SyntheticDNG.daylightNeutral, cameraFromXYZ: camera, profile: profile
+            asShotNeutral: asShotNeutral, cameraFromXYZ: camera, profile: profile
         ).data { sensor.value(x: $0, y: $1) }
     }
 }

@@ -15,8 +15,10 @@ public actor RenderService {
     /// The same renderer once `prepareViewfinder` has run, for frames rendered off the actor.
     /// `Renderer` is immutable apart from its `CIContext`, which is thread-safe.
     private nonisolated let viewfinderRenderer = Mutex<Renderer?>(nil)
-    private var previews: [String: Negative] = [:]
-    /// Least recently developed first; the oldest preview is dropped past `maxCachedPreviews`.
+    /// One develop per photo and size, with the RAW white balance it was developed at: another
+    /// white balance replaces it, so dragging the temperature doesn't fill the cache.
+    private var previews: [String: (negative: Negative, whiteBalance: CameraWhiteBalance?)] = [:]
+    /// Least recently used first; the oldest preview is dropped past `maxCachedPreviews`.
     private var lruKeys: [String] = []
     private let maxCachedPreviews = 12
     /// Preview sizes are rounded up to this step, so resizes (iPhone Duo fold/unfold, Mac
@@ -46,24 +48,29 @@ public actor RenderService {
         return new
     }
 
-    private func negative(_ url: URL, maxDimension requested: CGFloat) throws -> Negative {
+    private func negative(_ url: URL, maxDimension requested: CGFloat, whiteBalance: CameraWhiteBalance?) throws -> Negative {
         let maxDimension = (requested / previewSizeStep).rounded(.up) * previewSizeStep
         let key = "\(url.absoluteString)@\(Int(maxDimension))"
-        if let cached = previews[key] {
-            lruKeys.removeAll { $0 == key }
-            lruKeys.append(key)
-            return cached
+        if let cached = previews[key], cached.whiteBalance == whiteBalance {
+            markUsed(key)
+            return cached.negative
         }
         let renderer = try engine()
-        let developed = try develop(url, maxDimension: maxDimension)
+        let developed = try develop(url, maxDimension: maxDimension, whiteBalance: whiteBalance)
+        developCount += 1
         // Draft RAW decode may come back larger than asked; fit it exactly. Then render it
         // once into a half-float buffer, so slider moves don't redo the RAW develop or the
         // JPEG inversion (Core Image doesn't cache intermediates for us).
         let fitted = try renderer.materialize(renderer.resized(developed, longestEdge: maxDimension))
-        previews[key] = fitted
-        lruKeys.append(key)
+        previews[key] = (fitted, whiteBalance)
+        markUsed(key)
         if lruKeys.count > maxCachedPreviews { previews[lruKeys.removeFirst()] = nil }
         return fitted
+    }
+
+    private func markUsed(_ key: String) {
+        lruKeys.removeAll { $0 == key }
+        lruKeys.append(key)
     }
 
     /// A rendered preview. Throws `CancellationError` if the caller moved on while it waited
@@ -72,7 +79,8 @@ public actor RenderService {
         if let cached = cachedThumbnail(url, adjustments, maxDimension: maxDimension) { return cached }
         try Task.checkCancellation()
         let renderer = try engine()
-        let image = try renderer.cgImage(renderer.render(negative(url, maxDimension: maxDimension), adjustments))
+        let image = try renderer.cgImage(
+            renderer.render(negative(url, maxDimension: maxDimension, whiteBalance: adjustments.whiteBalance), adjustments))
         thumbnails.keep(image, url, adjustments, maxDimension: maxDimension)
         latestRenders.keep(image, url, maxDimension: maxDimension)
         return image
@@ -156,14 +164,16 @@ public actor RenderService {
     /// Full-resolution develop and encode, look baked in.
     public func export(_ url: URL, _ adjustments: Adjustments, format: Renderer.ExportFormat) throws -> Data {
         let renderer = try engine()
-        let full = try develop(url, maxDimension: nil)
+        let full = try develop(url, maxDimension: nil, whiteBalance: adjustments.whiteBalance)
         return try renderer.export(renderer.render(full, adjustments), format: format)
     }
 
-    /// Develops the file with its exposure anchor, measuring and remembering it the first time.
-    private func develop(_ url: URL, maxDimension: CGFloat?) throws -> Negative {
+    /// Develops the file with its exposure anchor, measuring and remembering it the first time;
+    /// the anchor is measured as shot, so a white balance change reuses it.
+    private func develop(_ url: URL, maxDimension: CGFloat?, whiteBalance: CameraWhiteBalance?) throws -> Negative {
         let developed = try engine().developer.develop(
-            Data(contentsOf: url), maxDimension: maxDimension, exposureAnchorStops: exposureAnchors[url])
+            Data(contentsOf: url), maxDimension: maxDimension, whiteBalance: whiteBalance,
+            exposureAnchorStops: exposureAnchors[url])
         exposureAnchors[url] = developed.exposureAnchorStops
         return developed
     }
@@ -179,9 +189,10 @@ public actor RenderService {
         latestRenders.remove(url)
     }
 
-    /// Cache keys, least recently developed first; for tests.
+    /// Cache keys, least recently used first; for tests.
     var cachedPreviewKeys: [String] { lruKeys }
-
+    /// Previews developed so far, cache misses; for tests.
+    private(set) var developCount = 0
     /// The file's remembered exposure anchor; for tests.
     func exposureAnchor(_ url: URL) -> Double? { exposureAnchors[url] }
 }

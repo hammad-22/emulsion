@@ -58,15 +58,23 @@ public struct Developer {
     }
 
     /// `maxDimension` develops a smaller image for fast previews. RAW files whose DNG profile
-    /// brightens through a gain table get the same `exposureAnchorStops` at any size. nil
-    /// `exposureAnchorStops` measures it; a caller that already developed this file passes the
-    /// anchor that develop reported, which skips the measurement. Non-RAW data ignores it.
-    public func develop(_ data: Data, maxDimension: CGFloat? = nil, exposureAnchorStops: Double? = nil) throws -> Negative {
-        try develop(data, maxDimension: maxDimension, anchor: exposureAnchorStops.map { .known(stops: $0) } ?? .measured)
+    /// brightens through a gain table get the same `exposureAnchorStops` at any size and any
+    /// white balance. `whiteBalance` (clamped to Apple's ranges) replaces the file's as-shot white
+    /// balance; nil keeps it, and photos that aren't RAW ignore it. nil `exposureAnchorStops`
+    /// measures the anchor (as shot); a caller that already developed this file passes the anchor
+    /// that develop reported, which skips the measurement. Non-RAW data ignores it.
+    public func develop(
+        _ data: Data, maxDimension: CGFloat? = nil, whiteBalance: CameraWhiteBalance? = nil, exposureAnchorStops: Double? = nil
+    ) throws -> Negative {
+        try develop(
+            data, maxDimension: maxDimension, whiteBalance: whiteBalance,
+            anchor: exposureAnchorStops.map { .known(stops: $0) } ?? .measured)
     }
 
-    func develop(_ data: Data, maxDimension: CGFloat?, anchor: ExposureAnchor.Choice) throws -> Negative {
-        if let type = Self.rawTypeIdentifier(of: data), let raw = CIRAWFilter(imageData: data, identifierHint: type) {
+    func develop(
+        _ data: Data, maxDimension: CGFloat?, whiteBalance: CameraWhiteBalance? = nil, anchor: ExposureAnchor.Choice
+    ) throws -> Negative {
+        if let raw = Self.rawFilter(data) {
             Self.bypassAppleRendering(raw)
             var anchorStops = 0.0
             var measuresAnchor = false
@@ -85,6 +93,9 @@ public struct Developer {
             }
             // Draft mode stays off after the anchor's thumbnails: switching it on decodes the file again.
             Self.applyPreviewScale(raw, maxDimension: maxDimension, allowsDraftMode: !measuresAnchor)
+            // After the anchor, which stays measured as shot whatever the white balance. Setting it
+            // here doesn't make the filter decode the file again (measured, MOV-10).
+            if let whiteBalance { Self.apply(whiteBalance, to: raw) }
             guard var output = raw.outputImage, !output.extent.isEmpty, !output.extent.isInfinite else {
                 throw EmulsionError.unsupportedPhoto
             }
@@ -107,6 +118,25 @@ public struct Developer {
         return try sceneFromDisplay(Self.normalized(image))
     }
 
+    /// The white balance Apple's RAW decoder reads from the file (DNG AsShotNeutral), before any
+    /// change; nil when `data` isn't RAW.
+    public static func asShotWhiteBalance(of data: Data) -> CameraWhiteBalance? {
+        rawFilter(data).map { CameraWhiteBalance(temperature: Double($0.neutralTemperature), tint: Double($0.neutralTint)) }
+    }
+
+    /// Apple's RAW decoder for `data`, or nil when it isn't RAW.
+    private static func rawFilter(_ data: Data) -> CIRAWFilter? {
+        rawTypeIdentifier(of: data).flatMap { CIRAWFilter(imageData: data, identifierHint: $0) }
+    }
+
+    /// Sets the decoder's neutral from a temperature and tint, which Apple converts to a camera
+    /// neutral and applies in the camera's colour space.
+    static func apply(_ whiteBalance: CameraWhiteBalance, to raw: CIRAWFilter) {
+        let clamped = whiteBalance.clamped()
+        raw.neutralTemperature = Float(clamped.temperature)
+        raw.neutralTint = Float(clamped.tint)
+    }
+
     /// Decodes at most `maxDimension` on the long edge (nil: full size), in RAW draft mode when
     /// that's smaller and `allowsDraftMode`.
     static func applyPreviewScale(_ raw: CIRAWFilter, maxDimension: CGFloat?, allowsDraftMode: Bool) {
@@ -119,9 +149,10 @@ public struct Developer {
     /// Bypass Apple's rendering: no tone boost, local tone mapping, extra contrast, gamut
     /// mapping or shadow bias. What remains is demosaiced, white-balanced, linear scene light
     /// scaled by the file's BaselineExposure (the exposure anchor comes after); noise reduction,
-    /// sharpening, lens correction and the decoder version stay at the file's defaults. Measured
-    /// on synthetic DNGs and 25 real files (MOV-79, `RAWDevelopTests`).
-    private static func bypassAppleRendering(_ raw: CIRAWFilter) {
+    /// sharpening, lens correction and the decoder version stay at the file's defaults (the
+    /// opt-in RAW decoder 9 is deliberately not used: docs/ENGINE.md, MOV-10). Measured on
+    /// synthetic DNGs and 25 real files (MOV-79, `RAWDevelopTests`).
+    static func bypassAppleRendering(_ raw: CIRAWFilter) {
         raw.boostAmount = 0
         // 1 is neutral (below 1 darkens the shadows; the file default is 0.9). It has no effect
         // while boost is 0 (pixel-identical develop, MOV-134) and only matters for the exposure
