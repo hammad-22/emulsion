@@ -75,6 +75,40 @@ enum ColorReferences {
         try JSONDecoder().decode(VideoTable.self, from: reference("video-signal")).samples
     }
 
+    /// CIEDE2000 references from `References/delta-e.json` (MOV-37): Sharma, Wu & Dalal (2005)
+    /// Lab pairs, Display P3 encoded pairs and the 24-patch chart in the working space.
+    struct DeltaE: Decodable, Sendable {
+        struct LabPair: Decodable, Sendable {
+            let pair: Int
+            let lab1: SIMD3<Double>
+            let lab2: SIMD3<Double>
+            let deltaE: Double
+        }
+        struct P3Pair: Decodable, Sendable {
+            let label: String
+            let rgb1: SIMD3<Double>
+            let rgb2: SIMD3<Double>
+            let lab1: SIMD3<Double>
+            let lab2: SIMD3<Double>
+            let deltaE: Double
+        }
+        struct Patch: Decodable, Sendable {
+            let name: String
+            let linear: SIMD3<Double>
+        }
+        let labPairs: [LabPair]
+        let p3Pairs: [P3Pair]
+        let chart24: [Patch]
+    }
+
+    static func deltaE() throws -> DeltaE { try deltaETable.get() }
+
+    private static let deltaETable: Result<DeltaE, any Error> = Result {
+        let decoder = JSONDecoder()
+        decoder.keyDecodingStrategy = .convertFromSnakeCase
+        return try decoder.decode(DeltaE.self, from: reference("delta-e"))
+    }
+
     private static func reference(_ name: String) throws -> Data {
         guard let url = Bundle.module.url(forResource: name, withExtension: "json", subdirectory: "References") else {
             throw CocoaError(.fileNoSuchFile)

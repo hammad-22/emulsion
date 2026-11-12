@@ -37,7 +37,25 @@ jobs:
 
       - name: Engine tests
         working-directory: Packages/EmulsionCore
+        env:
+          EMULSION_REGRESSION_REPORT: ${{ runner.temp }}/visual-regression
+          EMULSION_REGRESSION_IMAGES: all
         run: swift test
+
+      - name: Visual regression summary
+        if: always()
+        run: |
+          REPORT="$RUNNER_TEMP/visual-regression/report.md"
+          if [ -f "$REPORT" ]; then cat "$REPORT" >> "$GITHUB_STEP_SUMMARY"; fi
+
+      - name: Upload visual regression report
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02  # v4, MIT
+        with:
+          name: visual-regression-${{ github.run_id }}-${{ github.run_attempt }}
+          path: ${{ runner.temp }}/visual-regression
+          if-no-files-found: warn
+          retention-days: 14
 
       - name: App logic tests (EmulsionKit)
         working-directory: Packages/EmulsionKit
