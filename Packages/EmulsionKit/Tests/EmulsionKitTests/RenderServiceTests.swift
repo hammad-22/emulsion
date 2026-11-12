@@ -192,6 +192,22 @@ extension RenderServiceTests {
         #expect(await service.developCount == 1, "printer lights only re-run the look")
     }
 
+    /// The anchor is measured as shot, so a new white balance develops again with the file's anchor.
+    @Test func newWhiteBalanceReusesTheExposureAnchor() async throws {
+        let library = TestLibrary()
+        let url = library.store.url(for: try await library.store.add(TestPhoto.anchoredRAW, fileExtension: "dng"))
+        let service = library.renderService
+
+        _ = try await service.image(url, .neutral, maxDimension: 512)
+        let anchor = try #require(await service.exposureAnchor(url))
+        #expect(anchor != 0)
+        let reused = try await service.image(url, Self.tungstenWhiteBalance, maxDimension: 512)
+        #expect(await service.developCount == 2, "the white balance developed again")
+        #expect(await service.exposureAnchor(url) == anchor)
+        let measured = try await TestLibrary().renderService.image(url, Self.tungstenWhiteBalance, maxDimension: 512)
+        #expect(TestPixels.rgba(reused) == TestPixels.rgba(measured))
+    }
+
     @Test func exportDevelopsAtTheWhiteBalance() async throws {
         let library = TestLibrary()
         let url = library.store.url(for: try await library.store.add(TestRAW.tungstenTaggedAsDaylight, fileExtension: "dng"))

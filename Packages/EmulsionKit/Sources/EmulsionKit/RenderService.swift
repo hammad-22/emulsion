@@ -25,8 +25,8 @@ public actor RenderService {
     /// Preview sizes are rounded up to this step, so resizes (iPhone Duo fold/unfold, Mac
     /// windows) reuse a cached develop instead of decoding the RAW again for every size.
     private let previewSizeStep: CGFloat = 256
-    /// Each file's exposure anchor from its first develop, so later develops (other sizes, export)
-    /// skip measuring it. In memory only; keeping it on the photo record is a follow-up.
+    /// Each file's exposure anchor from its first develop, so later develops (other sizes, white
+    /// balances, export) skip measuring it. In memory only; keeping it on the photo record is a follow-up.
     private var exposureAnchors: [URL: Double] = [:]
     private nonisolated let thumbnails: ThumbnailCache
     private nonisolated let latestRenders: LatestRenderCache

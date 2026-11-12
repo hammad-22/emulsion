@@ -220,7 +220,8 @@ struct ExposureAnchorDevelopTests {
             let measured = RAWDevelopSupport.Developed(chart: Self.chart, try Self.developer.develop(data, maxDimension: maxDimension))
             let anchor = measured.negative.exposureAnchorStops
             #expect(anchor != 0)
-            let given = RAWDevelopSupport.Developed(chart: Self.chart, try Self.developer.develop(data, maxDimension: maxDimension, exposureAnchorStops: anchor))
+            let given = RAWDevelopSupport.Developed(
+                chart: Self.chart, try Self.developer.develop(data, maxDimension: maxDimension, exposureAnchorStops: anchor))
             #expect(given.negative.exposureAnchorStops == anchor)
             if maxDimension == nil {
                 #expect(given.pixels == measured.pixels)
