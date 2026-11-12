@@ -27,7 +27,7 @@ struct GrainTests {
     // MARK: Noise field
 
     /// Per channel on 1 MP: mean, variance, cross-channel and lag-1 correlation. Measured (seed 3):
-    /// |mean| ≤ 0.0032, variance 0.998–1.001, excess kurtosis −0.30…−0.31 (a sum of four uniforms:
+    /// |mean| ≤ 0.0008, variance 0.998–1.001, excess kurtosis −0.299…−0.304 (a sum of four uniforms:
     /// −0.3), |correlations| ≤ 0.002.
     @Test func noiseIsZeroMeanUnitVarianceAndIndependent() throws {
         let field = try noise(seed: 3)
@@ -55,7 +55,7 @@ struct GrainTests {
     }
 
     /// Same seed, same field; neighbouring whole seeds 0…100 and a half seed give independent
-    /// fields (the hash once dropped the seed's integer part). Measured worst |r| 0.0067.
+    /// fields (the hash once dropped the seed's integer part). Measured worst |r| 0.0047.
     @Test func noiseIsDeterministicAndDecorrelatedAcrossSeeds() throws {
         let side = 256
         func pattern(_ seed: Double) throws -> [Double] { try noise(seed: seed, side: side).flatMap { [$0.x, $0.y, $0.z] } }
@@ -75,8 +75,50 @@ struct GrainTests {
         #expect(worst < 0.05, "neighbouring seeds 0…100 must be independent")
     }
 
+    /// The noise is integer arithmetic up to its last multiply, so it is the same on every device:
+    /// the GPU field equals this CPU copy of the kernel (pcg4d) to float rounding. The float hash it
+    /// replaced differed from its own CPU copy in 38,223 of 38,400 pixels (one fused multiply-add
+    /// changes most of its values), so a GPU that rounds differently would have rendered other grain.
+    /// Measured: worst 0 (bit-identical) on 256 × 256 including negative coordinates, seeds 0, 3, 1023.
+    @Test(arguments: [0.0, 3, 1023])
+    func noiseIsTheSameOnEveryDevice(seed: Double) throws {
+        let extent = CGRect(x: -128, y: -64, width: 256, height: 256)
+        let gpu = Fixtures.linear(try EmulsionTestCase.kernels.grainNoise(extent, seed: seed))
+        var worst = 0.0
+        for row in 0..<256 {
+            for column in 0..<256 {
+                let cpu = Self.referenceNoise(x: Int32(column) - 128, y: Int32(row) - 64, seed: Float(seed))
+                worst = max(worst, simd_reduce_max(simd_abs(SIMD3<Double>(cpu) - gpu[row * 256 + column])))
+            }
+        }
+        print(String(format: "GRAIN noise GPU vs integer reference, seed %.0f: worst %.3g", seed, worst))
+        #expect(worst <= 1e-6)
+    }
+
+    /// The kernel `grainNoise` at pixel (x, y), computed on the CPU.
+    private static func referenceNoise(x: Int32, y: Int32, seed: Float) -> SIMD3<Float> {
+        func pcg4d(_ input: SIMD4<UInt32>) -> SIMD4<UInt32> {
+            var v = input &* 1_664_525 &+ 1_013_904_223
+            func mix() {
+                v.x &+= v.y &* v.w
+                v.y &+= v.z &* v.x
+                v.z &+= v.x &* v.y
+                v.w &+= v.y &* v.z
+            }
+            mix()
+            v ^= v &>> 16
+            mix()
+            return v
+        }
+        return SIMD3(
+            (0..<3).map { c in
+                let a = pcg4d(SIMD4(UInt32(bitPattern: x), UInt32(bitPattern: y), seed.bitPattern, UInt32(c))) &>> 10
+                return (Float(2 * (a.x + a.y + a.z + a.w) + 4) / 4_194_304 - 4) * (3 / Float(4)).squareRoot()
+            })
+    }
+
     /// White at the pixel scale: the radially averaged periodogram (10 bands to 0.5 cycles/pixel) is
-    /// flat. Measured: every band within 3.1% of the variance, all channels.
+    /// flat. Measured: every band within 1.7% of the variance, all channels.
     @Test func noiseSpectrumIsWhite() throws {
         let field = try noise(seed: 3)
         for c in 0..<3 {
@@ -145,7 +187,7 @@ struct GrainTests {
     // MARK: Through the print
 
     /// Flat neutral patches at 1600×1200, grain 1: rendered display σ per channel matches the Swift
-    /// mirror's Monte Carlo prediction within 5% (measured worst 0.5%), and follows the table: it is
+    /// mirror's Monte Carlo prediction within 5% (measured worst 0.3%), and follows the table: it is
     /// not a constant across exposure.
     @Test func displayGrainFollowsTheMirroredFilm() throws {
         let (w, h) = (1600, 1200)
@@ -171,9 +213,9 @@ struct GrainTests {
     /// reduced to each preview size by an area (box) average. For a whole-number scale the box is
     /// Selwyn's aperture; at fractional scales its partial pixels keep only scale²·Σw² (0.81, 0.75,
     /// 0.62) of a white field's variance relative to a continuous aperture, so the ratio is taken
-    /// with that known factor removed. Measured at 1179, 1600, 2556 px: 1.010, 1.010, 1.004; against
-    /// Selwyn's prediction from the full-size σ 1.007, 1.006, 1.005 (raw box 1.12, 1.16, 1.27;
-    /// Lanczos 1.12, 1.15, 1.12: it keeps only 76–80% of a white field's variance).
+    /// with that known factor removed. Measured at 1179, 1600, 2556 px: 1.005, 1.004, 1.000; against
+    /// Selwyn's prediction from the full-size σ 1.007, 1.006, 1.004 (raw box 1.11, 1.16, 1.27;
+    /// Lanczos 1.11, 1.14, 1.12: it keeps only 76–80% of a white field's variance).
     @Test func previewAndExportCarryMatchingGrain() throws {
         for r in try GrainMeasurement.previewExport(renderer) {
             print(

@@ -24,7 +24,7 @@ struct HalationProof {
 
         let pointOff = try EmulsionTestCase.render(point, off)
         try EmulsionTestCase.writePNG(pointOff, to: directory.appending(path: "highlight-point-halation0.png"))
-        for backing in [AntihalationBacking.remJet, .none] {
+        for backing in [AntihalationBacking.remJet, .unbacked] {
             let on = HalationTests.adjustments(1, backing)
             let pointOn = try EmulsionTestCase.render(point, on)
             try EmulsionTestCase.writePNG(pointOn, to: directory.appending(path: "highlight-point-halation1-\(backing).png"))

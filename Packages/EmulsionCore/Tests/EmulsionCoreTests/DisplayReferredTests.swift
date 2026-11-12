@@ -104,7 +104,7 @@ struct DisplayReferredTests {
         }
         let negative = try developed(picture)
         var on = Adjustments.neutral
-        (on.halation, on.backing) = (1, .none)
+        (on.halation, on.backing) = (1, .unbacked)
         let with = EmulsionTestCase.codes(try renderer.render(negative, on))
         let without = EmulsionTestCase.codes(try renderer.render(negative, .neutral))
         let ring = EmulsionTestCase.pixel(x: 214, y: 200, width: size)  // ~8 px outside the disc edge
@@ -177,10 +177,11 @@ struct DisplayReferredTests {
         let colors = randomColors(count: 200, lowest: 0.35, span: 0.3)
         let negative = try developed(Fixtures.row(colors, space: DisplayFixtures.displayP3), materialized: false)
         var a = Adjustments.neutral
-        (a.halation, a.backing, a.grain, a.seed, a.exposure, a.color) = (1, .none, 1, 4, 0.4, 0.5)
+        (a.halation, a.backing, a.grain, a.seed, a.exposure, a.color) = (1, .unbacked, 1, 4, 0.4, 0.5)
         let gpu = EmulsionTestCase.codes(try renderer.render(negative, a))
         let extent = negative.image.extent
-        let glows = Fixtures.linear(try EmulsionTestCase.kernels.halationGlow(of: negative.image, saturation: a.printSaturation))
+        let glows = Fixtures.linear(
+            try EmulsionTestCase.kernels.halationGlow(of: negative.image, model: FilmLook.stock, saturation: a.printSaturation))
         let noise = Fixtures.linear(try EmulsionTestCase.kernels.grainNoise(extent, seed: a.seed))
         let estimates = Fixtures.encodedFloats(negative.image, space: SceneFixtures.linearP3)
         let k = Halation.layerReturn(amount: a.halation, backing: a.backing)

@@ -22,7 +22,7 @@ enum Grain {
     static let datasheetApertureDiameterMicrometres = 48.0
 
     /// σ_D at 48 µm per layer (red, green, blue) for each layer's log10 exposure: the kernel's
-    /// `grainSigma`, a sum over the seven segments.
+    /// `densitySigma` before the per-pixel scale, a sum over the seven segments.
     static func sigmaD48(logExposure: SIMD3<Double>) -> SIMD3<Double> {
         let rows = knotValues
         var sigma = rows[0]
@@ -40,8 +40,9 @@ enum Grain {
         (Double.pi).squareRoot() * datasheetApertureDiameterMicrometres / 2 / p
     }
 
-    /// Density standard deviation per pixel and layer. `amount` 1 is the datasheet's granularity on
-    /// the assumed frame; lower values are an artistic reduction (equivalently a wider frame).
+    /// Density standard deviation per pixel and layer (kernel `densitySigma`). `amount` 1 is the
+    /// datasheet's granularity on the assumed frame; lower values are an artistic reduction
+    /// (equivalently a wider frame).
     static func densitySigma(logExposure: SIMD3<Double>, amount: Double, longEdge: Double) -> SIMD3<Double> {
         sigmaD48(logExposure: logExposure) * scale(amount: amount, longEdge: longEdge)
     }

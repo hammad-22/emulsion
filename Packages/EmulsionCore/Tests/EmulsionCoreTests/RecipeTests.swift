@@ -80,18 +80,38 @@ struct RecipeTests {
         }
     }
 
-    /// The backing is optional in format 1: a recipe written before it existed keeps rem-jet, and an
-    /// unknown backing is rejected.
-    @Test func backingIsOptionalAndValidated() throws {
+    /// Format 2 stores the backing beside the numeric adjustments, in one `adjustments` object, and
+    /// requires it; an unknown backing is rejected.
+    @Test func formatTwoRequiresTheBacking() throws {
         var unbacked = Adjustments()
-        unbacked.backing = .none
-        let json = String(decoding: try Recipe(name: "Glow", adjustments: unbacked).encoded(), as: UTF8.self)
-        #expect(try Recipe.decode(Data(json.utf8)).adjustments.backing == AntihalationBacking.none)
+        unbacked.backing = .unbacked
+        let data = try Recipe(name: "Glow", adjustments: unbacked).encoded()
+        let object = try #require(try JSONSerialization.jsonObject(with: data) as? [String: Any])
+        #expect(object["formatVersion"] as? Int == 2)
+        let settings = try #require(object["adjustments"] as? [String: Any])
+        #expect(settings.count == 9 && settings["backing"] as? String == "none")
+        #expect(try Recipe.decode(data).adjustments.backing == .unbacked)
+        let json = String(decoding: data, as: UTF8.self)
         let withoutBacking = json.replacingOccurrences(of: "\"backing\" : \"none\",", with: "")
         #expect(withoutBacking != json)
-        #expect(try Recipe.decode(Data(withoutBacking.utf8)).adjustments.backing == .remJet)
+        #expect(throws: EmulsionError.invalidRecipe) { try Recipe.decode(Data(withoutBacking.utf8)) }
         let unknown = json.replacingOccurrences(of: "\"backing\" : \"none\"", with: "\"backing\" : \"felt\"")
         #expect(throws: EmulsionError.invalidRecipe) { try Recipe.decode(Data(unknown.utf8)) }
+    }
+
+    /// Format 1 has no backing and prints with rem-jet. A `backing` key in a format-1 file is an
+    /// unknown key: ignored, as every format-1 reader ignores it, so it cannot change rendering
+    /// without a version change (docs/RECIPES.md).
+    @Test func formatOneReadsAsRemJetAndIgnoresABacking() throws {
+        var unbacked = Adjustments()
+        unbacked.backing = .unbacked
+        let json = String(decoding: try Recipe(name: "Glow", adjustments: unbacked).encoded(), as: UTF8.self)
+        let formatOne = json.replacingOccurrences(of: "\"formatVersion\" : 2", with: "\"formatVersion\" : 1")
+        #expect(formatOne != json)
+        #expect(try Recipe.decode(Data(formatOne.utf8)).adjustments.backing == .remJet)
+        let withoutBacking = formatOne.replacingOccurrences(of: "\"backing\" : \"none\",", with: "")
+        #expect(withoutBacking != formatOne)
+        #expect(try Recipe.decode(Data(withoutBacking.utf8)).adjustments.backing == .remJet)
     }
 
     /// MOV-92: no film brand or stock names in the product.
@@ -109,8 +129,8 @@ struct RecipeTests {
     @Test func compatibilityAndCorruptionAreExplicit() throws {
         let data = try Recipe(name: "Test", adjustments: Adjustments()).encoded()
         let json = String(decoding: data, as: UTF8.self)
-        for version in [0, 2] {
-            let changed = Data(json.replacingOccurrences(of: "\"formatVersion\" : 1", with: "\"formatVersion\" : \(version)").utf8)
+        for version in [0, 3] {
+            let changed = Data(json.replacingOccurrences(of: "\"formatVersion\" : 2", with: "\"formatVersion\" : \(version)").utf8)
             #expect(throws: EmulsionError.recipeVersionUnsupported) { try Recipe.decode(changed) }
             #expect(throws: EmulsionError.recipeVersionUnsupported) { try JSONDecoder().decode(Recipe.self, from: changed) }
         }

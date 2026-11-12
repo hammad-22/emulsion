@@ -11,7 +11,7 @@ import simd
 /// The glow G is measured on its own (`Kernels.halationGlow`); the layer exposure it gives is
 /// E′ = `Halation.exposureWithHalation`, which the film kernels apply (checked against the mirror).
 struct HalationTests {
-    static func adjustments(_ amount: Double = 1, _ backing: AntihalationBacking = .none) -> Adjustments {
+    static func adjustments(_ amount: Double = 1, _ backing: AntihalationBacking = .unbacked) -> Adjustments {
         var a = Adjustments.neutral
         (a.halation, a.backing) = (amount, backing)
         return a
@@ -23,7 +23,7 @@ struct HalationTests {
 
     /// The glow G per pixel: blurred layer exposure before the exposure control, unclamped.
     static func glow(_ scene: CIImage, saturation: Double = 1) throws -> [SIMD3<Double>] {
-        Fixtures.linear(try EmulsionTestCase.kernels.halationGlow(of: scene, saturation: saturation))
+        Fixtures.linear(try EmulsionTestCase.kernels.halationGlow(of: scene, model: FilmLook.stock, saturation: saturation))
     }
 
     /// Layer exposure E per pixel, as the film kernels compute it: max(sensitivity · saturated light
@@ -44,7 +44,7 @@ struct HalationTests {
     }
 
     /// k / (1 + k) per layer: the share of a layer's exposure the glow replaces.
-    static func share(_ backing: AntihalationBacking = .none) -> SIMD3<Double> {
+    static func share(_ backing: AntihalationBacking = .unbacked) -> SIMD3<Double> {
         let k = Halation.layerReturn(amount: 1, backing: backing)
         return k / (1 + k)
     }
@@ -65,17 +65,26 @@ struct HalationTests {
     // MARK: Uniform fields
 
     /// Film speed is defined on uniform patches, which include their own halation: a uniform field
-    /// is unchanged everywhere, borders and corners included. Measured worst: 0.02 codes (16.0, none, 1).
-    @Test(arguments: [SIMD3<Float>(0.18, 0.18, 0.18), SIMD3(16, 16, 16), SIMD3(0.6, 0.2, 0.05), SIMD3(0.05, 0.3, 2)])
-    func uniformFieldsAreUnchanged(_ light: SIMD3<Float>) throws {
-        let field = Fixtures.image(width: 300, height: 200, space: SceneFixtures.linearP3) { _, _ in light }
+    /// is unchanged everywhere, borders and corners included. Measured worst: 0.0001 codes, every size.
+    /// Odd sizes too: their halving is extended by the edge pixel and reflected half a pixel inside
+    /// (`mirroredPyramid`); 255 × 171 is a thumbnail-sized frame, 801 × 601 one whose blurs are all halved.
+    @Test(
+        arguments: [SIMD3<Float>(0.18, 0.18, 0.18), SIMD3(16, 16, 16), SIMD3(0.6, 0.2, 0.05), SIMD3(0.05, 0.3, 2)],
+        [
+            SIMD2(300, 200), SIMD2(255, 171), SIMD2(801, 601),
+        ])
+    func uniformFieldsAreUnchanged(_ light: SIMD3<Float>, _ size: SIMD2<Int>) throws {
+        let field = Fixtures.image(width: size.x, height: size.y, space: SceneFixtures.linearP3) { _, _ in light }
         let plain = try Self.codes(field, Self.adjustments(0))
+        var worst = 0.0
         for backing in AntihalationBacking.allCases {
             for amount in [0.35, 1] {
-                let worst = Self.maxDifference(try Self.codes(field, Self.adjustments(amount, backing)), plain)
-                #expect(worst <= 0.5, "\(light) \(backing) \(amount): \(worst) codes")
+                let difference = Self.maxDifference(try Self.codes(field, Self.adjustments(amount, backing)), plain)
+                #expect(difference <= 0.5, "\(light) \(size) \(backing) \(amount): \(difference) codes")
+                worst = max(worst, difference)
             }
         }
+        print(String(format: "HALATION uniform %@ %dx%d: worst %.4f codes", "\(light)", size.x, size.y, worst))
     }
 
     /// Halation 0 adds exactly nothing, for both contracts and every backing: the film kernels get
@@ -103,7 +112,7 @@ struct HalationTests {
 
     /// Halation is linear in exposure, so doubling the scene light and opening one stop give the
     /// same picture. Measured: 0.0 codes; the luminance-threshold halation it replaced failed by 33–37.
-    @Test(arguments: ["highlight-point", "edge"], [AntihalationBacking.none, .remJet])
+    @Test(arguments: ["highlight-point", "edge"], [AntihalationBacking.unbacked, .remJet])
     func exposureCommutesWithHalation(_ sceneName: String, _ backing: AntihalationBacking) throws {
         let scene = sceneName == "edge" ? SceneFixtures.edge() : SceneFixtures.highlightPoint(size: 800)
         let doubled = Self.adjustments(1, backing)
@@ -146,7 +155,7 @@ struct HalationTests {
     /// re-tint it: a neutral highlight's halation renders the same at Color −1, 0 and +1 (measured
     /// worst 9e-5 codes), and around a coloured source the added exposure of every layer follows the
     /// mirror (the source's layer exposure at that saturation, convolved with the profile), within
-    /// the radial profile's 3% of the peak (measured worst: 0.012 at −1 and +1).
+    /// the radial profile's 1.5% of the peak (measured worst: 0.0011 at −1 and +1).
     @Test func colorDoesNotRetintTheGlow() throws {
         let neutral = HalationDisc(size: 400)
         var looks: [[SIMD3<Double>]] = []
@@ -164,7 +173,7 @@ struct HalationTests {
             a.color = color
             let profile = try radialProfile(disc, a)
             print(String(format: "HALATION Color %+.0f: worst deviation %.4f of the peak", color, profile))
-            #expect(profile <= 0.03, "Color \(color): worst deviation \(profile) of the peak")
+            #expect(profile <= 0.015, "Color \(color): worst deviation \(profile) of the peak")
         }
     }
 
@@ -219,7 +228,7 @@ struct HalationTests {
             #expect(abs(fit.weights[i] - Halation.weights[i]) <= 1e-7)
             #expect(abs(fit.sigmasT[i] - Halation.sigmasInBaseThicknesses[i]) <= 1e-7)
         }
-        #expect(abs(reference.geometry.returnedFraction - Halation.returnFraction) <= 5e-4)
+        #expect(abs(reference.geometry.returnedFraction - Halation.baseReturnFraction) <= 5e-4)
         #expect(abs(Halation.weights.sum() - 1) <= 1e-6, "unit volume")
         let exact = try reference.irradianceProfile()
         let deviations = zip(exact.rT, exact.encircled).map { abs(Halation.encircledEnergy(radiusInBaseThicknesses: $0) - $1) }
@@ -228,18 +237,21 @@ struct HalationTests {
     }
 
     /// Added red-layer exposure around a small disc against the mixture convolved with the disc,
-    /// at two image sizes, compared at the same frame fractions (resolution independence).
-    /// Deviation is relative to the reference peak outside the disc. Measured: 0.012 (800), 0.011 (1600).
-    @Test(arguments: [800, 1600])
+    /// from thumbnail sizes (256, 512: `ThumbnailCache`) to 1600 px and an odd size, compared at the
+    /// same frame fractions (resolution independence). Deviation is relative to the reference peak
+    /// outside the disc. Measured: 0.0115 (256), 0.0055 (384), 0.0026 (512), 0.0010 (800, 801),
+    /// 0.0047 (1600); before narrow blurs used exact taps and the near-cancelling pair shared a level,
+    /// 0.030 (256) and 0.039 (512).
+    @Test(arguments: [256, 384, 512, 800, 801, 1600])
     func glowFollowsTheKernelAtAnySize(_ size: Int) throws {
         let profile = try radialProfile(HalationDisc(size: size), Self.adjustments())
         print(String(format: "HALATION size %d: worst deviation %.4f of the peak", size, profile))
-        #expect(profile <= 0.03, "size \(size): worst deviation \(profile) of the peak")
+        #expect(profile <= 0.015, "size \(size): worst deviation \(profile) of the peak")
     }
 
     /// Light moves, it is not created: over the frame the added red-layer exposure sums to ~0; at
     /// the source centre E′ = (E + k·G) / (1 + k) with G from the mixture convolved with the disc.
-    /// Measured: net −1.4 of 522 moved; centre 10.167 vs 10.158.
+    /// Measured: net 0.00 of 522.6 moved; centre 10.158 vs 10.158.
     @Test func halationMovesExposure() throws {
         let size = 800
         let disc = HalationDisc(size: size)
@@ -247,13 +259,44 @@ struct HalationTests {
         let net = added.map(\.x).reduce(0, +)
         let moved = added.map { abs($0.x) }.reduce(0, +)
         #expect(abs(net) <= 0.01 * moved, "net \(net) of \(moved) moved")
+        print(String(format: "HALATION net %.2f of %.1f moved", net, moved))
 
-        let k = Halation.layerReturn(amount: 1, backing: .none)
+        let k = Halation.layerReturn(amount: 1, backing: .unbacked)
         let centre = SIMD2(Double(size / 2), Double(size / 2))
         let exposure = disc.discExposure()
         let measured = exposure.x + added[EmulsionTestCase.pixel(x: size / 2, y: size / 2, width: size)].x
         let expected = Halation.exposureWithHalation(exposure, glow: disc.glow(at: centre), layerReturn: k).x
         #expect(abs(measured - expected) <= 0.002 * exposure.x, "centre \(measured) vs \(expected)")
+        print(String(format: "HALATION centre %.3f vs %.3f", measured, expected))
+    }
+
+    /// The reflection asks Core Image only for the source pixels it reads (asking for the whole
+    /// image kept a full-resolution intermediate at 48 MP, review B6): every pixel centre of a
+    /// requested rect, reflected as the kernel `mirroredEdges` does, lies in the rect it asks for,
+    /// for whole and half-pixel (halved odd) mirrors and rects inside, across and beyond the edges.
+    @Test(arguments: [CGRect(x: 0, y: 0, width: 40, height: 30), CGRect(x: 0, y: 0, width: 20.5, height: 15.5)])
+    func reflectionAsksOnlyForWhatItReads(_ mirror: CGRect) {
+        func reflect(_ v: Double, _ start: Double, _ size: Double) -> Double {
+            let period = 2 * size
+            let u = v - start
+            let m = u - period * (u / period).rounded(.down)
+            return start + (m > size ? period - m : m)
+        }
+        for rect in [
+            CGRect(x: 5, y: 5, width: 10, height: 10), CGRect(x: -12, y: -3, width: 20, height: 8),
+            CGRect(x: 30, y: 20, width: 25, height: 20), CGRect(x: -50, y: -40, width: 200, height: 150),
+            CGRect(x: 55, y: 2, width: 6, height: 4),
+        ] {
+            let source = Halation.mirroredSource(of: rect, in: mirror)
+            #expect(source.width * source.height < mirror.width * mirror.height || rect.width > mirror.width, "\(rect)")
+            for y in Int(rect.minY)..<Int(rect.maxY) {
+                for x in Int(rect.minX)..<Int(rect.maxX) {
+                    let read = CGPoint(
+                        x: reflect(Double(x) + 0.5, mirror.minX, mirror.width), y: reflect(Double(y) + 0.5, mirror.minY, mirror.height))
+                    #expect(source.contains(read), "\(rect) pixel (\(x), \(y)) reads \(read) outside \(source)")
+                }
+            }
+        }
     }
 
     // MARK: Backing
@@ -264,8 +307,8 @@ struct HalationTests {
         func glow(_ backing: AntihalationBacking) throws -> Double {
             try Self.addedExposure(scene, Self.adjustments(1, backing)).map { max($0.x, 0) }.reduce(0, +)
         }
-        let ratio = try glow(.none) / glow(.remJet)
-        let implied = Self.share(.none).x / Self.share(.remJet).x
+        let ratio = try glow(.unbacked) / glow(.remJet)
+        let implied = Self.share(.unbacked).x / Self.share(.remJet).x
         #expect(abs(ratio / implied - 1) <= 0.001, "ratio \(ratio), implied \(implied)")
         let undercoat = try Self.codes(scene, Self.adjustments(1, .undercoat))
         #expect(Self.maxDifference(undercoat, try Self.codes(scene, Self.adjustments(1, .remJet))) == 0)
@@ -274,13 +317,14 @@ struct HalationTests {
     // MARK: Display
 
     /// Next to a neutral highlight the glow is red-dominant; far away nothing changes. Measured
-    /// 10 px outside (unbacked, amount 1): +(195.8, 134.1, 19.1) codes; far: < 1e-4.
+    /// 10 px outside (unbacked, amount 1): +(193.5, 92.3, 13.3) codes; far: < 1e-4.
     @Test func glowIsRedAndLocal() throws {
         let point = SceneFixtures.highlightPoint(size: 800)
         let with = try Self.codes(point, Self.adjustments())
         let without = try Self.codes(point, Self.adjustments(0))
         let ring = EmulsionTestCase.pixel(x: 400 + 12 + 10, y: 400, width: 800)  // 10 px outside the source edge
         let delta = with[ring] - without[ring]
+        print(String(format: "HALATION 10 px outside: +(%.1f, %.1f, %.1f) codes", delta.x, delta.y, delta.z))
         #expect(delta.x > delta.y && delta.y > delta.z && delta.z >= -0.5, "\(delta)")
         #expect(delta.x > 3, "visible \(delta)")
         let far = EmulsionTestCase.pixel(x: 20, y: 20, width: 800)

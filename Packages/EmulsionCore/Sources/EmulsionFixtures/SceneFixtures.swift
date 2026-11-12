@@ -22,8 +22,8 @@ public enum SceneFixtures {
     }
     /// Flat neutral scene patch of one value, any size (grain statistics, preview/export).
     public static func flat(_ value: Double, width: Int = 256, height: Int = 256) -> CIImage {
-        let color =
-            CIColor(red: value, green: value, blue: value, alpha: 1, colorSpace: linear) ?? CIColor(red: value, green: value, blue: value)
+        // Non-nil: the initializer fails only for a colour space that is not RGB, and `linear` is RGB.
+        let color = CIColor(red: value, green: value, blue: value, alpha: 1, colorSpace: linear)!
         return CIImage(color: color).cropped(to: CGRect(x: 0, y: 0, width: width, height: height))
     }
     /// A small, very bright source on a dark scene (halation).

@@ -12,6 +12,8 @@ public final class Renderer: @unchecked Sendable {
     /// Core Image working space: extended linear sRGB, half float.
     static let workingSpace = CGColorSpace(name: CGColorSpace.extendedLinearSRGB)!
     let kernels: Kernels
+    /// The film every render prints with; the halation glow and the film kernels take it from here.
+    let model = FilmLook.stock
     public let developer: Developer
     private let context: CIContext
 
@@ -35,10 +37,9 @@ public final class Renderer: @unchecked Sendable {
         let scene = negative.image
         let extent = scene.extent
         // Halation and grain act inside the film kernels, on layer exposure and negative density
-        // (see `Halation`, `Grain`); off, they get black samplers and add exactly nothing.
-        let black = CIImage(color: .black).cropped(to: extent)
-        let glow = a.halation > 0 ? try kernels.halationGlow(of: scene, saturation: a.printSaturation) : black
-        let noise = a.grain > 0 ? try kernels.grainNoise(extent, seed: a.seed) : black
+        // (see `Halation`, `Grain`); with both off the film kernels run without them.
+        let glow = a.halation > 0 ? try kernels.halationGlow(of: scene, model: model, saturation: a.printSaturation) : nil
+        let noise = a.grain > 0 ? try kernels.grainNoise(extent, seed: a.seed) : nil
         var image = try filmPrint(negative, glow: glow, noise: noise, a)
         if a.highlights != 0 || a.shadows != 0 {
             image = try kernels.applyLocalTone(image, shadows: a.shadows, highlights: a.highlights)
@@ -47,20 +48,27 @@ public final class Renderer: @unchecked Sendable {
     }
 
     /// The film kernels: `negative` printed under clamped adjustments `a`, with the halation `glow`
-    /// (`Kernels.halationGlow`) and grain `noise` (`Kernels.grainNoise`) over its extent.
-    func filmPrint(_ negative: Negative, glow: CIImage, noise: CIImage, _ a: Adjustments) throws -> CIImage {
+    /// (`Kernels.halationGlow`) and grain `noise` (`Kernels.grainNoise`) over its extent; a missing
+    /// one adds exactly nothing (a black sampler, and k = 0 or σ·0). With neither, the variants
+    /// without samplers and texture arguments (`filmSystemPlain`, `filmSystemRelativePlain`) run.
+    func filmPrint(_ negative: Negative, glow: CIImage?, noise: CIImage?, _ a: Adjustments) throws -> CIImage {
         let extent = negative.image.extent
-        let texture =
-            Halation.kernelArguments(amount: a.halation, backing: a.backing)
-            + Grain.kernelArguments(amount: a.grain, longEdge: max(extent.width, extent.height))
-        let film = FilmLook.stock.kernelArguments(lights: a.printerLights, exposure: a.exposure, saturation: a.printSaturation)
-        if negative.contract == .displayReferred {
-            // A finished picture is printed relative to itself: zero edits reproduce it up to the
-            // output gamut fit (chroma above 85% of the P3 boundary is compressed).
-            let ends = FilmLook.stock.relativeArguments
-            return try kernels.run(kernels.filmSystemRelative, extent, [negative.image, glow, noise] + film + ends + texture)
+        let film = model.kernelArguments(lights: a.printerLights, exposure: a.exposure, saturation: a.printSaturation)
+        // A finished picture is printed relative to itself: zero edits reproduce it up to the
+        // output gamut fit (chroma above 85% of the P3 boundary is compressed).
+        let relative = negative.contract == .displayReferred
+        let ends = relative ? model.relativeArguments : []
+        guard glow != nil || noise != nil else {
+            return try kernels.run(
+                relative ? kernels.filmSystemRelativePlain : kernels.filmSystemPlain, extent, [negative.image] + film + ends)
         }
-        return try kernels.run(kernels.filmSystem, extent, [negative.image, glow, noise] + film + texture)
+        let black = CIImage(color: .black).cropped(to: extent)
+        let texture =
+            Halation.kernelArguments(for: model, amount: a.halation, backing: a.backing)
+            + Grain.kernelArguments(amount: a.grain, longEdge: max(extent.width, extent.height))
+        return try kernels.run(
+            relative ? kernels.filmSystemRelative : kernels.filmSystem, extent,
+            [negative.image, glow ?? black, noise ?? black] + film + ends + texture)
     }
 
     /// Develop once: render the (lazy) negative into a half-float buffer so interactive edits
