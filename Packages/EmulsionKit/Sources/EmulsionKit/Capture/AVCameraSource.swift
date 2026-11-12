@@ -18,6 +18,7 @@
         private let photoOutput = AVCapturePhotoOutput()
         private let videoOutput = AVCaptureVideoDataOutput()
         private nonisolated let frameDelivery = FrameDelivery()
+        private nonisolated let eventDelivery = SourceStream.events()
         private var isConfigured = false
         private var devices: [CameraLens: AVCaptureDevice] = [:]
         private var lensOptions: [LensOption] = []
@@ -29,25 +30,46 @@
         private var viewfinderLayer: ViewfinderLayer?
         private var rotation: AVCaptureDevice.RotationCoordinator?
         private var rotationObservation: NSKeyValueObservation?
-        private var subjectAreaChanges: Task<Void, Never>?
+        private var pressureObservation: NSKeyValueObservation?
+        /// The frame rate each device is held to under pressure; a device not listed runs its
+        /// format's default. Per device, since a lens keeps its rate while another one runs.
+        private var throttledRates: [ObjectIdentifier: Int32] = [:]
+        /// The session and focus notifications followed while the camera is started.
+        private var observations: [Task<Void, Never>] = []
         private let logger = Logger(subsystem: "com.hammad.emulsion", category: "Camera")
 
         public init() {}
 
         public nonisolated func frames() -> AsyncStream<CameraFrame> { frameDelivery.stream.makeStream() }
 
+        public nonisolated func events() -> AsyncStream<CameraEvent> { eventDelivery.makeStream() }
+
         public func start(lens: CameraLens) async throws(CameraError) -> CameraCapabilities {
             try await authorize()
             try configure()
             if input == nil { try use(lens) }
-            if subjectAreaChanges == nil { subjectAreaChanges = Task { await self.followSubjectAreaChanges() } }
+            if observations.isEmpty {
+                observations = [
+                    Task { await self.followSubjectAreaChanges() },
+                    // The session restarts itself after an interruption (AVCaptureSession.h).
+                    Task {
+                        await self.relay(AVCaptureSession.wasInterruptedNotification) {
+                            .interrupted(CameraInterruption(reasonIn: $0.userInfo))
+                        }
+                    },
+                    Task { await self.relay(AVCaptureSession.interruptionEndedNotification) { _ in .interruptionEnded } },
+                    Task { await self.followRuntimeErrors() },
+                ]
+            }
             if !session.isRunning { session.startRunning() }
             return capabilities
         }
 
+        /// Stops the session and the notifications followed while it ran, so a stopped camera
+        /// holds no tasks.
         public func stop() {
-            subjectAreaChanges?.cancel()
-            subjectAreaChanges = nil
+            for observation in observations { observation.cancel() }
+            observations = []
             if session.isRunning { session.stopRunning() }
         }
 
@@ -111,6 +133,7 @@
             switch AVCaptureDevice.authorizationStatus(for: .video) {
             case .authorized: return
             case .notDetermined: if await AVCaptureDevice.requestAccess(for: .video) { return }
+            case .restricted: throw .restricted
             default: break
             }
             throw .notAuthorized
@@ -164,14 +187,14 @@
                 throw error
             }
             self.lens = lens
-            trackRotation(of: device)
+            follow(device)
         }
 
         /// After a failed switch: the previous input back with its RAW state, or no input at all
         /// (`rawPixelFormat` stays 0), so a later `start` sets the camera up again.
         private func restore(_ previous: AVCaptureDeviceInput?, replacing failed: AVCaptureDeviceInput) {
             if let previous, swapInput(from: failed, to: previous), (try? configureRAW(for: previous.device)) != nil {
-                trackRotation(of: previous.device)
+                follow(previous.device)
                 return
             }
             session.beginConfiguration()
@@ -214,6 +237,72 @@
             if let largest = PhotoDimensions.choose(.full, from: photoDimensions) {
                 photoOutput.maxPhotoDimensions = CMVideoDimensions(width: largest.width, height: largest.height)
             }
+        }
+
+        /// Follows what belongs to the device the session runs: its rotation and its pressure.
+        private func follow(_ device: AVCaptureDevice) {
+            trackRotation(of: device)
+            pressureObservation = device.observe(\.systemPressureState, options: [.initial, .new]) { [weak self] device, _ in
+                let pressure = CameraPressure(device.systemPressureState.level)
+                let deviceID = ObjectIdentifier(device)
+                Task { await self?.respond(to: pressure, ofDevice: deviceID) }
+            }
+        }
+
+        /// Reports the pressure and lowers the frame rate under it, which also lightens the
+        /// viewfinder's film render. From `shutdown` the system interrupts the session itself.
+        private func respond(to pressure: CameraPressure, ofDevice deviceID: ObjectIdentifier) {
+            guard let device = input?.device, ObjectIdentifier(device) == deviceID else { return }
+            eventDelivery.yield(.pressure(pressure))
+            let rate = Self.frameRate(under: pressure)
+            guard rate != throttledRates[deviceID] else { return }
+            if let rate, !device.activeFormat.videoSupportedFrameRateRanges.contains(where: { $0.minFrameRate <= Double(rate) }) {
+                return
+            }
+            configure(device) {
+                // `.invalid` restores the active format's default rate.
+                let duration = rate.map { CMTime(value: 1, timescale: $0) } ?? .invalid
+                $0.activeVideoMinFrameDuration = duration
+                $0.activeVideoMaxFrameDuration = duration
+            }
+            throttledRates[deviceID] = rate
+        }
+
+        /// 20 fps from `serious`, as Apple's AVCam sample throttled (AVCaptureSystemPressure.h
+        /// advises throttling there); half that from `critical`, a judgement to roughly halve the
+        /// film render's cost again.
+        private static func frameRate(under pressure: CameraPressure) -> Int32? {
+            switch pressure {
+            case .nominal, .fair: nil
+            case .serious: 20
+            case .critical, .shutdown: 10
+            }
+        }
+
+        /// Passes each of the session's `name` notifications on as an event.
+        private func relay(_ name: Notification.Name, as event: @escaping @Sendable (Notification) -> CameraEvent) async {
+            for await event in sessionNotifications(name).map(event) { eventDelivery.yield(event) }
+        }
+
+        /// Restarts the session after the media services reset, as Apple's AVCam sample does;
+        /// any other runtime error, or a restart that doesn't take, is reported as a failure the
+        /// user can retry.
+        private func followRuntimeErrors() async {
+            let errors = sessionNotifications(AVCaptureSession.runtimeErrorNotification)
+                .map { ($0.userInfo?[AVCaptureSessionErrorKey] as? AVError)?.code }
+            for await code in errors {
+                logger.error("Capture session runtime error \(code?.rawValue ?? 0)")
+                if code == .mediaServicesWereReset, !session.isRunning { session.startRunning() }
+                if !session.isRunning { eventDelivery.yield(.failed) }
+            }
+        }
+
+        /// This session's notifications named `name`. Matched by identity, since the session
+        /// itself can't be sent to the notification sequence.
+        private func sessionNotifications(_ name: Notification.Name) -> some AsyncSequence<Notification, Never> {
+            let sessionID = ObjectIdentifier(session)
+            return NotificationCenter.default.notifications(named: name)
+                .filter { ($0.object as AnyObject?).map(ObjectIdentifier.init) == sessionID }
         }
 
         private func trackRotation(of device: AVCaptureDevice) {
@@ -288,6 +377,30 @@
         }
     }
 
+    extension CameraInterruption {
+        fileprivate init(reasonIn userInfo: [AnyHashable: Any]?) {
+            let code = userInfo?[AVCaptureSessionInterruptionReasonKey] as? Int
+            switch code.flatMap(AVCaptureSession.InterruptionReason.init) {
+            case .videoDeviceInUseByAnotherClient: self = .inUseByAnotherApp
+            case .videoDeviceNotAvailableWithMultipleForegroundApps: self = .multipleForegroundApps
+            case .videoDeviceNotAvailableDueToSystemPressure: self = .systemPressure
+            default: self = .other
+            }
+        }
+    }
+
+    extension CameraPressure {
+        fileprivate init(_ level: AVCaptureDevice.SystemPressureState.Level) {
+            switch level {
+            case .fair: self = .fair
+            case .serious: self = .serious
+            case .critical: self = .critical
+            case .shutdown: self = .shutdown
+            default: self = .nominal
+            }
+        }
+    }
+
     extension CameraLens {
         fileprivate init?(_ type: AVCaptureDevice.DeviceType) {
             switch type {
@@ -302,7 +415,7 @@
     /// Receives viewfinder frames on the frame queue and passes the newest on, with the
     /// rotation that turns it upright.
     private final class FrameDelivery: NSObject, AVCaptureVideoDataOutputSampleBufferDelegate, Sendable {
-        let stream = FrameStream()
+        let stream = SourceStream.frames()
         private let angle = Mutex<Double>(0)
 
         var rotationAngle: Double {

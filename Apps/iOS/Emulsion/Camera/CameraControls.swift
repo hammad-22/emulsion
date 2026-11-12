@@ -63,12 +63,12 @@ struct CameraControls: View {
     @ViewBuilder private var lenses: some View {
         if let capabilities = model.capabilities, capabilities.lenses.count > 1 {
             LensPicker(capabilities: capabilities) { lens in Task { await model.select(lens) } }
-                .disabled(model.isCapturing)
+                .disabled(!model.acceptsInput)
         }
     }
 
     private var shutter: some View {
-        ShutterButton(isEnabled: model.status == .running && !model.isCapturing, captureCount: model.captureCount) {
+        ShutterButton(isEnabled: model.acceptsInput, captureCount: model.captureCount) {
             Task { await model.capture() }
         }
     }

@@ -16,16 +16,21 @@ public actor MockCameraSource: CameraSource {
     /// Artistic: how far the crop pans across a sample, and how long one sweep takes.
     private static let drift = (pan: 0.25, period: 8.0)
 
-    private let authorized: Bool
+    private let startError: CameraError?
     private let captureError: CameraError?
     private let lenses: [LensOption]
     private let captureGate: CaptureGate?
-    private nonisolated let stream = FrameStream()
+    private nonisolated let stream = SourceStream.frames()
+    private nonisolated let eventStream = SourceStream.events()
     private var lens = CameraLens.wide
     private var delivery: Task<Void, Never>?
+    /// Paused by an emitted interruption: a real session delivers no frames then.
+    private var isInterrupted = false
     /// Each sample scaled once to cover the frame with room to pan.
     private var samples: [CGImage] = []
 
+    /// Whether frames are being delivered, as a session runs; for tests.
+    var isRunning: Bool { delivery != nil }
     /// The last focus point and capture resolution asked for; for tests.
     private(set) var lastFocusPoint: CGPoint?
     private(set) var lastCaptureResolution: AppSettings.Resolution?
@@ -36,14 +41,19 @@ public actor MockCameraSource: CameraSource {
     ]
 
     public init() {
-        self.init(authorized: true)
+        self.init(startError: nil)
+    }
+
+    /// A camera that never starts, as when access is denied or restricted.
+    public init(failingStartWith error: CameraError) {
+        self.init(startError: error)
     }
 
     init(
-        authorized: Bool = true, captureError: CameraError? = nil, lenses: [LensOption] = defaultLenses,
+        startError: CameraError? = nil, captureError: CameraError? = nil, lenses: [LensOption] = defaultLenses,
         captureGate: CaptureGate? = nil
     ) {
-        self.authorized = authorized
+        self.startError = startError
         self.captureError = captureError
         self.lenses = lenses
         self.captureGate = captureGate
@@ -58,8 +68,21 @@ public actor MockCameraSource: CameraSource {
 
     public nonisolated func frames() -> AsyncStream<CameraFrame> { stream.makeStream() }
 
+    public nonisolated func events() -> AsyncStream<CameraEvent> { eventStream.makeStream() }
+
+    /// Reports `event` as if the system caused it, for tests and the Simulator's walkthrough of
+    /// the camera's states. Frames pause while interrupted, as a session's do.
+    public func emit(_ event: CameraEvent) {
+        switch event {
+        case .interrupted: isInterrupted = true
+        case .interruptionEnded: isInterrupted = false
+        case .failed, .pressure: break
+        }
+        eventStream.yield(event)
+    }
+
     public func start(lens: CameraLens) throws(CameraError) -> CameraCapabilities {
-        guard authorized else { throw .notAuthorized }
+        if let startError { throw startError }
         guard !lenses.isEmpty else { throw .unavailable }
         if samples.isEmpty { samples = PhotoStore.sampleURLs.compactMap(Self.panningSample) }
         self.lens = lenses.contains { $0.lens == lens } ? lens : lenses[0].lens
@@ -70,6 +93,7 @@ public actor MockCameraSource: CameraSource {
     public func stop() {
         delivery?.cancel()
         delivery = nil
+        isInterrupted = false
     }
 
     public func select(_ lens: CameraLens) throws(CameraError) -> CameraCapabilities {
@@ -109,7 +133,7 @@ public actor MockCameraSource: CameraSource {
     private func deliverFrames() async {
         let start = ContinuousClock.now
         while !Task.isCancelled {
-            if let next = frame(at: start.duration(to: .now) / .seconds(1)) { stream.yield(next) }
+            if !isInterrupted, let next = frame(at: start.duration(to: .now) / .seconds(1)) { stream.yield(next) }
             try? await Task.sleep(for: Self.frameInterval)
         }
     }

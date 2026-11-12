@@ -19,15 +19,110 @@ struct CameraModelTests {
         #expect(model.capabilities?.rawFormat == .proRAW)
     }
 
-    @Test func unauthorizedCameraShowsUnauthorized() async {
+    @Test(arguments: [(CameraError.notAuthorized, CameraModel.Status.unauthorized), (.restricted, .restricted)])
+    func deniedAccessShowsWhy(error: CameraError, status: CameraModel.Status) async {
         let library = TestLibrary()
-        let model = library.camera(MockCameraSource(authorized: false))
+        let model = library.camera(MockCameraSource(failingStartWith: error))
 
         await model.start()
 
-        #expect(model.status == .unauthorized)
+        #expect(model.status == status)
         #expect(model.capabilities == nil)
         #expect(model.error == nil, "the screen explains it; no alert as well")
+    }
+
+    /// Another app takes the camera: the shutter and lenses stop working until it's back, and
+    /// the camera resumes on its own.
+    @Test func interruptionPausesTheCameraUntilItEnds() async {
+        let library = TestLibrary()
+        let source = MockCameraSource()
+        let model = library.camera(source)
+        await model.start()
+
+        await source.emit(.interrupted(.inUseByAnotherApp))
+        await Self.settle { model.status != .running }
+
+        #expect(model.status == .interrupted(.inUseByAnotherApp))
+        await model.capture()
+        await model.select(.telephoto)
+        #expect(model.captureCount == 0)
+        #expect(model.capabilities?.lens == .wide)
+        #expect(!model.acceptsInput)
+
+        await source.emit(.interruptionEnded)
+        await Self.settle { model.status == .running }
+
+        #expect(model.status == .running)
+        await model.capture()
+        #expect(model.lastCapture != nil)
+    }
+
+    /// Leaving the screen forgets an interruption: the session reports it again on the next start
+    /// if the camera is still taken.
+    @Test func stoppingForgetsAnInterruption() async {
+        let library = TestLibrary()
+        let model = library.camera()
+        await model.start()
+        model.handle(.interrupted(.multipleForegroundApps))
+
+        await model.stop()
+        #expect(model.status == .idle)
+        await model.start()
+
+        #expect(model.status == .running)
+    }
+
+    /// An unrecoverable session error shows the camera as unavailable; starting again retries.
+    @Test func sessionFailureIsUnavailableUntilRetried() async {
+        let library = TestLibrary()
+        let model = library.camera()
+        model.handle(.failed)
+        #expect(model.status == .idle, "a stopped camera can't fail")
+        await model.start()
+        model.handle(.interrupted(.other))
+
+        model.handle(.failed)
+
+        #expect(model.status == .unavailable)
+        await model.start()
+        #expect(model.status == .running, "the failure cleared the interruption")
+    }
+
+    @Test func pressureIsReported() async {
+        let library = TestLibrary()
+        let source = MockCameraSource()
+        let model = library.camera(source)
+        await model.start()
+
+        await source.emit(.pressure(.critical))
+        await Self.settle { model.pressure == .critical }
+
+        #expect(model.pressure == .critical)
+        #expect(model.status == .running, "the camera keeps running, slower")
+    }
+
+    /// Stopping (the app going to the background) stops the source, and nothing keeps a
+    /// discarded camera alive.
+    @Test func stoppedCameraHoldsNothing() async {
+        let library = TestLibrary()
+        let source = MockCameraSource()
+        weak var released: CameraModel?
+        do {
+            let model = library.camera(source)
+            await model.start()
+            #expect(await source.isRunning)
+            await model.stop()
+            released = model
+        }
+
+        #expect(await !source.isRunning)
+        #expect(released == nil)
+    }
+
+    /// Lets the model's event task run until `condition` holds; a bounded number of turns, not
+    /// a wall-clock wait (MOV-138).
+    private static func settle(until condition: () -> Bool) async {
+        for _ in 0..<1000 where !condition() { await Task.yield() }
     }
 
     @Test func startAndStopAreIdempotent() async {

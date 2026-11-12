@@ -22,3 +22,4 @@
   ```
   The walkthrough covers the phone layout only; it cannot select a Duo pose. Set Duo poses with T3 `agent-device fold closed|half-open|open` or Xcode Device Hub's Closed / Partially Open / Open buttons, on a simulator of your own with your own bundle ID. Capture the inner display with `xcrun simctl io <udid> screenshot --display primary-1`. Record which tool and pose each proof capture used, and say so when a pose could not be verified; never fake a pose with generic UI clicks or simctl taps.
   Launch with `--viewfinder-timing` (debug builds) to show the viewfinder's frame time and rate.
+  Launch with `-camera-scenario <name>` (debug Simulator builds) to show a camera state the Simulator can't produce: `in-use`, `multitasking`, `overheated`, `critical`, `failed`, `denied`, `restricted` (`CameraScenario.swift`).
