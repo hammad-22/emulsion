@@ -1,5 +1,6 @@
 import EmulsionCore
 import Foundation
+import ImageIO
 import Testing
 
 @testable import EmulsionKit
@@ -98,5 +99,36 @@ extension RenderServiceTests {
         _ = try await library.renderService.image(url, .init(), maxDimension: 1200)
 
         #expect(library.renderService.cachedThumbnail(url, .init(), maxDimension: 1200) == nil)
+    }
+}
+
+extension RenderServiceTests {
+    /// The anchor is measured on the file's first develop and reused for other sizes and the
+    /// export, which then match a service that measures it for them.
+    @Test func exposureAnchorIsMeasuredOncePerFileAndReused() async throws {
+        let library = TestLibrary()
+        let url = library.store.url(for: try await library.store.add(TestPhoto.anchoredRAW, fileExtension: "dng"))
+        let service = library.renderService
+        let fresh = { TestLibrary().renderService }
+
+        #expect(await service.exposureAnchor(url) == nil)
+        _ = try await service.image(url, .init(), maxDimension: 256)
+        let anchor = try #require(await service.exposureAnchor(url))
+        #expect(anchor != 0)
+
+        let reused = try await service.image(url, .init(), maxDimension: 512)
+        let measured = try await fresh().image(url, .init(), maxDimension: 512)
+        #expect(TestPixels.rgba(reused) == TestPixels.rgba(measured))
+        let exported = try await service.export(url, .init(), format: .jpeg)
+        let exportedFresh = try await fresh().export(url, .init(), format: .jpeg)
+        #expect(TestPixels.rgba(try Self.decoded(exported)) == TestPixels.rgba(try Self.decoded(exportedFresh)))
+        #expect(await service.exposureAnchor(url) == anchor)
+
+        await service.forget(url)
+        #expect(await service.exposureAnchor(url) == nil)
+    }
+
+    private static func decoded(_ data: Data) throws -> CGImage {
+        try #require(CGImageSourceCreateWithData(data as CFData, nil).flatMap { CGImageSourceCreateImageAtIndex($0, 0, nil) })
     }
 }

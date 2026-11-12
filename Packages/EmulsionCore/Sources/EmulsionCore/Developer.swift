@@ -11,7 +11,18 @@ import UniformTypeIdentifiers
 public struct Negative: @unchecked Sendable {
     public let image: CIImage
     public let contract: InputContract
+    /// Stops added at develop so the tones the RAW file's DNG profile renders at mid-gray sit at
+    /// scene 0.18: one exact multiply by 2^stops (undo it with −stops). Chosen from the file's own
+    /// pixels, so it follows the scene (two shots from one camera can differ); an estimate, not a
+    /// metered level. 0 when Apple can't apply a gain table for the file, or it isn't RAW.
+    public let exposureAnchorStops: Double
     public var size: CGSize { image.extent.size }
+
+    init(image: CIImage, contract: InputContract, exposureAnchorStops: Double = 0) {
+        self.image = image
+        self.contract = contract
+        self.exposureAnchorStops = exposureAnchorStops
+    }
 }
 
 /// Turns camera data into linear light for the film system. RAW (ProRAW or Bayer DNG) goes
@@ -20,7 +31,13 @@ public struct Negative: @unchecked Sendable {
 /// film curve: the camera's rendering can't be undone.
 public struct Developer {
     private let kernels: Kernels
-    init(kernels: Kernels) { self.kernels = kernels }
+    /// The exposure anchor's own context, caching intermediates (see `ExposureAnchor.stops(of:context:)`).
+    private let context: CIContext
+
+    init(kernels: Kernels, context: CIContext) {
+        self.kernels = kernels
+        self.context = context
+    }
 
     public static func isRAW(_ data: Data) -> Bool { rawTypeIdentifier(of: data) != nil }
 
@@ -40,15 +57,41 @@ public struct Developer {
         return type(hint: nil) ?? type(hint: [kCGImageSourceTypeIdentifierHint: dngTypeIdentifier] as CFDictionary)
     }
 
-    /// `maxDimension` develops a smaller image (RAW draft mode) for fast previews.
-    public func develop(_ data: Data, maxDimension: CGFloat? = nil) throws -> Negative {
+    /// `maxDimension` develops a smaller image for fast previews. RAW files whose DNG profile
+    /// brightens through a gain table get the same `exposureAnchorStops` at any size. nil
+    /// `exposureAnchorStops` measures it; a caller that already developed this file passes the
+    /// anchor that develop reported, which skips the measurement. Non-RAW data ignores it.
+    public func develop(_ data: Data, maxDimension: CGFloat? = nil, exposureAnchorStops: Double? = nil) throws -> Negative {
+        try develop(data, maxDimension: maxDimension, anchor: exposureAnchorStops.map { .known(stops: $0) } ?? .measured)
+    }
+
+    func develop(_ data: Data, maxDimension: CGFloat?, anchor: ExposureAnchor.Choice) throws -> Negative {
         if let type = Self.rawTypeIdentifier(of: data), let raw = CIRAWFilter(imageData: data, identifierHint: type) {
             Self.bypassAppleRendering(raw)
-            Self.applyPreviewScale(raw, maxDimension: maxDimension)
-            guard let output = raw.outputImage, !output.extent.isEmpty, !output.extent.isInfinite else {
+            var anchorStops = 0.0
+            var measuresAnchor = false
+            switch anchor {
+            // isLocalToneMapSupported: Apple can apply a gain table (ProfileGainTableMap) for this
+            // file. Deliberately excluded, anchor 0: a DNG with a tone curve but no gain table, and
+            // non-DNG RAW, where Apple's boost is its own look curve rather than the file's profile.
+            case .measured where raw.isLocalToneMapSupported:
+                Self.applyPreviewScale(raw, maxDimension: ExposureAnchor.thumbnailLongEdge, allowsDraftMode: false)
+                anchorStops = ExposureAnchor.stops(of: raw, context: context)
+                measuresAnchor = true
+            case .known(let stops):
+                anchorStops = stops
+            case .measured, .none:
+                break
+            }
+            // Draft mode stays off after the anchor's thumbnails: switching it on decodes the file again.
+            Self.applyPreviewScale(raw, maxDimension: maxDimension, allowsDraftMode: !measuresAnchor)
+            guard var output = raw.outputImage, !output.extent.isEmpty, !output.extent.isInfinite else {
                 throw EmulsionError.unsupportedPhoto
             }
-            return Negative(image: Self.normalized(output), contract: .sceneReferred)
+            if anchorStops != 0 {
+                output = output.applyingFilter("CIExposureAdjust", parameters: [kCIInputEVKey: anchorStops])
+            }
+            return Negative(image: Self.normalized(output), contract: .sceneReferred, exposureAnchorStops: anchorStops)
         }
         // Known limitation: HDR stills are read as their SDR rendition (a gain map is ignored,
         // PQ/HLG stills are tone-mapped by Core Image), so HDR headroom is discarded until MOV-49.
@@ -64,23 +107,26 @@ public struct Developer {
         return try sceneFromDisplay(Self.normalized(image))
     }
 
-    /// Decodes at most `maxDimension` on the long edge, in RAW draft mode when that's smaller.
-    static func applyPreviewScale(_ raw: CIRAWFilter, maxDimension: CGFloat?) {
-        guard let maxDimension else { return }
+    /// Decodes at most `maxDimension` on the long edge (nil: full size), in RAW draft mode when
+    /// that's smaller and `allowsDraftMode`.
+    static func applyPreviewScale(_ raw: CIRAWFilter, maxDimension: CGFloat?, allowsDraftMode: Bool) {
         let native = raw.nativeSize
-        let scale = min(1, maxDimension / max(native.width, native.height))
+        let scale = maxDimension.map { min(1, $0 / max(native.width, native.height)) } ?? 1
         raw.scaleFactor = Float(scale)
-        raw.isDraftModeEnabled = scale < 1
+        raw.isDraftModeEnabled = allowsDraftMode && scale < 1
     }
 
     /// Bypass Apple's rendering: no tone boost, local tone mapping, extra contrast, gamut
     /// mapping or shadow bias. What remains is demosaiced, white-balanced, linear scene light
-    /// scaled by the file's BaselineExposure; noise reduction, sharpening, lens correction and
-    /// the decoder version stay at the file's defaults. Measured on synthetic DNGs and 25 real
-    /// files (MOV-79, `RAWDevelopTests`).
+    /// scaled by the file's BaselineExposure (the exposure anchor comes after); noise reduction,
+    /// sharpening, lens correction and the decoder version stay at the file's defaults. Measured
+    /// on synthetic DNGs and 25 real files (MOV-79, `RAWDevelopTests`).
     private static func bypassAppleRendering(_ raw: CIRAWFilter) {
         raw.boostAmount = 0
-        raw.boostShadowAmount = 0
+        // 1 is neutral (below 1 darkens the shadows; the file default is 0.9). It has no effect
+        // while boost is 0 (pixel-identical develop, MOV-134) and only matters for the exposure
+        // anchor's profile render. Set once, so the anchor's two thumbnails share one decode.
+        raw.boostShadowAmount = 1
         if raw.isLocalToneMapSupported { raw.localToneMapAmount = 0 }
         if raw.isContrastSupported { raw.contrastAmount = 0 }
         // EDR 1–2 re-expands ProRAW highlights non-linearly and shifts midtones; 0 keeps them linear.

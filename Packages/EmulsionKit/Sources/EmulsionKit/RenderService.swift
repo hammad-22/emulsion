@@ -22,6 +22,9 @@ public actor RenderService {
     /// Preview sizes are rounded up to this step, so resizes (iPhone Duo fold/unfold, Mac
     /// windows) reuse a cached develop instead of decoding the RAW again for every size.
     private let previewSizeStep: CGFloat = 256
+    /// Each file's exposure anchor from its first develop, so later develops (other sizes, export)
+    /// skip measuring it. In memory only; keeping it on the photo record is a follow-up.
+    private var exposureAnchors: [URL: Double] = [:]
     private nonisolated let thumbnails: ThumbnailCache
     private nonisolated let latestRenders: LatestRenderCache
 
@@ -52,7 +55,7 @@ public actor RenderService {
             return cached
         }
         let renderer = try engine()
-        let developed = try renderer.developer.develop(Data(contentsOf: url), maxDimension: maxDimension)
+        let developed = try develop(url, maxDimension: maxDimension)
         // Draft RAW decode may come back larger than asked; fit it exactly. Then render it
         // once into a half-float buffer, so slider moves don't redo the RAW develop or the
         // JPEG inversion (Core Image doesn't cache intermediates for us).
@@ -153,12 +156,22 @@ public actor RenderService {
     /// Full-resolution develop and encode, look baked in.
     public func export(_ url: URL, _ adjustments: Adjustments, format: Renderer.ExportFormat) throws -> Data {
         let renderer = try engine()
-        let full = try renderer.developer.develop(Data(contentsOf: url))
+        let full = try develop(url, maxDimension: nil)
         return try renderer.export(renderer.render(full, adjustments), format: format)
     }
 
-    /// Drops every cached preview of a photo (after it's deleted or its source changes).
+    /// Develops the file with its exposure anchor, measuring and remembering it the first time.
+    private func develop(_ url: URL, maxDimension: CGFloat?) throws -> Negative {
+        let developed = try engine().developer.develop(
+            Data(contentsOf: url), maxDimension: maxDimension, exposureAnchorStops: exposureAnchors[url])
+        exposureAnchors[url] = developed.exposureAnchorStops
+        return developed
+    }
+
+    /// Drops every cached preview and the exposure anchor of a photo (after it's deleted or its
+    /// source changes).
     public func forget(_ url: URL) {
+        exposureAnchors[url] = nil
         let prefix = url.absoluteString + "@"
         for key in previews.keys where key.hasPrefix(prefix) { previews[key] = nil }
         lruKeys.removeAll { $0.hasPrefix(prefix) }
@@ -168,4 +181,7 @@ public actor RenderService {
 
     /// Cache keys, least recently developed first; for tests.
     var cachedPreviewKeys: [String] { lruKeys }
+
+    /// The file's remembered exposure anchor; for tests.
+    func exposureAnchor(_ url: URL) -> Double? { exposureAnchors[url] }
 }
