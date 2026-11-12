@@ -7,6 +7,9 @@ public protocol CameraSource: Sendable {
     /// Viewfinder frames, newest only: a slow consumer skips frames instead of queueing
     /// them. Each call starts a new stream and finishes the previous one.
     func frames() -> AsyncStream<CameraFrame>
+    /// What happens to the camera on its own: interruptions, unrecoverable errors, system
+    /// pressure. Every event, in order. Each call starts a new stream and finishes the previous one.
+    func events() -> AsyncStream<CameraEvent>
     /// Starts the camera on `lens` (or the wide lens if the device lacks it), asking for
     /// camera access first if the user hasn't decided yet.
     func start(lens: CameraLens) async throws(CameraError) -> CameraCapabilities

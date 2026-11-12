@@ -51,7 +51,10 @@ struct CameraScreen: View {
     /// The Simulator has no camera, so it shows the sample photos as a live viewfinder.
     private static func makeSource() -> any CameraSource {
         #if targetEnvironment(simulator)
-            MockCameraSource()
+            #if DEBUG
+                if let scenario = CameraScenario.launched { return scenario.makeSource() }
+            #endif
+            return MockCameraSource()
         #else
             AVCameraSource()
         #endif

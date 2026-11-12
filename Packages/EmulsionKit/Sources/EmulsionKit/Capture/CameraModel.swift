@@ -8,13 +8,23 @@ import Observation
 /// as an untouched original whose edit starts as the recipe.
 @MainActor @Observable
 public final class CameraModel {
-    public enum Status: Sendable {
-        case idle, starting, running, unauthorized, unavailable
+    public enum Status: Equatable, Sendable {
+        case idle, starting, running, unauthorized, restricted, unavailable
+        /// Started, but the system has paused the camera; it resumes by itself.
+        case interrupted(CameraInterruption)
     }
 
-    public private(set) var status = Status.idle
+    /// What the camera is doing now, including a pause the system imposed.
+    public var status: Status {
+        if lifecycle == .running, let interruption { .interrupted(interruption) } else { lifecycle }
+    }
+    /// How hard the device is working. The camera lowers its own frame rate under pressure, and
+    /// with it the viewfinder's film render (`AVCameraSource`).
+    public private(set) var pressure = CameraPressure.nominal
     public private(set) var capabilities: CameraCapabilities?
     public private(set) var isCapturing = false
+    /// Whether the shutter and lenses work: the camera runs and no photo is in flight.
+    public var acceptsInput: Bool { status == .running && !isCapturing }
     /// The newest photo taken in this session.
     public private(set) var lastCapture: PhotoRecord?
     /// Where the user last tapped to focus (0…1 of the upright frame), until the reticle fades.
@@ -34,6 +44,10 @@ public final class CameraModel {
         set { settings.recipe = newValue }
     }
 
+    /// What the app asked for (`start`, `stop`) and how that went; never `interrupted`.
+    private var lifecycle = Status.idle
+    /// Why the system paused the running camera, until it resumes.
+    private var interruption: CameraInterruption?
     private let source: any CameraSource
     private let store: PhotoStore
     private let settings: AppSettings
@@ -46,13 +60,41 @@ public final class CameraModel {
         self.source = source
         self.store = store
         self.settings = settings
+        followEvents()
+    }
+
+    /// Follows the camera's own events for the model's lifetime: the stream finishes when the
+    /// source goes away with the model.
+    private func followEvents() {
+        let events = source.events()
+        Task { [weak self] in
+            for await event in events {
+                guard let self else { return }
+                handle(event)
+            }
+        }
+    }
+
+    func handle(_ event: CameraEvent) {
+        switch event {
+        case .interrupted(let reason):
+            // Queued before `stop`: the next start reports a camera that's still taken.
+            guard lifecycle == .starting || lifecycle == .running else { return }
+            interruption = reason
+        case .interruptionEnded: interruption = nil
+        case .pressure(let level): if pressure != level { pressure = level }
+        case .failed:
+            guard lifecycle == .running else { return }
+            interruption = nil
+            lifecycle = .unavailable
+        }
     }
 
     /// Starts the camera; does nothing while it's already starting or running. The renderer and
     /// the viewfinder's tables are prepared meanwhile, so the first frame doesn't wait for them.
     public func start() async {
-        guard status != .starting, status != .running else { return }
-        status = .starting
+        guard lifecycle != .starting, lifecycle != .running else { return }
+        lifecycle = .starting
         let renderService = store.renderService
         // A renderer that can't be prepared now fails on the first frame instead; the camera
         // still starts.
@@ -66,30 +108,38 @@ public final class CameraModel {
         _ = await prepared
         do {
             let started = try result.get()
-            guard status == .starting else {
+            guard lifecycle == .starting else {
                 // Stopped while starting: leave the camera off.
                 await source.stop()
                 return
             }
             capabilities = started
-            status = .running
+            lifecycle = .running
         } catch {
-            status = error == .notAuthorized ? .unauthorized : .unavailable
-            if error != .notAuthorized { self.error = error }
+            switch error {
+            case .notAuthorized: lifecycle = .unauthorized
+            case .restricted: lifecycle = .restricted
+            default:
+                lifecycle = .unavailable
+                self.error = error
+            }
         }
     }
 
-    /// Stops the camera (leaving the app, opening the library). Safe to call repeatedly.
+    /// Stops the camera (leaving the app, opening the library), including one that failed while
+    /// running, so it can't restart behind the app. Safe to call repeatedly. An interruption is
+    /// forgotten: a camera that's still taken reports it again on the next start.
     public func stop() async {
-        guard status == .starting || status == .running else { return }
-        status = .idle
+        guard lifecycle == .starting || lifecycle == .running || lifecycle == .unavailable else { return }
+        lifecycle = .idle
+        interruption = nil
         await source.stop()
     }
 
     /// Switches lens; ignored while a photo is being taken, so the capture finishes on the lens
     /// it started with.
     public func select(_ lens: CameraLens) async {
-        guard status == .running, !isCapturing, lens != capabilities?.lens else { return }
+        guard acceptsInput, lens != capabilities?.lens else { return }
         do {
             capabilities = try await source.select(lens)
         } catch {
@@ -112,7 +162,7 @@ public final class CameraModel {
     /// Takes a RAW photo at the settings' resolution (12 MP on lenses without 48 MP) and adds it
     /// to the library with the recipe shown at the shutter press as its edit.
     public func capture() async {
-        guard status == .running, !isCapturing, let capabilities else { return }
+        guard acceptsInput, let capabilities else { return }
         isCapturing = true
         captureCount += 1
         defer { isCapturing = false }
@@ -141,19 +191,20 @@ public final class CameraModel {
         let delivery = Task { [weak self] in
             var frameNumber = 0
             for await frame in frames {
-                guard let look = self?.viewfinderLook(frameNumber: frameNumber) else { break }
+                guard let self else { break }
+                let look = viewfinderLook(frameNumber: frameNumber)
                 frameNumber += 1
                 let started = ContinuousClock.now
                 let image: CGImage
                 do {
                     image = try await renderService.viewfinderImage(frame, look, maxDimension: maxDimension)
                 } catch {
-                    self?.reportViewfinderFailure()
+                    reportViewfinderFailure()
                     continue
                 }
-                if self?.recordsViewfinderTiming == true {
+                if recordsViewfinderTiming {
                     let shown = ContinuousClock.now
-                    self?.viewfinderTiming.record(render: started.duration(to: shown), shownAt: shown)
+                    viewfinderTiming.record(render: started.duration(to: shown), shownAt: shown)
                 }
                 continuation.yield(image)
             }
