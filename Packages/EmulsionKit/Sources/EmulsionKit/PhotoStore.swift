@@ -1,8 +1,6 @@
 import EmulsionCore
 import Foundation
-import ImageIO
 import Observation
-import UniformTypeIdentifiers
 
 /// Originals live in one folder (Application Support by default); edits are
 /// non-destructive and stored in an index next to them. The index is written before the
@@ -14,6 +12,7 @@ public final class PhotoStore {
     /// saving an edit, deleting), for the app to show. Set it to nil once shown.
     public var lastError: EmulsionError?
     let folder: URL
+    private let importer: OriginalImporter
     let renderService: RenderService
     var indexURL: URL { folder.appending(path: "library.json") }
     /// False while the index on disk couldn't be read or moved aside: it must never be overwritten.
@@ -26,7 +25,8 @@ public final class PhotoStore {
         self.init(folder: URL.applicationSupportDirectory.appending(path: "Emulsion", directoryHint: .isDirectory), renderService: .shared)
     }
 
-    init(folder: URL, renderService: RenderService) {
+    init(folder: URL, renderService: RenderService, importer: OriginalImporter = OriginalImporter()) {
+        self.importer = importer
         self.folder = folder
         self.renderService = renderService
         try? FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
@@ -55,23 +55,22 @@ public final class PhotoStore {
     public func url(for photo: PhotoRecord) -> URL { folder.appending(path: photo.fileName) }
     public func photo(_ id: UUID) -> PhotoRecord? { photos.first { $0.id == id } }
 
-    /// Adds an original as delivered (e.g. by the photo picker), named after the type its
-    /// bytes actually are, not what the sender said it might be.
+    /// Prepares the original off the main actor, then commits against the latest library.
+    /// Cancellation before commit removes only this import's files. Once committed, an
+    /// import succeeds even if its caller is cancelled immediately afterward.
     @discardableResult
-    public func add(_ data: Data) throws -> PhotoRecord {
-        let type = CGImageSourceCreateWithData(data as CFData, nil).flatMap(CGImageSourceGetType).flatMap { UTType($0 as String) }
-        return try add(data, fileExtension: type?.preferredFilenameExtension ?? "jpg")
+    public func add(_ data: Data) async throws -> PhotoRecord {
+        try await insert([.data(data, fileExtension: nil)])[0]
     }
 
     @discardableResult
-    public func add(_ data: Data, fileExtension: String) throws -> PhotoRecord {
-        try insert([(data, fileExtension)])[0]
+    public func add(_ data: Data, fileExtension: String) async throws -> PhotoRecord {
+        try await insert([.data(data, fileExtension: fileExtension)])[0]
     }
 
-    /// Adds the bundled synthetic sample photos (made by `Tools/make-sample-photos.swift`),
-    /// so there is something to develop before the user imports their own.
-    public func addSamples() throws {
-        try insert(Self.sampleURLs.map { (try Data(contentsOf: $0), $0.pathExtension) })
+    /// Adds all bundled synthetic samples with one index commit.
+    public func addSamples() async throws {
+        try await insert(Self.sampleURLs.map { .file($0) })
     }
 
     /// The bundled sample photos, in the order they're added.
@@ -108,24 +107,18 @@ public final class PhotoStore {
         await delete([id])
     }
 
-    /// Copies originals in and lists them first, in the given order, with one index write.
-    /// If anything fails, the files already copied are removed and the library is unchanged.
     @discardableResult
-    private func insert(_ originals: [(data: Data, fileExtension: String)]) throws -> [PhotoRecord] {
-        var added: [PhotoRecord] = []
+    private func insert(_ originals: [OriginalImporter.Original]) async throws -> [PhotoRecord] {
+        guard canWriteIndex else { throw EmulsionError.librarySaveFailed }
+        let added = try await importer.prepare(originals, in: folder)
         do {
-            for original in originals {
-                let id = UUID()
-                let name = "\(id.uuidString).\(original.fileExtension.lowercased())"
-                try original.data.write(to: folder.appending(path: name), options: .atomic)
-                added.append(
-                    PhotoRecord(
-                        id: id, created: .now, fileName: name, isRAW: Developer.isRAW(original.data), adjustments: .defaults(for: id)))
-            }
+            try Task.checkCancellation()
+            // No suspension between reading the current photos, committing, and publishing:
+            // imports cannot restore a deleted record or overwrite an intervening edit.
             try commit { $0.insert(contentsOf: added, at: 0) }
             return added
         } catch {
-            for record in added { try? FileManager.default.removeItem(at: url(for: record)) }
+            await importer.remove(added, from: folder)
             throw error
         }
     }

@@ -5,9 +5,9 @@ import Testing
 
 @MainActor
 struct EditSessionTests {
-    @Test func closeWritesTheLastChangeAtOnce() throws {
+    @Test func closeWritesTheLastChangeAtOnce() async throws {
         let library = TestLibrary()
-        let session = EditSession(photo: try library.store.add(TestPhoto.jpeg, fileExtension: "jpg"), store: library.store)
+        let session = EditSession(photo: try await library.store.add(TestPhoto.jpeg, fileExtension: "jpg"), store: library.store)
 
         session.adjustments.exposure = 1.5
         session.close()
@@ -17,7 +17,7 @@ struct EditSessionTests {
 
     @Test func changesSaveOnceSlidersRest() async throws {
         let library = TestLibrary()
-        let photo = try library.store.add(TestPhoto.jpeg, fileExtension: "jpg")
+        let photo = try await library.store.add(TestPhoto.jpeg, fileExtension: "jpg")
         let session = EditSession(photo: photo, store: library.store)
 
         session.adjustments.warmth = 0.5
@@ -28,9 +28,9 @@ struct EditSessionTests {
         #expect(library.store.photo(photo.id)?.adjustments.warmth == 0.5)
     }
 
-    @Test func resetKeepsTheGrainPattern() throws {
+    @Test func resetKeepsTheGrainPattern() async throws {
         let library = TestLibrary()
-        let photo = try library.store.add(TestPhoto.jpeg, fileExtension: "jpg")
+        let photo = try await library.store.add(TestPhoto.jpeg, fileExtension: "jpg")
         let session = EditSession(photo: photo, store: library.store)
         session.adjustments.grain = 1
         session.adjustments.seed = 0
@@ -40,9 +40,9 @@ struct EditSessionTests {
         #expect(session.adjustments == photo.adjustments)
     }
 
-    @Test func aSessionIsEditedUntilReset() throws {
+    @Test func aSessionIsEditedUntilReset() async throws {
         let library = TestLibrary()
-        let photo = try library.store.add(TestPhoto.jpeg, fileExtension: "jpg")
+        let photo = try await library.store.add(TestPhoto.jpeg, fileExtension: "jpg")
         let session = EditSession(photo: photo, store: library.store)
         #expect(!session.isEdited)
         #expect(!photo.isEdited)
