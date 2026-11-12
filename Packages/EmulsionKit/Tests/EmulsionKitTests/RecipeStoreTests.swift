@@ -21,9 +21,9 @@ struct RecipeStoreTests {
         #expect(RecipeStore(folder: library.folder).recipes == [imported])
     }
 
-    @Test func failedImportKeepsRecipesAndPhotos() throws {
+    @Test func failedImportKeepsRecipesAndPhotos() async throws {
         let library = TestLibrary()
-        let photo = try library.store.add(TestPhoto.jpeg, fileExtension: "jpg")
+        let photo = try await library.store.add(TestPhoto.jpeg, fileExtension: "jpg")
         let store = RecipeStore(folder: library.folder)
         let saved = try store.save(name: "Keep", adjustments: Adjustments())
         let index = library.folder.appending(path: "recipes.json")
@@ -91,9 +91,9 @@ struct RecipeStoreTests {
         #expect(store.recipes == [saved])
     }
 
-    @Test func applyingKeepsOriginalAndEachPhotosSeed() throws {
+    @Test func applyingKeepsOriginalAndEachPhotosSeed() async throws {
         let library = TestLibrary()
-        let photo = try library.store.add(TestPhoto.jpeg, fileExtension: "jpg")
+        let photo = try await library.store.add(TestPhoto.jpeg, fileExtension: "jpg")
         let original = try Data(contentsOf: library.store.url(for: photo))
         let session = EditSession(photo: photo, store: library.store)
         for recipe in CuratedLooks.recipes {
