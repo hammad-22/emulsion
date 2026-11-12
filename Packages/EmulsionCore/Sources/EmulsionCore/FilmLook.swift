@@ -2,9 +2,17 @@ import Foundation
 import simd
 
 /// The stock Emulsion prints with, plus the texture and control constants the renderer uses.
-/// The color and tone system itself is `FilmModel`.
+/// The color and tone system itself is `FilmModel`; its parameters come from a stock file.
 public enum FilmLook {
-    public static let stock = FilmModel()
+    /// The default stock, `Resources/Stocks/emulsion-default.json`.
+    public static let stock: FilmModel = {
+        do throws(EmulsionError) {
+            return try FilmModel(stock: .bundled(named: "emulsion-default"))
+        } catch {
+            // The default ships inside the engine and is tested, so failing here is a build mistake, not user input.
+            fatalError("The bundled default stock is unusable: \(error.developerDescription)")
+        }
+    }()
     /// Width of the assumed frame: the full-aperture 35 mm camera gate, 0.980 in. The image's long
     /// edge maps to it. Other gauges are MOV-31.
     static let frameWidthMillimetres = 24.89

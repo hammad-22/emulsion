@@ -1,7 +1,10 @@
 import Foundation
 
-public enum EmulsionError: LocalizedError {
+public enum EmulsionError: LocalizedError, Equatable {
     case unsupportedPhoto, unsupportedVideoFormat, renderFailed, kernelsMissing
+    /// A stock file or `FilmStock` the engine can't print with. The reason (developer English, not for alerts) is the
+    /// `failureReason`.
+    case invalidStock(String)
     case libraryUnreadable, librarySaveFailed, libraryDeleteFailed
     case invalidRecipe, recipeVersionUnsupported, recipeModelUnsupported, recipesUnreadable, recipeSaveFailed
     public var errorDescription: String? {
@@ -20,6 +23,7 @@ public enum EmulsionError: LocalizedError {
         case .unsupportedVideoFormat: return String(localized: "This video format isn't supported.", bundle: .module)
         case .renderFailed: return String(localized: "The photo couldn't be rendered.", bundle: .module)
         case .kernelsMissing: return String(localized: "Emulsion's image kernels are missing from the app bundle.", bundle: .module)
+        case .invalidStock: return String(localized: "This film stock can't be used.", bundle: .module)
         case .libraryUnreadable:
             return String(
                 localized:
@@ -30,5 +34,15 @@ public enum EmulsionError: LocalizedError {
         case .libraryDeleteFailed:
             return String(localized: "The photo was removed from the library, but its original file couldn't be deleted.", bundle: .module)
         }
+    }
+
+    public var failureReason: String? {
+        guard case .invalidStock(let reason) = self else { return nil }
+        return reason
+    }
+
+    /// Description and failure reason together, for logs and developer tools.
+    package var developerDescription: String {
+        [errorDescription, failureReason].compactMap { $0 }.joined(separator: " ")
     }
 }
