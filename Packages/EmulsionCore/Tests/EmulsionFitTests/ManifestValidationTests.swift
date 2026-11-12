@@ -102,8 +102,8 @@ struct ManifestValidationTests {
         let pinned = String(repeating: "0", count: 64)
         fixture.characteristicSHA256 = pinned
         let error = try #require(try fixture.loadError())
-        guard case .tracingMismatch(let file, let expected, let found) = error else {
-            Issue.record("expected tracingMismatch, got \(error)")
+        guard case .checksumMismatch(let file, let expected, let found) = error else {
+            Issue.record("expected checksumMismatch, got \(error)")
             return
         }
         #expect(file.hasSuffix("fixture-stock/characteristic.csv"))
@@ -117,8 +117,8 @@ struct ManifestValidationTests {
         let csv = (Fixture.csvs["characteristic.csv"] ?? "") + "2.00,not-a-number\n"
         fixture.characteristicCSV = csv
         let error = try #require(try fixture.loadError())
-        guard case .tracingMismatch(_, let expected, let found) = error else {
-            Issue.record("expected tracingMismatch, got \(error)")
+        guard case .checksumMismatch(_, let expected, let found) = error else {
+            Issue.record("expected checksumMismatch, got \(error)")
             return
         }
         #expect(expected == Fixture.sha256("characteristic.csv"))

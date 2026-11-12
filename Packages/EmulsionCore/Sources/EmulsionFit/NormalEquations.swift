@@ -13,6 +13,16 @@ enum NormalEquations {
         return solve(lower: lower, b)
     }
 
+    /// The x minimizing Σ_n w_n·(Σ_i x_i·columns[i][n] − rhs[n])², through the normal equations (Σ w·a_i·a_j) x =
+    /// Σ w·a_i·rhs; nil when they are singular. `weights` defaults to 1 per sample.
+    static func solveLeastSquares(columns: [[Double]], rhs: [Double], weights: [Double]? = nil) -> [Double]? {
+        let weights = weights ?? [Double](repeating: 1, count: rhs.count)
+        func weightedDot(_ a: [Double], _ b: [Double]) -> Double {
+            weights.indices.reduce(0) { $0 + weights[$1] * a[$1] * b[$1] }
+        }
+        return solve(columns.flatMap { a in columns.map { weightedDot(a, $0) } }, columns.map { weightedDot($0, rhs) })
+    }
+
     /// A⁻¹, or nil when A is singular or not positive definite.
     static func inverse(_ a: [Double], order: Int) -> [Double]? {
         guard let lower = factor(a, order: order) else { return nil }
