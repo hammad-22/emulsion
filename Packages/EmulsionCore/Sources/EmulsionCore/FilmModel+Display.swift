@@ -80,10 +80,13 @@ extension FilmModel {
     /// Per channel, the edited print's ratio to the zero-edit print is applied to the photo. Where
     /// the photo is darker than its print (gain < 1) and the edit brightens the channel, (1 − gain)²
     /// of the print's increase is added on top, so a zero channel can still rise (desaturation)
-    /// and the response has no slope jump at zero edits.
-    func renderRelative(estimate: SIMD3<Double>, edited: SIMD3<Double>, lights: SIMD3<Double>, saturation: Double) -> SIMD3<Double> {
+    /// and the response has no slope jump at zero edits. `grain` (negative density) enters the
+    /// edited print only.
+    func renderRelative(
+        estimate: SIMD3<Double>, edited: SIMD3<Double>, lights: SIMD3<Double>, saturation: Double, grain: SIMD3<Double> = .zero
+    ) -> SIMD3<Double> {
         let base = render(estimate)
-        let print = render(edited, lights: lights, saturation: saturation)
+        let print = render(edited, lights: lights, saturation: saturation, grain: grain)
         let photo = display(fromSceneEstimate: estimate)
         return SIMD3(
             (0..<3).map { c -> Double in

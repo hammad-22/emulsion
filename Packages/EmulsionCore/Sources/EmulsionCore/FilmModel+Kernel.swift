@@ -3,7 +3,8 @@ import simd
 
 extension FilmModel {
     /// Kernel arguments for `filmSystem`, with user printer lights (log10), exposure (stops) and
-    /// saturation folded in (the ABI is documented above `filmRender` in Emulsion.ci.metal).
+    /// saturation folded in (the ABI is documented above `filmRender` in Emulsion.ci.metal). The
+    /// film kernels take the grain noise sampler before these and `Grain.kernelArguments` after them.
     func kernelArguments(lights: SIMD3<Double> = .zero, exposure: Double = 0, saturation: Double = 1) -> [CIVector] {
         let total = printerLights + lights
         return CIVector.rows(of: sensitivity) + [

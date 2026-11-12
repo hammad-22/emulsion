@@ -7,10 +7,10 @@ The UI should stay simple, while the engine underneath is something a colorist c
 ## Architecture
 
 ```
-source ──▶ input transform ──▶ scene light (linear, 0.18 = mid-gray) ──▶ grade ──▶ film system ──▶ output
-          RAW develop         one working space for every source          exposure   negative → print   P3 today;
-          log / HLG curves                                                  halation   printer lights     Rec.709 2.4,
-          display estimate                                                  local tone grain              PQ/HLG next
+source ──▶ input transform ──▶ scene light (linear, 0.18 = mid-gray) ──▶ halation ──▶ film system ──▶ local tone ──▶ output
+          RAW develop         one working space for every source                       exposure                       P3 today;
+          log / HLG curves                                                             negative + grain               Rec.709 2.4,
+          display estimate                                                             → print (printer lights)       PQ/HLG next
 ```
 
 | Stage | File | What it does |
@@ -22,7 +22,7 @@ source ──▶ input transform ──▶ scene light (linear, 0.18 = mid-gray)
 | Highlight chroma retention | same | The one non-physical step. Bright saturated light (neon) blends toward a ratio-preserving render above +1.5 stops, so it doesn't band. Midtones are unaffected; timed (warm/cool) neutrals above +1.5 stops lose part of their timing, and very bright saturated colors stay tinted instead of reaching white (artistic choice under review) |
 | Halation | `Halation.swift`, `Renderer.sceneWithHalation`, `halationSource` and `halationAdd` kernels | Light reflected at the back of the base re-exposes the red layer (a quarter as much the green, never the blue), before the negative. Linear in exposure (no threshold), so it commutes with the exposure control. The spread is a 3-Gaussian fit of the derived single-bounce profile, scaled by base thickness over an assumed 35 mm frame; uniform areas are unchanged, so it shows only at edges and points. Backing: none, undercoat or rem-jet (default; both backings estimated at 5% of the unbacked return). Blurred at reduced scale over mirrored edges (FILM-THEORY §6.1) |
 | Local tone | `LocalTone.swift` | Halo-free Highlights/Shadows: a box-averaged base layer with edge-preserving upsampling (carried over from the GradingCore study; the current test allows ≤3 codes of halo) |
-| Grain | `grain` kernel | Density noise on perceptual lightness, peaking in the midtones. The cell size is relative to the image, and sub-pixel cells are attenuated, so preview and export carry matching grain statistics |
+| Grain | `Grain.swift`, `grainNoise` kernel, inside `filmSystem` / `filmSystemRelative` | Random negative density per layer, added before printing, so the print shapes it. σ per layer is the datasheet's granularity (H-1-5207, 48 µm aperture) at that layer's exposure, scaled to the pixel by Selwyn's law on the assumed 24.89 mm frame; the noise is white per pixel, so previews and exports carry the same grain per film area. Amount 1 is the datasheet's granularity; below 1 is an artistic reduction. The print's own grain is not modelled (FILM-THEORY §6.2) |
 | Interactive speed | `Renderer.materialize` | The developed preview is rendered once into a half-float buffer, so slider moves never re-run the RAW develop or the JPEG inversion |
 
 ## Input contracts
@@ -72,7 +72,7 @@ Tests, all passing:
 - bright colors lose chroma without abrupt desaturation (they don't fully reach white: see highlight chroma retention);
 - neon light degrades no faster than gray at the same brightness;
 - halation is linear in exposure (2× scene at 0 EV equals +1 EV, within 1 code), leaves uniform fields unchanged (≤ 0.5 code, borders included), moves exposure rather than creating it, follows its kernel within 3% of the peak at two image sizes, barely responds to blue light (< 20% of an equal-luminance red source) and never raises blue-layer exposure;
-- grain is zero-mean, strongest in the midtones, deterministic per seed, and matches between preview and export;
+- grain noise is zero-mean, unit-variance, white (periodogram flat within 3.1%), independent across pixels, layers and seeds (|r| < 0.02), and deterministic per seed; the table matches the digitized datasheet (within 3.6% of Kodak's trace at −4…+4 stops) and Selwyn scaling matches a Boolean-model simulation (within 4.1% for pixels ≥ 6.2 µm, 10% at 3.1 µm); the printed grain matches the Swift mirror within 5% (measured 0.5%) at −4…+4 stops; previews at 1179, 1600 and 2556 px carry the export's grain within 10% (measured within 1%, area-averaged with the box's fractional-pixel factor removed, or against Selwyn's prediction from the export's σ); grain 0 is bit-identical to the render without grain; grain moves the mean by under 1 code (measured under 0.1 at 1600 px);
 - display-referred photos (P3 code values and a real JPEG) are reproduced at zero edits: gray codes 0–255 within 1 code on every channel, saturated colors within 5° of hue and 0.02 OKLab lightness; at −3 EV the gray ramp stays monotone with steps of at most 3 codes, including the top codes; the scene estimate is bounded (white at most +4 stops, black at −9); exposure darkens every gray code and has no slope jump at zero edits (±0.02 stops within 4%), desaturating a primary raises its zero channels, a clipped white still glows red-orange without a backing, halation stays finite, and the GPU matches the Swift mirror;
 - the viewfinder's preview estimate prints within OKLab ΔE×100 0.036 (max) / 0.007 (mean) of printing the exact display estimate on a 4096-step gray ramp, 0.029 / 0.007 on P3 primaries, secondaries and the display patches, and 0.032 / 0.010 on a saturated hue sweep; the gray estimate itself is within 0.003 stops; out-of-range light is clamped like the kernel and alpha is kept; a preview estimate prints exactly like scene light, and no input or develop produces one;
 - every input declares its contract, and the developed negative keeps it (log, HLG and Display P3 code values, a JPEG, and through materialize and resize);

@@ -39,27 +39,29 @@ public final class Renderer: @unchecked Sendable {
 
         image = try sceneWithHalation(image, a)
 
+        // Grain is negative density, added inside the film kernels (see `Grain`).
+        let noise = a.grain > 0 ? try grainNoise(extent, seed: a.seed) : CIImage(color: .black).cropped(to: extent)
+        let grain = Grain.kernelArguments(amount: a.grain, longEdge: longEdge)
         if negative.contract == .displayReferred {
             // A finished picture is printed relative to itself: zero edits reproduce it up to the
             // output gamut fit (chroma above 85% of the P3 boundary is compressed).
             let film = FilmLook.stock.relativeKernelArguments(lights: a.printerLights, exposure: a.exposure, saturation: a.printSaturation)
-            image = try kernels.run(kernels.filmSystemRelative, extent, [image, negative.image] + film)
+            image = try kernels.run(kernels.filmSystemRelative, extent, [image, negative.image, noise] + film + grain)
         } else {
             let film = FilmLook.stock.kernelArguments(lights: a.printerLights, exposure: a.exposure, saturation: a.printSaturation)
-            image = try kernels.run(kernels.filmSystem, extent, [image] + film)
+            image = try kernels.run(kernels.filmSystem, extent, [image, noise] + film + grain)
         }
 
         if a.highlights != 0 || a.shadows != 0 {
             image = try kernels.applyLocalTone(image, shadows: a.shadows, highlights: a.highlights)
         }
-
-        if a.grain > 0 {
-            let cell = FilmLook.grainCell * longEdge
-            // Sub-pixel cells: lower the amplitude to what pixel averaging would give.
-            let correction = min(1, cell)
-            image = try kernels.run(kernels.grain, extent, [image, CIVector(x: a.grain, y: max(cell, 1), z: a.seed, w: correction)])
-        }
         return image.cropped(to: extent)
+    }
+
+    /// Grain noise over `extent`: rgb = independent zero-mean, unit-variance values per pixel and
+    /// layer, white, deterministic for `seed` (kernel `grainNoise`).
+    func grainNoise(_ extent: CGRect, seed: Double) throws -> CIImage {
+        try kernels.run(kernels.grainNoise, extent, [seed])
     }
 
     /// Scene light with halation added, before the film (see `Halation`). Linear in the scene, so it

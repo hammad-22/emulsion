@@ -73,17 +73,38 @@ float3 fitP3(float3 rgb) {
 // Display-referred kernels add ends = soft ends (kneeHigh, a, kneeLow, b) (see SoftEnds in
 // FilmModel+Display.swift); displayToScene adds i0..i2, the rows of the inverse sensitivity;
 // filmSystemRelative adds baseLights = the calibrated printer lights alone.
+// Grain (filmSystem, filmSystemRelative; packed by Grain.swift): a `noise` sampler after the
+// image samplers (grainNoise: rgb = unit-variance noise per layer R, G, B) and, last, g0..g7 =
+// one table knot each: (σ red, σ green, σ blue, log10 exposure vs mid-gray), σ = density standard
+// deviation per pixel (datasheet σ at 48 µm × amount × Selwyn scale), knots ascending.
 float logistic(float x) { return 1.0/(1.0+exp(-x)); }
 
-float3 filmRender(float3 p, float3 m0, float3 m1, float3 m2, float4 neg, float4 negOff,
-                  float4 prt, float4 misc, float3 lights, float3 d0, float3 d1, float3 d2) {
+// The film's layer exposure, log10 relative to mid-gray, after the exposure control and saturation.
+float3 layerLogExposure(float3 p, float3 m0, float3 m1, float3 m2, float4 negOff, float4 misc) {
     p*=exp2(negOff.w);
     float Y=lumaP3(p);
     p=Y+(p-Y)*misc.z;
     float3 E=max(float3(dot(m0,p),dot(m1,p),dot(m2,p)),float3(1e-7));
-    float3 logE=log10(E/0.18);
+    return log10(E/0.18);
+}
+
+struct GrainTable { float4 g[8]; };
+// Per-layer density standard deviation at log exposure logE: piecewise linear through the 8 knots,
+// held at the end values outside them (seven fixed segments, no search).
+float3 grainSigma(float3 logE, GrainTable t) {
+    float3 s=t.g[0].xyz;
+    for(int i=0;i<7;i++) s+=(t.g[i+1].xyz-t.g[i].xyz)*clamp((logE-t.g[i].w)/(t.g[i+1].w-t.g[i].w),0.0,1.0);
+    return s;
+}
+// Density added to each negative layer: σ(logE)·n.
+float3 grainDensity(float3 logE, float3 n, GrainTable t) { return grainSigma(logE,t)*n; }
+
+// grain = density added to the negative layers (R, G, B) before printing.
+float3 filmRender(float3 p, float3 m0, float3 m1, float3 m2, float4 neg, float4 negOff,
+                  float4 prt, float4 misc, float3 lights, float3 d0, float3 d1, float3 d2, float3 grain) {
+    float3 logE=layerLogExposure(p,m0,m1,m2,negOff,misc);
     float3 kn=4.0*neg.xyz/neg.w;
-    float3 dNeg=neg.w*float3(logistic(kn.x*(logE.x-negOff.x)),logistic(kn.y*(logE.y-negOff.y)),logistic(kn.z*(logE.z-negOff.z)));
+    float3 dNeg=neg.w*float3(logistic(kn.x*(logE.x-negOff.x)),logistic(kn.y*(logE.y-negOff.y)),logistic(kn.z*(logE.z-negOff.z)))+grain;
     float3 logP=lights-dNeg;
     float3 kp=4.0*prt.xyz/prt.w;
     float3 dP=misc.x+prt.w*pow(float3(logistic(kp.x*logP.x),logistic(kp.y*logP.y),logistic(kp.z*logP.z)),float3(1.0/misc.y));
@@ -94,28 +115,33 @@ float3 filmRender(float3 p, float3 m0, float3 m1, float3 m2, float4 neg, float4 
 
 // Scene light (linear P3) → displayed print (display-linear P3) before the gamut fit: filmRender
 // plus highlight chroma retention (misc.w), which blends bright saturated light toward a
-// ratio-preserving rendering through the same neutral response (see FilmModel.render).
+// ratio-preserving rendering through the same neutral response (see FilmModel.render). `n` is the
+// pixel's grain noise; the neutral response carries the same density offset.
 float3 filmPrint(float3 p, float3 m0, float3 m1, float3 m2, float4 neg, float4 negOff,
-                 float4 prt, float4 misc, float3 lights, float3 d0, float3 d1, float3 d2) {
-    float3 o=filmRender(p,m0,m1,m2,neg,negOff,prt,misc,lights,d0,d1,d2);
+                 float4 prt, float4 misc, float3 lights, float3 d0, float3 d1, float3 d2, float3 n, GrainTable t) {
+    float3 grain=grainDensity(layerLogExposure(p,m0,m1,m2,negOff,misc),n,t);
+    float3 o=filmRender(p,m0,m1,m2,neg,negOff,prt,misc,lights,d0,d1,d2,grain);
     float3 q=p*exp2(negOff.w); float Yq=lumaP3(q); q=Yq+(q-Yq)*misc.z;
     float m=max(max(q.x,q.y),max(q.z,1e-7));
     float w=misc.w*smoothstep(1.5,4.0,log2(m/0.18));
     if(w>0.0) {
         // Neutral of brightness m: undo the exposure filmRender re-applies, no saturation.
-        float g=filmRender(float3(m)*exp2(-negOff.w),m0,m1,m2,neg,negOff,prt,float4(misc.x,misc.y,1.0,0.0),lights,d0,d1,d2).y;
+        float g=filmRender(float3(m)*exp2(-negOff.w),m0,m1,m2,neg,negOff,prt,float4(misc.x,misc.y,1.0,0.0),lights,d0,d1,d2,grain).y;
         o=mix(o,q*(g/m),w);
     }
     return o;
 }
 
-// Scene light (working space, premultiplied) → displayed print (working space), soft-mapped into P3.
-extern "C" float4 filmSystem(coreimage::sample_t sample, float4 m0, float4 m1, float4 m2,
+// Scene light (working space, premultiplied) and grain noise → displayed print (working space),
+// soft-mapped into P3.
+extern "C" float4 filmSystem(coreimage::sample_t sample, coreimage::sample_t noise, float4 m0, float4 m1, float4 m2,
                              float4 neg, float4 negOff, float4 prt, float4 misc, float4 lights,
-                             float4 d0, float4 d1, float4 d2) {
+                             float4 d0, float4 d1, float4 d2,
+                             float4 g0, float4 g1, float4 g2, float4 g3, float4 g4, float4 g5, float4 g6, float4 g7) {
     float a=sample.a;
     float3 p=toP3(sample.rgb/max(a,1e-6));
-    float3 o=filmPrint(p,m0.xyz,m1.xyz,m2.xyz,neg,negOff,prt,misc,lights.xyz,d0.xyz,d1.xyz,d2.xyz);
+    GrainTable t={{g0,g1,g2,g3,g4,g5,g6,g7}};
+    float3 o=filmPrint(p,m0.xyz,m1.xyz,m2.xyz,neg,negOff,prt,misc,lights.xyz,d0.xyz,d1.xyz,d2.xyz,noise.rgb,t);
     return float4(fitP3(fromP3(o))*a,a);
 }
 
@@ -130,7 +156,7 @@ constant int displaySearchSteps=22;
 // F_n: display-linear green of the calibrated print of a neutral scene `linear`, at zero edits.
 float neutralPrint(float linear, float3 m0, float3 m1, float3 m2, float4 neg, float4 negOff,
                    float4 prt, float4 misc, float3 lights, float3 d0, float3 d1, float3 d2) {
-    return filmRender(float3(linear),m0,m1,m2,neg,float4(negOff.xyz,0.0),prt,float4(misc.x,misc.y,1.0,0.0),lights,d0,d1,d2).y;
+    return filmRender(float3(linear),m0,m1,m2,neg,float4(negOff.xyz,0.0),prt,float4(misc.x,misc.y,1.0,0.0),lights,d0,d1,d2,float3(0.0)).y;
 }
 // F_n of each component: three neutral scenes, one per channel.
 float3 neutralPrint3(float3 v, float3 m0, float3 m1, float3 m2, float4 neg, float4 negOff,
@@ -175,20 +201,23 @@ extern "C" float4 displayToScene(coreimage::sample_t sample, float4 m0, float4 m
 }
 
 // Scene estimate of a display-referred photo `edited` (with the user's halation added) and
-// `original` (the estimate untouched), both linear working space, premultiplied → displayed print
-// (working space), soft-mapped into P3. The edited print's change from the zero-edit print is
-// applied to the original display value, so zero edits reproduce the photo up to fitP3 (chroma
-// above 85% of the P3 boundary is compressed); edit arguments as
-// filmSystem, plus ends and the calibrated printer lights (baseLights).
-extern "C" float4 filmSystemRelative(coreimage::sample_t edited, coreimage::sample_t original, float4 m0, float4 m1, float4 m2,
+// `original` (the estimate untouched), both linear working space, premultiplied, and grain noise →
+// displayed print (working space), soft-mapped into P3. The edited print's change from the
+// zero-edit print is applied to the original display value, so zero edits reproduce the photo up
+// to fitP3 (chroma above 85% of the P3 boundary is compressed); edit arguments as filmSystem, plus
+// ends and the calibrated printer lights (baseLights). Grain enters the edited print only.
+extern "C" float4 filmSystemRelative(coreimage::sample_t edited, coreimage::sample_t original, coreimage::sample_t noise,
+                                     float4 m0, float4 m1, float4 m2,
                                      float4 neg, float4 negOff, float4 prt, float4 misc, float4 lights,
-                                     float4 d0, float4 d1, float4 d2, float4 ends, float4 baseLights) {
+                                     float4 d0, float4 d1, float4 d2, float4 ends, float4 baseLights,
+                                     float4 g0, float4 g1, float4 g2, float4 g3, float4 g4, float4 g5, float4 g6, float4 g7) {
     float a=edited.a;
     float3 p=toP3(edited.rgb/max(a,1e-6));
     float3 s0=toP3(original.rgb/max(original.a,1e-6));
     float4 baseNegOff=float4(negOff.xyz,0.0), baseMisc=float4(misc.x,misc.y,1.0,misc.w);
-    float3 e=filmPrint(p,m0.xyz,m1.xyz,m2.xyz,neg,negOff,prt,misc,lights.xyz,d0.xyz,d1.xyz,d2.xyz);
-    float3 b=filmPrint(s0,m0.xyz,m1.xyz,m2.xyz,neg,baseNegOff,prt,baseMisc,baseLights.xyz,d0.xyz,d1.xyz,d2.xyz);
+    GrainTable t={{g0,g1,g2,g3,g4,g5,g6,g7}};
+    float3 e=filmPrint(p,m0.xyz,m1.xyz,m2.xyz,neg,negOff,prt,misc,lights.xyz,d0.xyz,d1.xyz,d2.xyz,noise.rgb,t);
+    float3 b=filmPrint(s0,m0.xyz,m1.xyz,m2.xyz,neg,baseNegOff,prt,baseMisc,baseLights.xyz,d0.xyz,d1.xyz,d2.xyz,float3(0.0),t);
     float3 E=max(float3(dot(m0.xyz,s0),dot(m1.xyz,s0),dot(m2.xyz,s0)),float3(1e-7));
     // Clamped to what the soft ends produce for display 0…1, so the inverse stays in 0…1.
     float lo=compressEnds(0.0,ends), hi=compressEnds(1.0,ends);
@@ -291,7 +320,7 @@ extern "C" float4 halationAdd(coreimage::sample_t sample, coreimage::sample_t bl
     return float4(fromP3(p+float3(dot(i0.xyz,dE),dot(i1.xyz,dE),dot(i2.xyz,dE)))*a,a);
 }
 
-// ---- Grain ----
+// ---- Grain (see Grain.swift) ----
 // The seed enters through irrational multiples, so seeds that differ by whole numbers
 // (which fract() alone would cancel) still give independent patterns.
 float hash(float2 p, float seed) {
@@ -299,29 +328,24 @@ float hash(float2 p, float seed) {
     q+=dot(q,q.yzx+33.33);
     return fract((q.x+q.y)*q.z)*2.0-1.0;
 }
-float valueNoise(float2 p, float seed) {
-    float2 i=floor(p), f=fract(p);
-    float2 u=f*f*(3.0-2.0*f);
-    float a=hash(i,seed), b=hash(i+float2(1,0),seed), c=hash(i+float2(0,1),seed), d=hash(i+float2(1,1),seed);
-    return mix(mix(a,b,u.x),mix(c,d,u.x),u.y);
-}
-// Film grain as density noise on perceptual lightness, strongest in the midtones.
-// `params` = (amount, cell size in pixels, seed, amplitude correction for sub-pixel cells).
-// Below one pixel per cell, the amplitude is reduced to what averaging would produce, so a
-// small preview and the full-resolution export carry statistically matching grain.
-extern "C" float4 grain(coreimage::sample_t sample, float4 params, coreimage::destination dest) {
-    float a=sample.a;
-    float3 rgb=sample.rgb/max(a,1e-6);
-    float Y=max(lumaSRGB(rgb),0.0);
-    float L=pow(Y,1.0/3.0);
-    float2 p=dest.coord()/max(params.y,1e-3);
-    float n=(valueNoise(p,params.z)+.5*valueNoise(p*2.03+17.0,params.z+1.7))*1.9;
-    float envelope=smoothstep(.03,.30,L)*(1.0-smoothstep(.72,1.0,L));
-    float Ln=max(L+params.x*.045*params.w*n*envelope,0.0);
-    float ratio=Y>1e-7 ? pow(Ln/max(L,1e-4),3.0) : 1.0;
-    float3 chroma=float3(valueNoise(p+41.0,params.z),valueNoise(p+83.0,params.z),valueNoise(p+127.0,params.z));
-    rgb=rgb*ratio*(1.0+params.x*.012*params.w*chroma*envelope);
-    return float4(rgb*a,a);
+// Uniform hashes summed per value; their sum, scaled to unit variance, is close to Gaussian
+// (excess kurtosis −1.2/4).
+constant int grainHashesPerValue=4;
+// Hash k (0…11) of a pixel is read at pixel + k·grainDrawOffset (exact in float). The offsets'
+// differences are never whole pixels (k − k′ < 32), so no hash is shared with another pixel or
+// channel; steps under a pixel this size keep the draws independent (k/16 steps left the sum's
+// excess kurtosis at −0.46 instead of −0.30).
+constant float2 grainDrawOffset=float2(17.0,9.0)/32.0;
+// Generator: rgb = three independent, zero-mean, unit-variance values per integer pixel (red,
+// green and blue layer), deterministic for `seed`; opaque. White: no correlation between pixels.
+extern "C" float4 grainNoise(float seed, coreimage::destination dest) {
+    float2 pixel=floor(dest.coord());
+    float3 n=float3(0.0);
+    for(int c=0;c<3;c++) {
+        for(int k=0;k<grainHashesPerValue;k++) n[c]+=hash(pixel+float(c*grainHashesPerValue+k)*grainDrawOffset,seed);
+    }
+    // A uniform on [−1, 1) has variance 1/3.
+    return float4(n*sqrt(3.0/float(grainHashesPerValue)),1.0);
 }
 
 // ---- Local tone (Highlights / Shadows), carried over from the GradingCore study ----

@@ -79,14 +79,30 @@ public struct FilmModel: Sendable, Equatable {
     /// Scene-linear Display P3 → display-linear Display P3 (before gamut mapping).
     /// `lights` adds user printer lights (log10) to the calibrated ones.
     public func render(_ scene: SIMD3<Double>, lights: SIMD3<Double> = .zero, saturation: Double = 1) -> SIMD3<Double> {
-        let y = dot(scene, SIMD3(0.2289746, 0.6917385, 0.0792869))
-        let s = SIMD3(repeating: y) + (scene - SIMD3(repeating: y)) * saturation
-        let perLayer = system(s, lights: lights)
+        render(scene, lights: lights, saturation: saturation, grain: .zero)
+    }
+
+    /// `render` of a grainy negative: `grain` is density added to the negative layers (the neutral
+    /// response of highlight chroma retention gets it too).
+    func render(_ scene: SIMD3<Double>, lights: SIMD3<Double> = .zero, saturation: Double = 1, grain: SIMD3<Double>) -> SIMD3<Double> {
+        let s = saturated(scene, saturation)
+        let perLayer = system(s, lights: lights, grain: grain)
         let m = max(s.max(), 1e-7)
         let w = highlightChromaRetention * Self.smoothstep(1.5, 4.0, log2(m / 0.18))
         guard w > 0 else { return perLayer }
-        let ratioPreserving = s * (system(SIMD3(repeating: m), lights: lights).y / m)
+        let ratioPreserving = s * (system(SIMD3(repeating: m), lights: lights, grain: grain).y / m)
         return perLayer + (ratioPreserving - perLayer) * w
+    }
+
+    func saturated(_ scene: SIMD3<Double>, _ saturation: Double) -> SIMD3<Double> {
+        let y = dot(scene, SIMD3(0.2289746, 0.6917385, 0.0792869))
+        return SIMD3(repeating: y) + (scene - SIMD3(repeating: y)) * saturation
+    }
+
+    /// The layers' log10 exposure relative to mid-gray for scene light `scene` (what grain is indexed by).
+    func layerLogExposure(_ scene: SIMD3<Double>, saturation: Double = 1) -> SIMD3<Double> {
+        let exposure = simd_max(sensitivity * saturated(scene, saturation), SIMD3(repeating: 1e-7))
+        return SIMD3((0..<3).map { log10(exposure[$0] / 0.18) })
     }
 
     static func smoothstep(_ a: Double, _ b: Double, _ x: Double) -> Double {
@@ -94,11 +110,9 @@ public struct FilmModel: Sendable, Equatable {
         return t * t * (3 - 2 * t)
     }
 
-    /// The photochemical chain itself.
-    func system(_ s: SIMD3<Double>, lights: SIMD3<Double>) -> SIMD3<Double> {
-        let exposure = simd_max(sensitivity * s, SIMD3(repeating: 1e-7))
-        let logE = SIMD3((0..<3).map { log10(exposure[$0] / 0.18) })
-        let dNeg = negativeDensity(logE)
+    /// The photochemical chain itself; `grain` is density added to the negative layers.
+    func system(_ s: SIMD3<Double>, lights: SIMD3<Double>, grain: SIMD3<Double> = .zero) -> SIMD3<Double> {
+        let dNeg = negativeDensity(layerLogExposure(s)) + grain
         // More negative density → less light reaches the print.
         let logP = printerLights + lights - dNeg
         let dPrint = printDyes * printDensity(logP)
