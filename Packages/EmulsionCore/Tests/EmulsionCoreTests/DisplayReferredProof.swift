@@ -1,9 +1,7 @@
 import CoreImage
 import EmulsionFixtures
 import Foundation
-import ImageIO
 import Testing
-import UniformTypeIdentifiers
 
 @testable import EmulsionCore
 
@@ -29,7 +27,7 @@ struct DisplayReferredProof {
         let down3 = try rendered(exposure: -3)
         let up2 = try rendered(exposure: 2)
         for (name, image) in [("source", chart), ("zero-edits", zero), ("minus-3ev", down3), ("plus-2ev", up2)] {
-            try writePNG(image, to: directory.appending(path: "\(name).png"))
+            try EmulsionTestCase.writePNG(image, to: directory.appending(path: "\(name).png"))
         }
 
         var lines = ["Display-referred proof (chart \(width) px wide; codes are encoded Display P3 x255, before 8-bit rounding)"]
@@ -95,12 +93,5 @@ struct DisplayReferredProof {
         let table = lines.joined(separator: "\n")
         print(table)
         try table.write(to: directory.appending(path: "numbers.txt"), atomically: true, encoding: .utf8)
-    }
-
-    private func writePNG(_ image: CIImage, to url: URL) throws {
-        let cg = try renderer.cgImage(image)
-        let destination = try #require(CGImageDestinationCreateWithURL(url as CFURL, UTType.png.identifier as CFString, 1, nil))
-        CGImageDestinationAddImage(destination, cg, nil)
-        #expect(CGImageDestinationFinalize(destination))
     }
 }

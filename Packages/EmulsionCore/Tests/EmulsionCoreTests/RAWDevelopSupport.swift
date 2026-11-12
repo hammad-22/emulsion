@@ -1,4 +1,5 @@
 import CoreImage
+import EmulsionFixtures
 import Foundation
 import simd
 
@@ -8,6 +9,12 @@ import simd
 enum RAWDevelopSupport {
     /// ":"-separated folders of real DNGs (opt-in; real samples never enter the repo).
     static let samplesFolders = ProcessInfo.processInfo.environment["EMULSION_RAW_SAMPLES"]
+
+    /// Long edge of the scaled real-file decode, to keep 48 MP files fast.
+    static let previewLongEdge: CGFloat = 1024
+
+    /// A highlight that reaches 4.0 in scene light is two stops above the old ceiling of 1.0.
+    static let headroomFloor = 4.0
 
     /// Every .dng (any case) in the folders of EMULSION_RAW_SAMPLES, sorted by name per folder.
     static func sampleURLs() throws -> [URL] {
@@ -21,46 +28,41 @@ enum RAWDevelopSupport {
         }
     }
 
+    /// Rec. 709 / sRGB luminance (Y) of linear sRGB.
+    static func luminance(_ c: SIMD3<Double>) -> Double { (SyntheticDNG.xyzFromLinearSRGB * c).y }
+
+    /// How far a colour is from neutral: max(|R/G − 1|, |B/G − 1|).
+    static func neutralError(_ c: SIMD3<Double>) -> Double { max(abs(c.x / c.y - 1), abs(c.z / c.y - 1)) }
+
+    /// The brightest channel value over all pixels.
+    static func maxValue(_ pixels: [SIMD3<Double>]) -> Double { pixels.map { $0.max() }.max() ?? .nan }
+
     /// Highlight statistics of a developed frame (linear sRGB pixels).
     struct FrameStats {
-        var max: SIMD3<Double>
-        var min: Double
-        var median: Double
-        var p999: Double
-        var mean: SIMD3<Double>
+        let maxValue: Double
+        /// 99.9th percentile of luminance.
+        let p999: Double
         /// Fractions of pixels whose brightest channel exceeds 1, 2 and 4.
-        var over1: Double
-        var over2: Double
-        var over4: Double
-        /// Mean R/G and B/G of the brightest 0.1 % of pixels by luminance: the colour of clipped highlights.
-        var highlightRatios: SIMD2<Double>
-        var isFinite: Bool
-
-        static func luminance(_ c: SIMD3<Double>) -> Double { 0.2126729 * c.x + 0.7151522 * c.y + 0.0721750 * c.z }
+        let over1: Double
+        let over2: Double
+        let over4: Double
+        let isFinite: Bool
 
         init(_ pixels: [SIMD3<Double>]) {
-            let sortedLuminance = pixels.map(Self.luminance).sorted()
+            let sortedLuminance = pixels.map(luminance).sorted()
             let count = Double(pixels.count)
-            max = pixels.reduce(SIMD3(repeating: -.infinity)) { simd_max($0, $1) }
-            min = pixels.map { $0.min() }.min() ?? .nan
-            median = sortedLuminance[sortedLuminance.count / 2]
-            p999 = sortedLuminance[Swift.min(sortedLuminance.count - 1, Int(count * 0.999))]
-            mean = pixels.reduce(SIMD3<Double>.zero, +) / count
+            maxValue = RAWDevelopSupport.maxValue(pixels)
+            p999 = sortedLuminance[min(sortedLuminance.count - 1, Int(count * 0.999))]
             over1 = Double(pixels.filter { $0.max() > 1 }.count) / count
             over2 = Double(pixels.filter { $0.max() > 2 }.count) / count
             over4 = Double(pixels.filter { $0.max() > 4 }.count) / count
-            let threshold = p999
-            let brightest = pixels.filter { Self.luminance($0) >= threshold }
-            let brightMean = brightest.reduce(SIMD3<Double>.zero, +) / Double(Swift.max(brightest.count, 1))
-            highlightRatios = SIMD2(brightMean.x / brightMean.y, brightMean.z / brightMean.y)
             isFinite = pixels.allSatisfy { $0.x.isFinite && $0.y.isFinite && $0.z.isFinite }
         }
-
-        var maxValue: Double { max.max() }
     }
 
-    /// The Developer's RAW configuration before MOV-79: Apple's look processing off, gamut
-    /// mapping, shadow bias and highlight recovery at the file's defaults.
+    /// The Developer's RAW configuration before MOV-79, frozen here for before/after
+    /// comparisons: Apple's look processing off, gamut mapping, shadow bias and highlight
+    /// recovery at the file's defaults.
     static func applyPreMOV79Develop(_ raw: CIRAWFilter) {
         raw.boostAmount = 0
         raw.boostShadowAmount = 0
@@ -69,19 +71,22 @@ enum RAWDevelopSupport {
         raw.extendedDynamicRangeAmount = 0
     }
 
-    /// A negative developed with the pre-MOV-79 configuration, for before/after comparisons.
+    /// A negative developed with the pre-MOV-79 configuration.
     static func preMOV79Negative(_ raw: CIRAWFilter, maxDimension: CGFloat? = nil) throws -> Negative {
         applyPreMOV79Develop(raw)
-        if let maxDimension {
-            let scale = min(1, maxDimension / max(raw.nativeSize.width, raw.nativeSize.height))
-            raw.scaleFactor = Float(scale)
-            raw.isDraftModeEnabled = scale < 1
-        }
+        Developer.applyPreviewScale(raw, maxDimension: maxDimension)
         guard let output = raw.outputImage, !output.extent.isEmpty, !output.extent.isInfinite else {
             throw EmulsionError.unsupportedPhoto
         }
-        let e = output.extent.integral
-        let image = output.cropped(to: e).transformed(by: CGAffineTransform(translationX: -e.minX, y: -e.minY))
-        return Negative(image: image, contract: .sceneReferred)
+        return Negative(image: Developer.normalized(output), contract: .sceneReferred)
     }
+}
+
+extension Double {
+    /// Four significant digits, for probe and real-file tables.
+    var fourDigits: String { String(format: "%.4g", self) }
+}
+
+extension SIMD3<Double> {
+    var fourDigits: String { "(\(x.fourDigits), \(y.fourDigits), \(z.fourDigits))" }
 }

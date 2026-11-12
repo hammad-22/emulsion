@@ -24,7 +24,7 @@ public struct Developer {
 
     public static func isRAW(_ data: Data) -> Bool { rawTypeIdentifier(of: data) != nil }
 
-    private static let dngTypeIdentifier = "com.adobe.raw-image"
+    static let dngTypeIdentifier = "com.adobe.raw-image"
 
     /// The RAW type of `data`, or nil when it isn't RAW. Read from memory, ImageIO types many
     /// DNGs as plain TIFF (23 of 25 ProRAW files tested, MOV-79) and CIRAWFilter then decodes
@@ -43,17 +43,12 @@ public struct Developer {
     /// `maxDimension` develops a smaller image (RAW draft mode) for fast previews.
     public func develop(_ data: Data, maxDimension: CGFloat? = nil) throws -> Negative {
         if let type = Self.rawTypeIdentifier(of: data), let raw = CIRAWFilter(imageData: data, identifierHint: type) {
-            developLinear(raw)
-            if let maxDimension {
-                let native = raw.nativeSize
-                let scale = min(1, maxDimension / max(native.width, native.height))
-                raw.scaleFactor = Float(scale)
-                raw.isDraftModeEnabled = scale < 1
-            }
+            Self.bypassAppleRendering(raw)
+            Self.applyPreviewScale(raw, maxDimension: maxDimension)
             guard let output = raw.outputImage, !output.extent.isEmpty, !output.extent.isInfinite else {
                 throw EmulsionError.unsupportedPhoto
             }
-            return Negative(image: normalized(output), contract: .sceneReferred)
+            return Negative(image: Self.normalized(output), contract: .sceneReferred)
         }
         // Known limitation: HDR stills are read as their SDR rendition (a gain map is ignored,
         // PQ/HLG stills are tone-mapped by Core Image), so HDR headroom is discarded until MOV-49.
@@ -66,7 +61,16 @@ public struct Developer {
                 image = image.lanczosScaled(by: scale)
             }
         }
-        return try sceneFromDisplay(normalized(image))
+        return try sceneFromDisplay(Self.normalized(image))
+    }
+
+    /// Decodes at most `maxDimension` on the long edge, in RAW draft mode when that's smaller.
+    static func applyPreviewScale(_ raw: CIRAWFilter, maxDimension: CGFloat?) {
+        guard let maxDimension else { return }
+        let native = raw.nativeSize
+        let scale = min(1, maxDimension / max(native.width, native.height))
+        raw.scaleFactor = Float(scale)
+        raw.isDraftModeEnabled = scale < 1
     }
 
     /// Bypass Apple's rendering: no tone boost, local tone mapping, extra contrast, gamut
@@ -74,7 +78,7 @@ public struct Developer {
     /// scaled by the file's BaselineExposure; noise reduction, sharpening, lens correction and
     /// the decoder version stay at the file's defaults. Measured on synthetic DNGs and 25 real
     /// files (MOV-79, `RAWDevelopTests`).
-    private func developLinear(_ raw: CIRAWFilter) {
+    private static func bypassAppleRendering(_ raw: CIRAWFilter) {
         raw.boostAmount = 0
         raw.boostShadowAmount = 0
         if raw.isLocalToneMapSupported { raw.localToneMapAmount = 0 }
@@ -137,7 +141,8 @@ public struct Developer {
         space.contract == .displayReferred ? try sceneFromDisplay(light) : Negative(image: light, contract: space.contract)
     }
 
-    private func normalized(_ image: CIImage) -> CIImage {
+    /// Crops to whole pixels and moves the origin to (0, 0).
+    static func normalized(_ image: CIImage) -> CIImage {
         let e = image.extent.integral
         return image.cropped(to: e).transformed(by: CGAffineTransform(translationX: -e.minX, y: -e.minY))
     }

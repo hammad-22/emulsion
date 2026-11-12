@@ -1,6 +1,8 @@
 import CoreImage
 import EmulsionFixtures
 import ImageIO
+import Testing
+import UniformTypeIdentifiers
 import XCTest
 import simd
 
@@ -36,5 +38,12 @@ class EmulsionTestCase: XCTestCase {
             SIMD3(-0.0196375546, -0.0786360456, 1.0982736001),
         ])
         return Fixtures.toOKLab(m * p)
+    }
+    /// Writes `image` as a PNG, for opt-in proof renders.
+    static func writePNG(_ image: CIImage, to url: URL) throws {
+        let cgImage = try sharedRenderer.cgImage(image)
+        let destination = try #require(CGImageDestinationCreateWithURL(url as CFURL, UTType.png.identifier as CFString, 1, nil))
+        CGImageDestinationAddImage(destination, cgImage, nil)
+        #expect(CGImageDestinationFinalize(destination))
     }
 }

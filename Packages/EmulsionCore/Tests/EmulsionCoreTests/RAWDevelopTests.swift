@@ -27,7 +27,7 @@ struct RAWDevelopTests {
         let negative = try developer.develop(data, maxDimension: maxDimension)
         let pixels = Fixtures.linear(negative.image)
         let means = chart.means(of: pixels, width: Int(negative.size.width), height: Int(negative.size.height))
-        return Developed(negative: negative, means: means, maxValue: pixels.map { $0.max() }.max() ?? .nan)
+        return Developed(negative: negative, means: means, maxValue: RAWDevelopSupport.maxValue(pixels))
     }
 
     /// Developed linear sRGB of a camera value, from the fixture's own maths: the sensor clips to
@@ -42,8 +42,6 @@ struct RAWDevelopTests {
     static let unclippedNeutrals = RAWDevelopChart.neutralIndices.filter { cameraValues[$0].max() < 0.95 }
     /// Neutral patches with at least one channel at or above sensor white.
     static let clippedNeutrals = RAWDevelopChart.neutralIndices.filter { cameraValues[$0].max() >= 1 }
-
-    static func neutralError(_ c: SIMD3<Double>) -> Double { max(abs(c.x / c.y - 1), abs(c.z / c.y - 1)) }
 
     // MARK: Tolerances (about 2× the worst value measured on macOS 27.2, Bayer and linear files)
 
@@ -76,19 +74,18 @@ struct RAWDevelopTests {
 
     /// Exposure that puts the brightest unclipped neutral (camera 0.72) at 5.76, above 4.0.
     static let headroomBaselineStops = 3.0
-    static let headroomFloor = 4.0
 
     @Test(arguments: SyntheticDNG.Mosaic.allCases)
     func developedHighlightsKeepHeadroom(_ mosaic: SyntheticDNG.Mosaic) throws {
         let developed = try Self.develop(mosaic, baselineStops: Self.headroomBaselineStops)
         let brightest = try #require(Self.unclippedNeutrals.last)
         let expected = Self.expected(camera: Self.cameraValues[brightest], baselineStops: Self.headroomBaselineStops)
-        #expect(expected.y > Self.headroomFloor)
+        #expect(expected.y > RAWDevelopSupport.headroomFloor)
         let measured = developed.means[brightest]
         #expect(
             abs(measured.y / expected.y - 1) < Self.linearTolerance,
             "brightest unclipped neutral: expected \(expected.y), measured \(measured.y)")
-        #expect(developed.maxValue > Self.headroomFloor, "max over the image \(developed.maxValue)")
+        #expect(developed.maxValue > RAWDevelopSupport.headroomFloor, "max over the image \(developed.maxValue)")
     }
 
     // MARK: Linearity and neutrality
@@ -102,7 +99,7 @@ struct RAWDevelopTests {
             let expected = Self.expected(camera: Self.cameraValues[index], baselineStops: baselineStops)
             let measured = developed.means[index]
             worstLinear = max(worstLinear, (abs(measured / expected - 1)).max())
-            worstNeutral = max(worstNeutral, Self.neutralError(measured))
+            worstNeutral = max(worstNeutral, RAWDevelopSupport.neutralError(measured))
         }
         #expect(worstLinear < Self.linearTolerance, "worst relative error \(worstLinear)")
         #expect(worstNeutral < Self.neutralTolerance, "worst neutral error \(worstNeutral)")
@@ -115,7 +112,7 @@ struct RAWDevelopTests {
         #expect(!Self.clippedNeutrals.isEmpty)
         for index in Self.clippedNeutrals {
             let measured = developed.means[index]
-            #expect(Self.neutralError(measured) < Self.clippedNeutralTolerance, "patch \(index): \(measured)")
+            #expect(RAWDevelopSupport.neutralError(measured) < Self.clippedNeutralTolerance, "patch \(index): \(measured)")
             #expect(measured.y >= developed.means[lastUnclipped].y, "patch \(index) darker than the last unclipped patch")
         }
     }
@@ -153,7 +150,7 @@ struct RAWDevelopTests {
     @Test(arguments: SyntheticDNG.Mosaic.allCases)
     func developedRAWRendersFinite(_ mosaic: SyntheticDNG.Mosaic) throws {
         let developed = try Self.develop(mosaic, baselineStops: Self.headroomBaselineStops)
-        #expect(developed.maxValue > Self.headroomFloor)
+        #expect(developed.maxValue > RAWDevelopSupport.headroomFloor)
         #expect(developed.means.contains { $0.min() < 0 })
         var textured = Adjustments()
         textured.seed = 7
@@ -171,9 +168,6 @@ struct RAWDevelopTests {
 /// Real DNGs from EMULSION_RAW_SAMPLES (never checked in): the pre-MOV-79 develop against today's.
 @Suite(.enabled(if: RAWDevelopSupport.samplesFolders != nil), .serialized)
 struct RAWDevelopRealFileTests {
-    static let longEdge: CGFloat = 1024
-    /// A highlight that reaches 4.0 in scene light is two stops above the old ceiling.
-    static let headroomFloor = 4.0
     static let minimumFilesForHeadroomCheck = 20
     static let minimumFilesAboveFloor = 3
     /// The old develop's max may exceed the new one only by rounding.
@@ -183,7 +177,6 @@ struct RAWDevelopRealFileTests {
         let urls = try RAWDevelopSupport.sampleURLs()
         try #require(!urls.isEmpty, "EMULSION_RAW_SAMPLES lists no .dng files")
         let developer = RAWDevelopTests.developer
-        func f(_ v: Double) -> String { String(format: "%.4g", v) }
         print("| File | BaselineExposure | Old max | New max | New p99.9 lum | > 1 | > 2 | > 4 |")
         print("| --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: |")
         var aboveFloor = 0
@@ -191,20 +184,22 @@ struct RAWDevelopRealFileTests {
             let raw = try #require(CIRAWFilter(imageURL: url))
             let baseline = raw.baselineExposure
             let old = RAWDevelopSupport.FrameStats(
-                Fixtures.linear(try RAWDevelopSupport.preMOV79Negative(raw, maxDimension: Self.longEdge).image))
-            let developed = try developer.develop(Data(contentsOf: url), maxDimension: Self.longEdge)
+                Fixtures.linear(try RAWDevelopSupport.preMOV79Negative(raw, maxDimension: RAWDevelopSupport.previewLongEdge).image))
+            let developed = try developer.develop(Data(contentsOf: url), maxDimension: RAWDevelopSupport.previewLongEdge)
             #expect(developed.contract == .sceneReferred, "\(url.lastPathComponent) did not develop as RAW")
             let new = RAWDevelopSupport.FrameStats(Fixtures.linear(developed.image))
             let name = url.lastPathComponent
             print(
-                "| \(name) | \(f(Double(baseline))) | \(f(old.maxValue)) | \(f(new.maxValue)) | \(f(new.p999)) | \(f(new.over1)) | \(f(new.over2)) | \(f(new.over4)) |"
+                "| \(name) | \(Double(baseline).fourDigits) | \(old.maxValue.fourDigits) | \(new.maxValue.fourDigits) | \(new.p999.fourDigits)"
+                    + " | \(new.over1.fourDigits) | \(new.over2.fourDigits) | \(new.over4.fourDigits) |"
             )
             #expect(old.isFinite && new.isFinite, "\(name) has non-finite values")
             #expect(new.maxValue >= old.maxValue - Self.maxTolerance, "\(name): new max \(new.maxValue) < old max \(old.maxValue)")
-            if new.maxValue > Self.headroomFloor { aboveFloor += 1 }
+            if new.maxValue > RAWDevelopSupport.headroomFloor { aboveFloor += 1 }
         }
         if urls.count >= Self.minimumFilesForHeadroomCheck {
-            #expect(aboveFloor >= Self.minimumFilesAboveFloor, "\(aboveFloor) of \(urls.count) files exceed \(Self.headroomFloor)")
+            #expect(
+                aboveFloor >= Self.minimumFilesAboveFloor, "\(aboveFloor) of \(urls.count) files exceed \(RAWDevelopSupport.headroomFloor)")
         }
     }
 }
@@ -220,11 +215,7 @@ struct RAWDevelopProofRenders {
     static let wedgeBaselineStops = 2.0
 
     static func write(_ negative: Negative, to url: URL) throws {
-        let renderer = RAWDevelopTests.renderer
-        let image = try renderer.cgImage(renderer.render(negative, .neutral))
-        let destination = try #require(CGImageDestinationCreateWithURL(url as CFURL, UTType.png.identifier as CFString, 1, nil))
-        CGImageDestinationAddImage(destination, image, nil)
-        #expect(CGImageDestinationFinalize(destination))
+        try EmulsionTestCase.writePNG(RAWDevelopTests.renderer.render(negative, .neutral), to: url)
     }
 
     @Test func writesBeforeAfterRenders() throws {
