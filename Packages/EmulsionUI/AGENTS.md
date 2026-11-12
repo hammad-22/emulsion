@@ -1,6 +1,6 @@
 # EmulsionUI
 
-Shared SwiftUI components for the iOS and Mac apps: the rendered photo, adjustment panel, inspector and rulers, and later the look picker, before/after compare, grid, histogram and Liquid Glass styles (MOV-120).
+Shared SwiftUI components for the iOS and Mac apps: the rendered photo, adjustment panel, inspector and rulers, the shared Looks picker, and later before/after compare, grid, histogram and Liquid Glass styles (MOV-120).
 
 - **Views only.** State and logic come from `EmulsionKit` (e.g. `AdjustmentGroup` defines the controls; this package only draws them). Pure layout geometry lives with the shared views; test containment and non-overlap using fixed region frames.
 - **Both platforms.** Every view builds for iOS and macOS. Platform differences go behind small `#if os(...)` adapters here, so the apps stay thin.
