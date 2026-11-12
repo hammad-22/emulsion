@@ -1,3 +1,4 @@
+import EmulsionCore
 import EmulsionKit
 import PhotosUI
 import SwiftUI
@@ -29,6 +30,7 @@ public struct PhotoImportButton: View {
         .onChange(of: selection) { _, items in
             guard !items.isEmpty else { return }
             selection = []
+            // Keep the batch alive when its first photo replaces the empty-state view.
             Task { await importPhotos(items) }
         }
     }
@@ -37,8 +39,11 @@ public struct PhotoImportButton: View {
         var firstError: (any Error)?
         for item in items {
             do {
-                guard let data = try await item.loadTransferable(type: Data.self) else { continue }
-                try store.add(data)
+                try Task.checkCancellation()
+                guard let data = try await item.loadTransferable(type: Data.self) else { throw EmulsionError.unsupportedPhoto }
+                try await store.add(data)
+            } catch is CancellationError {
+                break
             } catch {
                 firstError = firstError ?? error
             }

@@ -7,10 +7,25 @@ import UniformTypeIdentifiers
 
 @MainActor
 struct PhotoStoreTests {
+    @Test func aCancelledImportDoesNotPublishOrLeaveAnOriginal() async throws {
+        let library = TestLibrary()
+        let task = Task { @MainActor in
+            withUnsafeCurrentTask { $0?.cancel() }
+            return try await library.store.add(TestPhoto.jpeg)
+        }
+        do {
+            _ = try await task.value
+            Issue.record("A cancelled import succeeded")
+        } catch is CancellationError {
+        }
+        #expect(library.store.photos.isEmpty)
+        #expect(try FileManager.default.contentsOfDirectory(atPath: library.folder.path).isEmpty)
+    }
+
     @Test func deleteForgetsCachedPreviews() async throws {
         let library = TestLibrary()
         let store = library.store
-        let photo = try store.add(TestPhoto.jpeg, fileExtension: "JPG")
+        let photo = try await store.add(TestPhoto.jpeg, fileExtension: "JPG")
         _ = try await library.renderService.image(store.url(for: photo), photo.adjustments, maxDimension: 512)
         let beforeDelete = await library.renderService.cachedPreviewKeys
         #expect(beforeDelete.count == 1)
@@ -25,7 +40,8 @@ struct PhotoStoreTests {
 
     @Test func deletingASelectionRemovesOnlyThosePhotos() async throws {
         let library = TestLibrary()
-        let photos = try (0..<3).map { _ in try library.store.add(TestPhoto.jpeg, fileExtension: "jpg") }
+        var photos: [PhotoRecord] = []
+        for _ in 0..<3 { photos.append(try await library.store.add(TestPhoto.jpeg, fileExtension: "jpg")) }
 
         await library.store.delete([photos[0].id, photos[2].id])
 
@@ -35,7 +51,8 @@ struct PhotoStoreTests {
 
     @Test func failedSelectionDeletionKeepsEveryRecordAndOriginal() async throws {
         let library = TestLibrary()
-        let photos = try (0..<3).map { _ in try library.store.add(TestPhoto.jpeg, fileExtension: "jpg") }
+        var photos: [PhotoRecord] = []
+        for _ in 0..<3 { photos.append(try await library.store.add(TestPhoto.jpeg, fileExtension: "jpg")) }
         let saved = try Data(contentsOf: library.store.indexURL)
         try FileManager.default.removeItem(at: library.store.indexURL)
         try FileManager.default.createDirectory(at: library.store.indexURL, withIntermediateDirectories: false)
@@ -52,9 +69,9 @@ struct PhotoStoreTests {
         #expect(Set(library.reopened().photos.map(\.id)) == Set(photos.map(\.id)))
     }
 
-    @Test func editsPersistAcrossLaunches() throws {
+    @Test func editsPersistAcrossLaunches() async throws {
         let library = TestLibrary()
-        let photo = try library.store.add(TestPhoto.jpeg, fileExtension: "jpg")
+        let photo = try await library.store.add(TestPhoto.jpeg, fileExtension: "jpg")
         var edit = photo.adjustments
         edit.exposure = 1
         library.store.update(photo.id, adjustments: edit)
@@ -68,7 +85,7 @@ struct PhotoStoreTests {
 
     @Test func aFailedOriginalRemovalIsReported() async throws {
         let library = TestLibrary()
-        let photo = try library.store.add(TestPhoto.jpeg, fileExtension: "jpg")
+        let photo = try await library.store.add(TestPhoto.jpeg, fileExtension: "jpg")
         let original = library.store.url(for: photo)
         try FileManager.default.removeItem(at: original)
         try FileManager.default.createDirectory(at: original, withIntermediateDirectories: false)
@@ -84,8 +101,8 @@ struct PhotoStoreTests {
 
     @Test func aSaveFailureIsReportedAfterADeleteFailure() async throws {
         let library = TestLibrary()
-        let other = try library.store.add(TestPhoto.jpeg, fileExtension: "jpg")
-        let photo = try library.store.add(TestPhoto.jpeg, fileExtension: "jpg")
+        let other = try await library.store.add(TestPhoto.jpeg, fileExtension: "jpg")
+        let photo = try await library.store.add(TestPhoto.jpeg, fileExtension: "jpg")
         let original = library.store.url(for: photo)
         try FileManager.default.removeItem(at: original)
         try FileManager.default.createDirectory(at: original, withIntermediateDirectories: false)
@@ -106,10 +123,10 @@ struct PhotoStoreTests {
         #expect(library.store.lastError == .librarySaveFailed)
     }
 
-    @Test func importNamesTheFileAfterWhatItIs() throws {
+    @Test func importNamesTheFileAfterWhatItIs() async throws {
         let library = TestLibrary()
-        #expect(try library.store.add(TestPhoto.jpeg).fileName.hasSuffix(".jpeg"))
-        #expect(try library.store.add(Data("not an image".utf8)).fileName.hasSuffix(".jpg"))
+        #expect(try await library.store.add(TestPhoto.jpeg).fileName.hasSuffix(".jpeg"))
+        await #expect(throws: EmulsionError.unsupportedPhoto) { try await library.store.add(Data("not an image".utf8)) }
     }
 
     @Test func grainSeedsAreWholeNumbersInTheKernelsRange() {
@@ -120,7 +137,7 @@ struct PhotoStoreTests {
 
     @Test func samplesImportAndRender() async throws {
         let library = TestLibrary()
-        try library.store.addSamples()
+        try await library.store.addSamples()
 
         #expect(library.store.photos.count == 3)
         #expect(library.reopened().photos.count == 3, "one index write covers the whole batch")
@@ -130,9 +147,9 @@ struct PhotoStoreTests {
         }
     }
 
-    @Test func anIndexFromAnOlderVersionLoadsWithDefaults() throws {
+    @Test func anIndexFromAnOlderVersionLoadsWithDefaults() async throws {
         let library = TestLibrary()
-        let photo = try library.store.add(TestPhoto.jpeg, fileExtension: "jpg")
+        let photo = try await library.store.add(TestPhoto.jpeg, fileExtension: "jpg")
         // As an older app wrote it: before `halation` and `seed` existed.
         let olderIndex = """
             [{"id": "\(photo.id)", "created": 0, "fileName": "\(photo.fileName)", "isRAW": false,
@@ -151,9 +168,9 @@ struct PhotoStoreTests {
         #expect(adjustments.halation == Adjustments().halation)
     }
 
-    @Test func aRecordMissingItsEditsGetsTheDefaultLook() throws {
+    @Test func aRecordMissingItsEditsGetsTheDefaultLook() async throws {
         let library = TestLibrary()
-        let photo = try library.store.add(TestPhoto.jpeg, fileExtension: "jpg")
+        let photo = try await library.store.add(TestPhoto.jpeg, fileExtension: "jpg")
         let minimalIndex = #"[{"id": "\#(photo.id)", "fileName": "\#(photo.fileName)"}]"#
         try Data(minimalIndex.utf8).write(to: library.store.indexURL)
 
@@ -162,10 +179,10 @@ struct PhotoStoreTests {
         #expect(reopened.photo(photo.id)?.adjustments == .defaults(for: photo.id))
     }
 
-    @Test func aBadRecordDoesNotDiscardOtherPhotosEdits() throws {
+    @Test func aBadRecordDoesNotDiscardOtherPhotosEdits() async throws {
         let library = TestLibrary()
-        let kept = try library.store.add(TestPhoto.jpeg, fileExtension: "jpg")
-        let damaged = try library.store.add(TestPhoto.jpeg, fileExtension: "jpg")
+        let kept = try await library.store.add(TestPhoto.jpeg, fileExtension: "jpg")
+        let damaged = try await library.store.add(TestPhoto.jpeg, fileExtension: "jpg")
         var edit = kept.adjustments
         edit.exposure = 1.5
         library.store.update(kept.id, adjustments: edit)
@@ -186,9 +203,9 @@ struct PhotoStoreTests {
         #expect(try Data(contentsOf: backup) == corrupt)
     }
 
-    @Test func anUnreadableIndexIsKeptAndTheOriginalsStayListed() throws {
+    @Test func anUnreadableIndexIsKeptAndTheOriginalsStayListed() async throws {
         let library = TestLibrary()
-        let photo = try library.store.add(TestPhoto.jpeg, fileExtension: "jpg")
+        let photo = try await library.store.add(TestPhoto.jpeg, fileExtension: "jpg")
         let corrupt = Data("[{\"id\": tru".utf8)
         try corrupt.write(to: library.store.indexURL)
 
@@ -208,9 +225,9 @@ struct PhotoStoreTests {
         #expect(library.reopened().photo(photo.id)?.adjustments.exposure == 2)
     }
 
-    @Test func anIndexThatCantBeReadNowIsLeftAlone() throws {
+    @Test func anIndexThatCantBeReadNowIsLeftAlone() async throws {
         let library = TestLibrary()
-        let photo = try library.store.add(TestPhoto.jpeg, fileExtension: "jpg")
+        let photo = try await library.store.add(TestPhoto.jpeg, fileExtension: "jpg")
         let index = library.store.indexURL
         let saved = try Data(contentsOf: index)
         // As when file protection keeps the index locked at launch.
@@ -229,9 +246,9 @@ struct PhotoStoreTests {
         #expect(library.reopened().photo(photo.id)?.adjustments == photo.adjustments)
     }
 
-    @Test func anInaccessibleLibraryFolderIsNotTreatedAsAnEmptyLibrary() throws {
+    @Test func anInaccessibleLibraryFolderIsNotTreatedAsAnEmptyLibrary() async throws {
         let library = TestLibrary()
-        let photo = try library.store.add(TestPhoto.jpeg, fileExtension: "jpg")
+        let photo = try await library.store.add(TestPhoto.jpeg, fileExtension: "jpg")
         let saved = try Data(contentsOf: library.store.indexURL)
         try FileManager.default.setAttributes([.posixPermissions: 0], ofItemAtPath: library.folder.path(percentEncoded: false))
         defer {
@@ -242,14 +259,14 @@ struct PhotoStoreTests {
         try FileManager.default.setAttributes([.posixPermissions: 0o755], ofItemAtPath: library.folder.path(percentEncoded: false))
 
         #expect(reopened.lastError == .libraryUnreadable)
-        #expect(throws: EmulsionError.librarySaveFailed) { try reopened.add(TestPhoto.jpeg, fileExtension: "jpg") }
+        await #expect(throws: EmulsionError.librarySaveFailed) { try await reopened.add(TestPhoto.jpeg, fileExtension: "jpg") }
         #expect(try Data(contentsOf: library.store.indexURL) == saved)
         #expect(library.reopened().photo(photo.id) != nil)
     }
 
-    @Test func originalsAreRecoveredWhenTheIndexIsMissing() throws {
+    @Test func originalsAreRecoveredWhenTheIndexIsMissing() async throws {
         let library = TestLibrary()
-        let photo = try library.store.add(TestPhoto.jpeg, fileExtension: "jpg")
+        let photo = try await library.store.add(TestPhoto.jpeg, fileExtension: "jpg")
         try FileManager.default.removeItem(at: library.store.indexURL)
 
         let reopened = library.reopened()
@@ -259,9 +276,9 @@ struct PhotoStoreTests {
         #expect(library.reopened().photos.map(\.id) == [photo.id])
     }
 
-    @Test func aFailedSaveIsReportedAndNotShownAsSaved() throws {
+    @Test func aFailedSaveIsReportedAndNotShownAsSaved() async throws {
         let library = TestLibrary()
-        let photo = try library.store.add(TestPhoto.jpeg, fileExtension: "jpg")
+        let photo = try await library.store.add(TestPhoto.jpeg, fileExtension: "jpg")
         // A folder where the index should be makes every index write fail.
         try FileManager.default.removeItem(at: library.store.indexURL)
         try FileManager.default.createDirectory(at: library.store.indexURL, withIntermediateDirectories: false)
@@ -276,7 +293,7 @@ struct PhotoStoreTests {
         edit.exposure = 2
         library.store.update(photo.id, adjustments: edit)
         #expect(library.store.lastError == nil, "reported once, not on every slider rest")
-        #expect(throws: EmulsionError.librarySaveFailed) { try library.store.add(TestPhoto.jpeg, fileExtension: "jpg") }
+        await #expect(throws: EmulsionError.librarySaveFailed) { try await library.store.add(TestPhoto.jpeg, fileExtension: "jpg") }
         #expect(library.store.photos.map(\.id) == [photo.id], "a failed import leaves no orphan behind")
         let originals = try FileManager.default.contentsOfDirectory(atPath: library.folder.path(percentEncoded: false))
         #expect(originals.filter { $0.hasSuffix(".jpg") } == [photo.fileName])

@@ -8,7 +8,7 @@ import Testing
 struct RenderServiceTests {
     @Test func resizesWithinOneStepReuseTheCachedDevelop() async throws {
         let library = TestLibrary()
-        let url = library.store.url(for: try library.store.add(TestPhoto.jpeg, fileExtension: "jpg"))
+        let url = library.store.url(for: try await library.store.add(TestPhoto.jpeg, fileExtension: "jpg"))
         let service = library.renderService
         let name = url.absoluteString
 
@@ -24,7 +24,7 @@ struct RenderServiceTests {
 
     @Test func originalIsUndevelopedAndFitsTheSize() async throws {
         let library = TestLibrary()
-        let url = library.store.url(for: try library.store.add(TestPhoto.jpeg, fileExtension: "jpg"))
+        let url = library.store.url(for: try await library.store.add(TestPhoto.jpeg, fileExtension: "jpg"))
 
         let original = try await library.renderService.original(url, maxDimension: 100)
 
@@ -37,7 +37,7 @@ struct RenderServiceTests {
 extension RenderServiceTests {
     @Test func thumbnailsAreKeptPerEditAndForgottenWithThePhoto() async throws {
         let library = TestLibrary()
-        let url = library.store.url(for: try library.store.add(TestPhoto.jpeg, fileExtension: "jpg"))
+        let url = library.store.url(for: try await library.store.add(TestPhoto.jpeg, fileExtension: "jpg"))
         let service = library.renderService
         var warmer = Adjustments()
         warmer.warmth = 0.5
@@ -53,7 +53,7 @@ extension RenderServiceTests {
 
     @Test func latestEditorRenderIsKeptUntilThePhotoIsForgotten() async throws {
         let library = TestLibrary()
-        let url = library.store.url(for: try library.store.add(TestPhoto.jpeg, fileExtension: "jpg"))
+        let url = library.store.url(for: try await library.store.add(TestPhoto.jpeg, fileExtension: "jpg"))
         let service = library.renderService
 
         _ = try await service.original(url, maxDimension: 900)
@@ -93,7 +93,7 @@ extension RenderServiceTests {
 
     @Test func editorSizedRendersAreNotKept() async throws {
         let library = TestLibrary()
-        let url = library.store.url(for: try library.store.add(TestPhoto.jpeg, fileExtension: "jpg"))
+        let url = library.store.url(for: try await library.store.add(TestPhoto.jpeg, fileExtension: "jpg"))
 
         _ = try await library.renderService.image(url, .init(), maxDimension: 1200)
 

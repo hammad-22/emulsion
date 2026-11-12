@@ -43,10 +43,12 @@ struct LibraryEmptyState: View {
     }
 
     private func addSamples() {
-        do {
-            try store.addSamples()
-        } catch {
-            self.error = error.localizedDescription
+        Task {
+            do {
+                try await store.addSamples()
+            } catch {
+                self.error = error.localizedDescription
+            }
         }
     }
 }

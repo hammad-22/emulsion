@@ -54,11 +54,13 @@ struct LibraryScreen: View {
     }
 
     private func addSamples() {
-        do {
-            try store.addSamples()
-            selection = store.photos.first?.id
-        } catch {
-            importError = error.localizedDescription
+        Task {
+            do {
+                try await store.addSamples()
+                selection = store.photos.first?.id
+            } catch {
+                importError = error.localizedDescription
+            }
         }
     }
 }

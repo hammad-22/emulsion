@@ -7,6 +7,7 @@ Shared app logic for the iOS and Mac apps: the photo library (`PhotoStore`, `Pho
 - **Feature logic lands here or in EmulsionCore**, so the iOS app (curated subset) and the Mac app (everything) never duplicate it.
 - **Public API is what the apps need, nothing more.** Test-only accessors stay internal and are reached with `@testable import`.
 - **Library persistence:** decode missing optional schema fields with defaults; keep unreadable indexes intact or backed up, preserve readable records during recovery, and commit the index before changing visible library state. Surface write failures. Distinguish a missing index from an inaccessible one using the throwing read, not `fileExists`.
+- **Imports:** `PhotoStore.add` and `addSamples` are async. `OriginalImporter` prepares original bytes on its actor; commit against the current library on the main actor without suspension before publication. Cancellation before commit cleans only import-owned files; a committed import succeeds. Keep edits/deletes made during preparation.
 - **Tests** use Swift Testing and run on both platforms:
   ```bash
   (cd Packages/EmulsionKit && swift test)
