@@ -91,6 +91,7 @@ final class LibraryToEditorUITests: XCTestCase {
     @MainActor
     func testSamplesEditCompareAndSave() throws {
         let app = XCUIApplication()
+        app.launchArguments = ["--library"]
         app.launch()
         XCTAssertTrue(app.navigationBars["Library"].waitForExistence(timeout: 5))
 

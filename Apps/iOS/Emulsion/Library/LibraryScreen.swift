@@ -3,9 +3,11 @@ import EmulsionUI
 import SwiftUI
 
 /// The photo library: every imported photo with its film look, newest first.
-/// The camera (MOV-60) will open in front of this.
+/// Opens over the camera, with a button back to it.
 struct LibraryScreen: View {
     @Environment(PhotoStore.self) private var store
+    @Environment(\.isPresented) private var isPresented
+    @Environment(\.dismiss) private var dismiss
     @State private var path: [PhotoRecord.ID] = []
     @State private var selection = LibrarySelection()
     @State private var previewID: PhotoRecord.ID?
@@ -32,6 +34,11 @@ struct LibraryScreen: View {
                     .navigationTransition(.zoom(sourceID: id, in: editorTransition))
             }
             .toolbar {
+                if isPresented {
+                    ToolbarItem(placement: .topBarLeading) {
+                        Button("Camera", systemImage: "camera") { dismiss() }
+                    }
+                }
                 if !store.photos.isEmpty {
                     LibraryToolbar(selection: $selection) { importError = $0.localizedDescription }
                 }

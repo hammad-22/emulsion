@@ -22,7 +22,7 @@ public final class AppSettings {
 
     public var autoSave: Bool { didSet { defaults.set(autoSave, forKey: Key.autoSave) } }
     public var format: Renderer.ExportFormat { didSet { defaults.set(format.rawValue, forKey: Key.format) } }
-    /// Capture resolution; read by the camera once it exists (MOV-60).
+    /// The camera's capture resolution; lenses without 48 MP capture at 12 MP.
     public var resolution: Resolution { didSet { defaults.set(resolution.rawValue, forKey: Key.resolution) } }
 
     private let defaults = UserDefaults.standard
