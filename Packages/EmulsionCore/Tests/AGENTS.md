@@ -5,7 +5,7 @@
 - **Use chromatic inputs, not only gray:** gray hides wrong gamut matrices and channel swaps.
 - **Tolerances must match what the docs claim.** If a test needs a looser tolerance, fix the doc too.
 - Prefer independent references (published values, colour-science tables) over checking the code against its own mirror.
-- Halation's kernel is checked against `References/halation-kernel.json` (the exact single-bounce profile, written by `Tools/halation-kernel`); `HalationProof` writes before/after renders and CSVs when `EMULSION_PROOF_DIR` is set.
+- Halation's kernel is checked against `References/halation-kernel.json` (the exact single-bounce profile, written by `Tools/halation-kernel`); tests measure the glow image (`Kernels.halationGlow`) and the layer exposure it gives (`HalationTests.addedExposure`); `HalationProof` writes before/after renders and CSVs when `EMULSION_PROOF_DIR` is set. Every `References/` table loads through `ColorReferences`.
 - Grain is checked against `References/granularity.json` (the digitized datasheet table) and `References/grain-boolean-model.json` (Selwyn scaling, W(0)), copies of the `Tools/grain-reference` outputs; statistics helpers are in `GrainMeasurement`, and `GrainProof` writes crops and CSVs when `EMULSION_PROOF_DIR` is set.
 - Input transforms are checked against `References/input-transforms.json` (and 10-bit video against `References/video-signal.json`) through `ColorReferences` (loaders, tolerances); reuse it for any new input or signal-range test.
 - Fixtures are synthetic and deterministic (the only photos are the frozen CC0 scenes in `Scenes/`). Never read the user's photo library or private images.

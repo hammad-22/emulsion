@@ -6,7 +6,7 @@ import Foundation
 struct Kernels {
     // Named exactly like the Metal functions in Emulsion.ci.metal.
     let filmSystem, filmSystemRelative, displayToScene, inputTransform, ycbcrInputTransform: CIColorKernel
-    let halationSource, halationAdd, grainNoise, lightnessGuide, localTone: CIColorKernel
+    let halationSource, halationMix, grainNoise, lightnessGuide, localTone: CIColorKernel
     let mirroredEdges: CIWarpKernel
 
     init() throws {
@@ -28,7 +28,7 @@ struct Kernels {
         inputTransform = try load("inputTransform")
         ycbcrInputTransform = try load("ycbcrInputTransform")
         halationSource = try load("halationSource")
-        halationAdd = try load("halationAdd")
+        halationMix = try load("halationMix")
         grainNoise = try load("grainNoise")
         lightnessGuide = try load("lightnessGuide")
         localTone = try load("localTone")

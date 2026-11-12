@@ -13,7 +13,7 @@ extension FilmModel {
     private static let referenceSearchSteps = 60
 
     /// F_n: display-linear green of the calibrated print of a neutral scene `linear`, at zero edits.
-    func neutralPrint(_ linear: Double) -> Double { system(SIMD3(repeating: linear), lights: .zero).y }
+    func neutralPrint(_ linear: Double) -> Double { system(logExposure: layerLogExposure(SIMD3(repeating: linear)), lights: .zero).y }
 
     /// K, per channel: identity between the knees; above `kneeHigh` display values bend down so
     /// display white lands on F_n(ceiling), below `kneeLow` they bend up so black lands on
@@ -76,17 +76,18 @@ extension FilmModel {
 
     /// Display-linear print of a display-referred photo under edits, before gamut mapping.
     /// `estimate` is the photo's scene estimate; `edited` is the scene the edits print (the
-    /// estimate with exposure and halation applied: `render` does not apply exposure).
+    /// estimate with exposure applied: `render` does not apply exposure).
     /// Per channel, the edited print's ratio to the zero-edit print is applied to the photo. Where
     /// the photo is darker than its print (gain < 1) and the edit brightens the channel, (1 − gain)²
     /// of the print's increase is added on top, so a zero channel can still rise (desaturation)
-    /// and the response has no slope jump at zero edits. `grain` (negative density) enters the
-    /// edited print only.
+    /// and the response has no slope jump at zero edits. Halation (`glow` at the exposure of
+    /// `edited`, `k`) and `grain` (negative density) enter the edited print only, as in `render`.
     func renderRelative(
-        estimate: SIMD3<Double>, edited: SIMD3<Double>, lights: SIMD3<Double>, saturation: Double, grain: SIMD3<Double> = .zero
+        estimate: SIMD3<Double>, edited: SIMD3<Double>, lights: SIMD3<Double>, saturation: Double, glow: SIMD3<Double> = .zero,
+        layerReturn k: SIMD3<Double> = .zero, grain: SIMD3<Double> = .zero
     ) -> SIMD3<Double> {
         let base = render(estimate)
-        let print = render(edited, lights: lights, saturation: saturation, grain: grain)
+        let print = render(edited, lights: lights, saturation: saturation, glow: glow, layerReturn: k, grain: grain)
         let photo = display(fromSceneEstimate: estimate)
         return SIMD3(
             (0..<3).map { c -> Double in

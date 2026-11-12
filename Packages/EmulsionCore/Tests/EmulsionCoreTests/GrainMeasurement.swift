@@ -54,12 +54,8 @@ enum GrainMeasurement {
 
     /// P3 encoding (the sRGB transfer function) of display-linear values, ×255.
     static func codes(_ linear: SIMD3<Double>) -> SIMD3<Double> {
-        func encode(_ x: Double) -> Double { x <= 0.0031308 ? 12.92 * x : 1.055 * pow(x, 1 / 2.4) - 0.055 }
-        return SIMD3(encode(linear.x), encode(linear.y), encode(linear.z)) * 255
+        SIMD3(Fixtures.encode(linear.x), Fixtures.encode(linear.y), Fixtures.encode(linear.z)) * 255
     }
-
-    /// Display P3 luminance weights (as `EmulsionTestCase.luma`).
-    static func luma(_ c: SIMD3<Double>) -> Double { 0.2290 * c.x + 0.6917 * c.y + 0.0793 * c.z }
 
     /// Area (box) reduction by `scale` source pixels per output pixel, `outWidth`×`outHeight` output
     /// pixels, the first starting `origin` source pixels into the source (both axes): each output pixel is the mean of the source over its square,
@@ -140,9 +136,7 @@ enum GrainMeasurement {
 
     /// A uniform neutral scene `stops` from mid-gray.
     static func flat(stops: Double, width: Int, height: Int) -> CIImage {
-        let v = 0.18 * pow(2, stops)
-        let color = CIColor(red: v, green: v, blue: v, alpha: 1, colorSpace: SceneFixtures.linear) ?? CIColor(red: v, green: v, blue: v)
-        return CIImage(color: color).cropped(to: CGRect(x: 0, y: 0, width: width, height: height))
+        SceneFixtures.flat(0.18 * pow(2, stops), width: width, height: height)
     }
 
     /// Display-linear P3 values of the `size`×`size` square at (`x`, `y`) in `image`.
@@ -151,7 +145,7 @@ enum GrainMeasurement {
     }
 
     /// Standard deviation of display luma in codes.
-    static func lumaSD(_ linear: [SIMD3<Double>]) -> Double { standardDeviation(linear.map { luma(codes($0)) }) }
+    static func lumaSD(_ linear: [SIMD3<Double>]) -> Double { standardDeviation(linear.map { EmulsionTestCase.luma(codes($0)) }) }
 
     /// Standard deviation per channel, in codes.
     static func channelSD(_ linear: [SIMD3<Double>]) -> SIMD3<Double> {

@@ -82,37 +82,55 @@ public struct FilmModel: Sendable, Equatable {
         render(scene, lights: lights, saturation: saturation, grain: .zero)
     }
 
-    /// `render` of a grainy negative: `grain` is density added to the negative layers (the neutral
-    /// response of highlight chroma retention gets it too).
-    func render(_ scene: SIMD3<Double>, lights: SIMD3<Double> = .zero, saturation: Double = 1, grain: SIMD3<Double>) -> SIMD3<Double> {
-        let s = saturated(scene, saturation)
-        let perLayer = system(s, lights: lights, grain: grain)
+    /// `render` with halation and grain, as the film kernels apply them. `glow` is the halation glow
+    /// at the exposure of `scene` (the kernels' G·2^EV) and `k` the light returned per layer: each
+    /// layer is exposed to `Halation.exposureWithHalation`, and highlight chroma retention sees the
+    /// light with that change. `grain` is density added to the negative layers (the neutral response
+    /// of highlight chroma retention gets it too).
+    func render(
+        _ scene: SIMD3<Double>, lights: SIMD3<Double> = .zero, saturation: Double = 1, glow: SIMD3<Double> = .zero,
+        layerReturn k: SIMD3<Double> = .zero, grain: SIMD3<Double>
+    ) -> SIMD3<Double> {
+        let light = saturated(scene, saturation)
+        let exposure = simd_max(sensitivity * light, .zero)
+        let halated = Halation.exposureWithHalation(exposure, glow: simd_max(glow, .zero), layerReturn: k)
+        // The light the layers see, with the halation's change of exposure (for chroma retention).
+        let s = light + sensitivity.inverse * (halated - exposure)
+        let perLayer = system(logExposure: Self.logExposure(halated), lights: lights, grain: grain)
         let m = max(s.max(), 1e-7)
         let w = highlightChromaRetention * Self.smoothstep(1.5, 4.0, log2(m / 0.18))
         guard w > 0 else { return perLayer }
-        let ratioPreserving = s * (system(SIMD3(repeating: m), lights: lights, grain: grain).y / m)
+        let neutral = system(logExposure: layerLogExposure(SIMD3(repeating: m)), lights: lights, grain: grain)
+        let ratioPreserving = s * (neutral.y / m)
         return perLayer + (ratioPreserving - perLayer) * w
     }
 
+    /// Display P3 luminance weights (the Color control saturates about this luminance).
+    static let p3Luminance = SIMD3<Double>(0.2289746, 0.6917385, 0.0792869)
+
     func saturated(_ scene: SIMD3<Double>, _ saturation: Double) -> SIMD3<Double> {
-        let y = dot(scene, SIMD3(0.2289746, 0.6917385, 0.0792869))
+        let y = dot(scene, Self.p3Luminance)
         return SIMD3(repeating: y) + (scene - SIMD3(repeating: y)) * saturation
     }
 
-    /// The layers' log10 exposure relative to mid-gray for scene light `scene` (what grain is indexed by).
-    func layerLogExposure(_ scene: SIMD3<Double>, saturation: Double = 1) -> SIMD3<Double> {
-        let exposure = simd_max(sensitivity * saturated(scene, saturation), SIMD3(repeating: 1e-7))
-        return SIMD3((0..<3).map { log10(exposure[$0] / 0.18) })
+    /// log10 of layer exposure `exposure` relative to mid-gray.
+    static func logExposure(_ exposure: SIMD3<Double>) -> SIMD3<Double> {
+        let clamped = simd_max(exposure, SIMD3(repeating: 1e-7))
+        return SIMD3((0..<3).map { log10(clamped[$0] / 0.18) })
     }
+
+    /// The layers' log10 exposure relative to mid-gray for scene light `scene` (what grain is indexed by).
+    func layerLogExposure(_ scene: SIMD3<Double>) -> SIMD3<Double> { Self.logExposure(sensitivity * scene) }
 
     static func smoothstep(_ a: Double, _ b: Double, _ x: Double) -> Double {
         let t = min(1, max(0, (x - a) / (b - a)))
         return t * t * (3 - 2 * t)
     }
 
-    /// The photochemical chain itself; `grain` is density added to the negative layers.
-    func system(_ s: SIMD3<Double>, lights: SIMD3<Double>, grain: SIMD3<Double> = .zero) -> SIMD3<Double> {
-        let dNeg = negativeDensity(layerLogExposure(s)) + grain
+    /// The photochemical chain from the layers' log exposure; `grain` is density added to the
+    /// negative layers.
+    func system(logExposure: SIMD3<Double>, lights: SIMD3<Double>, grain: SIMD3<Double> = .zero) -> SIMD3<Double> {
+        let dNeg = negativeDensity(logExposure) + grain
         // More negative density → less light reaches the print.
         let logP = printerLights + lights - dNeg
         let dPrint = printDyes * printDensity(logP)

@@ -1,5 +1,4 @@
 import CoreImage
-import CoreImage.CIFilterBuiltins
 import CoreVideo
 import Foundation
 import ImageIO
@@ -12,7 +11,7 @@ public final class Renderer: @unchecked Sendable {
     public static let outputSpace = CGColorSpace(name: CGColorSpace.displayP3)!
     /// Core Image working space: extended linear sRGB, half float.
     static let workingSpace = CGColorSpace(name: CGColorSpace.extendedLinearSRGB)!
-    private let kernels: Kernels
+    let kernels: Kernels
     public let developer: Developer
     private let context: CIContext
 
@@ -33,93 +32,35 @@ public final class Renderer: @unchecked Sendable {
     /// negatives are printed relative to the photo they were developed from.
     public func render(_ negative: Negative, _ adjustments: Adjustments) throws -> CIImage {
         let a = adjustments.clamped()
-        var image = negative.image
-        let extent = image.extent
-        let longEdge = max(extent.width, extent.height)
-
-        image = try sceneWithHalation(image, a)
-
-        // Grain is negative density, added inside the film kernels (see `Grain`).
-        let noise = a.grain > 0 ? try grainNoise(extent, seed: a.seed) : CIImage(color: .black).cropped(to: extent)
-        let grain = Grain.kernelArguments(amount: a.grain, longEdge: longEdge)
-        if negative.contract == .displayReferred {
-            // A finished picture is printed relative to itself: zero edits reproduce it up to the
-            // output gamut fit (chroma above 85% of the P3 boundary is compressed).
-            let film = FilmLook.stock.relativeKernelArguments(lights: a.printerLights, exposure: a.exposure, saturation: a.printSaturation)
-            image = try kernels.run(kernels.filmSystemRelative, extent, [image, negative.image, noise] + film + grain)
-        } else {
-            let film = FilmLook.stock.kernelArguments(lights: a.printerLights, exposure: a.exposure, saturation: a.printSaturation)
-            image = try kernels.run(kernels.filmSystem, extent, [image, noise] + film + grain)
-        }
-
+        let scene = negative.image
+        let extent = scene.extent
+        // Halation and grain act inside the film kernels, on layer exposure and negative density
+        // (see `Halation`, `Grain`); off, they get black samplers and add exactly nothing.
+        let black = CIImage(color: .black).cropped(to: extent)
+        let glow = a.halation > 0 ? try kernels.halationGlow(of: scene, saturation: a.printSaturation) : black
+        let noise = a.grain > 0 ? try kernels.grainNoise(extent, seed: a.seed) : black
+        var image = try filmPrint(negative, glow: glow, noise: noise, a)
         if a.highlights != 0 || a.shadows != 0 {
             image = try kernels.applyLocalTone(image, shadows: a.shadows, highlights: a.highlights)
         }
         return image.cropped(to: extent)
     }
 
-    /// Grain noise over `extent`: rgb = independent zero-mean, unit-variance values per pixel and
-    /// layer, white, deterministic for `seed` (kernel `grainNoise`).
-    func grainNoise(_ extent: CGRect, seed: Double) throws -> CIImage {
-        try kernels.run(kernels.grainNoise, extent, [seed])
-    }
-
-    /// Scene light with halation added, before the film (see `Halation`). Linear in the scene, so it
-    /// commutes with exposure, which the film kernel applies (MOV-102).
-    func sceneWithHalation(_ scene: CIImage, _ adjustments: Adjustments) throws -> CIImage {
-        let a = adjustments.clamped()
-        guard a.halation > 0 else { return scene }
-        let extent = scene.extent
-        let sensitivity = FilmLook.stock.sensitivity
-        let exposure = try kernels.run(kernels.halationSource, extent, [scene] + CIVector.rows(of: sensitivity))
-        let mirrored = try mirroredToInfinity(exposure)
-        let pixelsPerBase = Halation.pixelsPerBaseThickness(longEdge: max(extent.width, extent.height))
-        let sigmas = Halation.sigmasInBaseThicknesses * pixelsPerBase
-        let blurs = Self.lowResBlurs(mirrored, sigmas: (0..<3).map { sigmas[$0] }).map { $0.cropped(to: extent) }
-        let weights = Halation.weights
-        let k = Halation.layerReturn(amount: a.halation, backing: a.backing)
-        let arguments: [Any] =
-            [scene] + blurs + [CIVector(x: weights.x, y: weights.y, z: weights.z, w: 0), CIVector(x: k.x, y: k.y, z: k.z, w: 0)]
-            + CIVector.rows(of: sensitivity) + CIVector.rows(of: sensitivity.inverse)
-        return try kernels.run(kernels.halationAdd, extent, arguments)
-    }
-
-    /// `image` reflected at its edges, repeating without end (the warp `mirroredEdges`). Unlike
-    /// clamping, a bright border pixel is not repeated to infinity (review F-12), and a uniform
-    /// field stays uniform up to the border.
-    func mirroredToInfinity(_ image: CIImage) throws -> CIImage {
-        let e = image.extent
-        guard
-            let mirrored = kernels.mirroredEdges.apply(
-                extent: .infinite, roiCallback: { _, _ in e }, image: image.clampedToExtent().samplingNearest(),
-                arguments: [CIVector(cgRect: e)])
-        else { throw EmulsionError.renderFailed }
-        // An intermediate, so a later scale is not folded into the warp's nearest sampling.
-        return mirrored.insertingIntermediate(cache: false)
-    }
-
-    /// Gaussian blurs of an infinite image, each at reduced scale. Each halving is its own 2×2
-    /// average (an intermediate: Core Image would otherwise fold successive halvings into one sparse
-    /// sample and drop small highlights), shared by the blurs. The Gaussian is narrowed by the
-    /// variance the halvings (box of N px: (N² − 1)/12) and the bilinear return (N²/6) add, so each
-    /// blur's effective sigma is the one asked for.
-    static func lowResBlurs(_ image: CIImage, sigmas: [Double]) -> [CIImage] {
-        let maxHalvings = 3
-        let minBlurPixels = 2.0
-        let levels = sigmas.map { sigma in
-            (0...maxHalvings).last { $0 == 0 || sigma / pow(2, Double($0)) >= minBlurPixels } ?? 0
+    /// The film kernels: `negative` printed under clamped adjustments `a`, with the halation `glow`
+    /// (`Kernels.halationGlow`) and grain `noise` (`Kernels.grainNoise`) over its extent.
+    func filmPrint(_ negative: Negative, glow: CIImage, noise: CIImage, _ a: Adjustments) throws -> CIImage {
+        let extent = negative.image.extent
+        let texture =
+            Halation.kernelArguments(amount: a.halation, backing: a.backing)
+            + Grain.kernelArguments(amount: a.grain, longEdge: max(extent.width, extent.height))
+        let film = FilmLook.stock.kernelArguments(lights: a.printerLights, exposure: a.exposure, saturation: a.printSaturation)
+        if negative.contract == .displayReferred {
+            // A finished picture is printed relative to itself: zero edits reproduce it up to the
+            // output gamut fit (chroma above 85% of the P3 boundary is compressed).
+            let ends = FilmLook.stock.relativeArguments
+            return try kernels.run(kernels.filmSystemRelative, extent, [negative.image, glow, noise] + film + ends + texture)
         }
-        var pyramid = [image]
-        for _ in 0..<(levels.max() ?? 0) {
-            pyramid.append(
-                pyramid[pyramid.count - 1].transformed(by: CGAffineTransform(scaleX: 0.5, y: 0.5)).insertingIntermediate(cache: false))
-        }
-        return zip(sigmas, levels).map { sigma, level in
-            let n = pow(2, Double(level))
-            let added = level == 0 ? 0 : (n * n - 1) / 12 + n * n / 6
-            let lowSigma = max(sigma * sigma - added, 0).squareRoot() / n
-            return pyramid[level].applyingGaussianBlur(sigma: lowSigma).transformed(by: CGAffineTransform(scaleX: n, y: n))
-        }
+        return try kernels.run(kernels.filmSystem, extent, [negative.image, glow, noise] + film + texture)
     }
 
     /// Develop once: render the (lazy) negative into a half-float buffer so interactive edits

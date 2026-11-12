@@ -33,9 +33,6 @@ enum Grain {
         return sigma
     }
 
-    /// Pixel side on the film in µm: the image's long edge spans the assumed frame width.
-    static func pixelPitchMicrometres(longEdge: Double) -> Double { FilmLook.frameWidthMillimetres * 1000 / longEdge }
-
     /// σ(pixel) / σ(48 µm) by Selwyn's law, σ√area constant: √(π·24²) / p for a square pixel of side
     /// p µm. An approximation that assumes the aperture is much larger than the grain; for 0.5 µm
     /// grains the Boolean-model reference finds it within 4.1% for p ≥ 6.2 µm and 7–10% high at 3.1 µm.
@@ -53,13 +50,21 @@ enum Grain {
     static func kernelArguments(amount: Double, longEdge: Double) -> [CIVector] {
         let s = scale(amount: amount, longEdge: longEdge)
         return zip(knotValues, logExposureKnots).map { sigma, knot in
-            CIVector(x: sigma.x * s, y: sigma.y * s, z: sigma.z * s, w: knot)
+            CIVector(sigma * s, w: knot)
         }
     }
 
     private static func scale(amount: Double, longEdge: Double) -> Double {
-        amount * selwynScale(pixelPitchMicrometres: pixelPitchMicrometres(longEdge: longEdge))
+        amount * selwynScale(pixelPitchMicrometres: FilmLook.micrometresPerPixel(longEdge: longEdge))
     }
 
     private static let knotValues = (0..<logExposureKnots.count).map { SIMD3(sigmaD48Red[$0], sigmaD48Green[$0], sigmaD48Blue[$0]) }
+}
+
+extension Kernels {
+    /// Grain noise over `extent`: rgb = independent zero-mean, unit-variance values per pixel and
+    /// layer, white, deterministic for `seed` (kernel `grainNoise`).
+    func grainNoise(_ extent: CGRect, seed: Double) throws -> CIImage {
+        try run(grainNoise, extent, [seed])
+    }
 }

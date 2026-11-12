@@ -19,14 +19,10 @@ struct GrainTests {
     }
 
     private func noise(seed: Double, side: Int = fieldSide) throws -> [SIMD3<Double>] {
-        Fixtures.linear(try renderer.grainNoise(CGRect(x: 0, y: 0, width: side, height: side), seed: seed))
+        Fixtures.linear(try EmulsionTestCase.kernels.grainNoise(CGRect(x: 0, y: 0, width: side, height: side), seed: seed))
     }
 
     private static func channel(_ v: [SIMD3<Double>], _ c: Int) -> [Double] { v.map { $0[c] } }
-
-    private func render(_ scene: CIImage, _ a: Adjustments, contract: InputContract = .sceneReferred) throws -> CIImage {
-        try renderer.render(Negative(image: scene, contract: contract), a)
-    }
 
     // MARK: Noise field
 
@@ -99,7 +95,7 @@ struct GrainTests {
     /// The engine's table is the digitized one, and it reproduces Kodak's trace at camera stops
     /// −4…+4 within the interpolation error (minimax fit ≤ 5.2%). Measured worst: 3.6%.
     @Test func tableMatchesTheDigitizedDatasheet() throws {
-        let reference = try GrainReference.granularity()
+        let reference = try ColorReferences.granularity()
         #expect(Grain.logExposureKnots == reference.engineTable.logExposureKnots)
         #expect(Grain.sigmaD48Red == reference.engineTable.sigmaD48um.red)
         #expect(Grain.sigmaD48Green == reference.engineTable.sigmaD48um.green)
@@ -126,7 +122,7 @@ struct GrainTests {
     /// (measured 1.0–4.1% high for p ≥ 6.2 µm, 6.7–9.8% high at 3.1 µm); noise power per area σ²p²
     /// equals the reference's W(0) (measured within 0.6%). The frame width gives the reference's pitches.
     @Test func selwynScalingMatchesTheBooleanReference() throws {
-        let reference = try GrainReference.booleanModel()
+        let reference = try ColorReferences.grainBooleanModel()
         for density in reference.densities {
             let sigma48 = density.aperture48um.sigmaDLinearized.value
             for pixel in density.pixels {
@@ -135,7 +131,7 @@ struct GrainTests {
                 print(String(format: "GRAIN Selwyn D %.1f p %.1f µm: predicted/simulated %.4f", density.targetDensity, pixel.sideUm, ratio))
                 #expect(abs(ratio - 1) <= 0.10, "D \(density.targetDensity), p \(pixel.sideUm) µm: \(ratio)")
                 if pixel.sideUm >= 6 { #expect(abs(ratio - 1) <= 0.05) }
-                let pitch = Grain.pixelPitchMicrometres(longEdge: Double(pixel.pixelCountAcrossFrame))
+                let pitch = FilmLook.micrometresPerPixel(longEdge: Double(pixel.pixelCountAcrossFrame))
                 #expect(abs(pitch / pixel.exactPitchUm - 1) < 1e-4)
             }
             let p = 6.2
@@ -157,7 +153,8 @@ struct GrainTests {
         for stops in [-4.0, -2, 0, 2, 4] {
             let sd = GrainMeasurement.channelSD(
                 GrainMeasurement.linearCrop(
-                    try render(GrainMeasurement.flat(stops: stops, width: w, height: h), Self.adjustments(grain: 1)), size: 512))
+                    try EmulsionTestCase.render(GrainMeasurement.flat(stops: stops, width: w, height: h), Self.adjustments(grain: 1)),
+                    size: 512))
             let predicted = GrainMeasurement.predictedDisplaySD(stops: stops, amount: 1, longEdge: Double(w))
             print(
                 String(
@@ -201,7 +198,7 @@ struct GrainTests {
             #expect(abs(measured.z / measured[c] / expected - 1) < 0.02)
         }
         let display = GrainMeasurement.linearCrop(
-            try render(GrainMeasurement.flat(stops: 0, width: 1600, height: 1200), Self.adjustments(grain: 1)), size: 512
+            try EmulsionTestCase.render(GrainMeasurement.flat(stops: 0, width: 1600, height: 1200), Self.adjustments(grain: 1)), size: 512
         ).map(GrainMeasurement.codes)
         let (rg, gb) = (
             GrainMeasurement.correlation(Self.channel(display, 0), Self.channel(display, 1)),
@@ -223,9 +220,11 @@ struct GrainTests {
         let picture = DisplayFixtures.proofChart()
         for (image, contract) in [(scene, InputContract.sceneReferred), (picture, .displayReferred)] {
             let source = contract == .displayReferred ? try renderer.developer.sceneFromDisplay(image).image : image
-            let clean = EmulsionTestCase.codes(try render(source, Self.adjustments(grain: 0, seed: 3), contract: contract))
-            #expect(EmulsionTestCase.codes(try render(source, Self.adjustments(grain: 0, seed: 77), contract: contract)) == clean)
-            #expect(EmulsionTestCase.codes(try render(source, Self.adjustments(grain: 1), contract: contract)) != clean)
+            let clean = EmulsionTestCase.codes(try EmulsionTestCase.render(source, Self.adjustments(grain: 0, seed: 3), contract: contract))
+            #expect(
+                EmulsionTestCase.codes(try EmulsionTestCase.render(source, Self.adjustments(grain: 0, seed: 77), contract: contract))
+                    == clean)
+            #expect(EmulsionTestCase.codes(try EmulsionTestCase.render(source, Self.adjustments(grain: 1), contract: contract)) != clean)
         }
     }
 
@@ -236,8 +235,8 @@ struct GrainTests {
         let scene = GrainMeasurement.flat(stops: stops, width: 1600, height: 1200)
         func meanLuma(_ grain: Double) throws -> Double {
             GrainMeasurement.mean(
-                GrainMeasurement.linearCrop(try render(scene, Self.adjustments(grain: grain)), size: 512).map {
-                    GrainMeasurement.luma(GrainMeasurement.codes($0))
+                GrainMeasurement.linearCrop(try EmulsionTestCase.render(scene, Self.adjustments(grain: grain)), size: 512).map {
+                    EmulsionTestCase.luma(GrainMeasurement.codes($0))
                 })
         }
         let shift = try meanLuma(1) - meanLuma(0)
@@ -248,9 +247,9 @@ struct GrainTests {
 
 /// `References/granularity.json` (written by `Tools/grain-reference/granularity`): the digitized
 /// datasheet granularity of the stock the engine's table comes from.
-struct GrainReference: Decodable {
-    struct Layers: Decodable { let red, green, blue: [Double] }
-    struct EngineTable: Decodable {
+struct GrainReference: Decodable, Sendable {
+    struct Layers: Decodable, Sendable { let red, green, blue: [Double] }
+    struct EngineTable: Decodable, Sendable {
         let logExposureKnots: [Double]
         let sigmaD48um: Layers
         // convertFromSnakeCase reads "sigma_d_48um" as "sigmaD48Um".
@@ -259,7 +258,7 @@ struct GrainReference: Decodable {
             case sigmaD48um = "sigmaD48Um"
         }
     }
-    struct Stock: Decodable {
+    struct Stock: Decodable, Sendable {
         let engineTable: EngineTable
         let sigmaDAtCameraStops: [String: [String: Double]]
     }
@@ -280,20 +279,18 @@ struct GrainReference: Decodable {
         sigmaAtCameraStops = ["R", "G", "B"].map { stock.sigmaDAtCameraStops[$0] ?? [:] }
     }
 
-    static func granularity() throws -> GrainReference { try decode("granularity") }
-
     /// `References/grain-boolean-model.json` (written by `Tools/grain-reference/boolean-model`).
-    struct BooleanModel: Decodable {
-        struct Estimate: Decodable { let value: Double }
-        struct Aperture: Decodable { let sigmaDLinearized: Estimate }
-        struct Pixel: Decodable {
+    struct BooleanModel: Decodable, Sendable {
+        struct Estimate: Decodable, Sendable { let value: Double }
+        struct Aperture: Decodable, Sendable { let sigmaDLinearized: Estimate }
+        struct Pixel: Decodable, Sendable {
             let sideUm: Double
             let exactPitchUm: Double
             let pixelCountAcrossFrame: Int
             let sigmaDLinearized: Estimate
         }
-        struct Spectrum: Decodable { let w0SimulatedPlateau: Estimate }
-        struct Density: Decodable {
+        struct Spectrum: Decodable, Sendable { let w0SimulatedPlateau: Estimate }
+        struct Density: Decodable, Sendable {
             let targetDensity: Double
             let aperture48um: Aperture
             let pixels: [Pixel]
@@ -305,14 +302,5 @@ struct GrainReference: Decodable {
             }
         }
         let densities: [Density]
-    }
-
-    static func booleanModel() throws -> BooleanModel { try decode("grain-boolean-model") }
-
-    private static func decode<T: Decodable>(_ name: String) throws -> T {
-        let url = try #require(Bundle.module.url(forResource: name, withExtension: "json", subdirectory: "References"))
-        let decoder = JSONDecoder()
-        decoder.keyDecodingStrategy = .convertFromSnakeCase
-        return try decoder.decode(T.self, from: Data(contentsOf: url))
     }
 }

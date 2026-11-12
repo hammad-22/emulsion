@@ -8,6 +8,7 @@ import simd
 /// Independent colour-science reference vectors for every `InputColorSpace`: code values in,
 /// linear Rec.709/D65 working-space light out. Generated offline by
 /// `Tools/color-references/generate_input_references.py` into `References/input-transforms.json`.
+/// Also the loader of every other table in `References/`.
 enum ColorReferences {
     struct Sample: Decodable, Sendable {
         let label: String
@@ -102,11 +103,27 @@ enum ColorReferences {
     }
 
     static func deltaE() throws -> DeltaE { try deltaETable.get() }
+    private static let deltaETable = decoded(DeltaE.self, "delta-e")
 
-    private static let deltaETable: Result<DeltaE, any Error> = Result {
-        let decoder = JSONDecoder()
-        decoder.keyDecodingStrategy = .convertFromSnakeCase
-        return try decoder.decode(DeltaE.self, from: reference("delta-e"))
+    /// The digitized datasheet granularity (MOV-30), from `Tools/grain-reference/granularity`.
+    static func granularity() throws -> GrainReference { try granularityTable.get() }
+    private static let granularityTable = decoded(GrainReference.self, "granularity")
+
+    /// Boolean-model grain (Selwyn scaling, W(0)), from `Tools/grain-reference/boolean-model`.
+    static func grainBooleanModel() throws -> GrainReference.BooleanModel { try grainBooleanModelTable.get() }
+    private static let grainBooleanModelTable = decoded(GrainReference.BooleanModel.self, "grain-boolean-model")
+
+    /// The derived halation profile and its fits (MOV-32), from `Tools/halation-kernel`.
+    static func halationKernel() throws -> HalationReference { try halationKernelTable.get() }
+    private static let halationKernelTable = decoded(HalationReference.self, "halation-kernel")
+
+    /// `References/<name>.json` with snake_case keys, decoded once by the caller's stored `let`.
+    private static func decoded<T: Decodable>(_ type: T.Type, _ name: String) -> Result<T, any Error> {
+        Result {
+            let decoder = JSONDecoder()
+            decoder.keyDecodingStrategy = .convertFromSnakeCase
+            return try decoder.decode(type, from: reference(name))
+        }
     }
 
     private static func reference(_ name: String) throws -> Data {

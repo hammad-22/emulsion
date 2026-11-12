@@ -35,7 +35,8 @@ public enum Fixtures {
     // MARK: Fixtures
 
     /// sRGB / Display P3 transfer function (linear → encoded).
-    public static func encode(_ x: Float) -> Float { x <= 0.0031308 ? 12.92 * x : 1.055 * pow(x, 1 / 2.4) - 0.055 }
+    public static func encode(_ x: Double) -> Double { x <= 0.0031308 ? 12.92 * x : 1.055 * pow(x, 1 / 2.4) - 0.055 }
+    public static func encode(_ x: Float) -> Float { Float(encode(Double(x))) }
 
     public static func grayRamp(steps: Int = 256) -> [SIMD3<Float>] {
         (0..<steps).map {
