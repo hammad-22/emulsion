@@ -12,9 +12,10 @@ iOS 26 / macOS 26 only, iPhone 17 Pro and iPhone Duo as targets. Swift 6.4 toolc
 
 ## Layout
 - `Packages/EmulsionCore/`: the engine package. Every look decision lives here.
-  - `Sources/EmulsionCore/`: film math (`FilmModel`), input transforms (`ColorSpaces`), develop (`Developer`), render graph and export (`Renderer`), stock and texture constants (`FilmLook`), kernel argument packing (`FilmModel+Kernel`).
+  - `Sources/EmulsionCore/`: film math (`FilmModel`), input transforms (`ColorSpaces`), develop (`Developer`), render graph and export (`Renderer`), stock files (`Resources/Stocks/*.json`, loaded through `FilmStock`; the default is `FilmLook.stock`), texture constants (`FilmLook`), kernel argument packing (`FilmModel+Kernel`).
   - `Kernels/Emulsion.ci.metal`: GPU kernels; must match the Swift mirror. Compiled `.metallib`s are checked in under `Resources/Kernels/`.
   - `Sources/EmulsionFixtures/`: synthetic test images. `Tests/`: the test suite, with visual regression goldens in `Tests/EmulsionCoreTests/Goldens/` and frozen CC0 photos in `Scenes/`.
+  - `Sources/EmulsionFit/` + `Sources/emulsion-fit/`: offline stock fitting (`emulsion-fit` CLI: manifest and reference-data loader and checks, bounded least squares, negative-curve fit). `Sources/EmulsionFit/Resources/StockData/<stock>/` holds the provenance manifests and the fitted stock files (`negative-fit.stock.json`; parameters and provenance only, not loaded by the engine until MOV-25). The traced curve CSVs are not in the repo (`docs/DECISIONS.md`, 12 Nov 2026): they are local reference data, pinned by SHA-256 in the manifests; never commit them. Not a library product, so no app can link it. The tracing tools are in `Tools/stock-digitizing/`.
 - `Packages/EmulsionKit/`: shared app logic for iOS and Mac (library, `RenderService`, camera capture, editor controls, settings, export, sample photos). No UI.
 - `Packages/EmulsionUI/`: shared SwiftUI components (rendered photo, sliders, photo import).
 - `Apps/iOS/`: the iOS app (`Emulsion.xcodeproj`, sources in `Emulsion/`, UI walkthrough in `EmulsionUITests/`). Opens on the camera; the library and editor are behind it.
@@ -37,8 +38,10 @@ sh Tools/build-kernels.sh                                    # after any .metal 
 .venv/bin/python -I Tools/grain-reference/boolean-model/boolean_grain_reference.py --out Tools/grain-reference/boolean-model/grain-boolean-model.json
 (cd Packages/EmulsionCore && EMULSION_PERF=1 swift test --filter PerformanceProbe)  # Mac timings
 (cd Packages/EmulsionCore && EMULSION_UPDATE_GOLDENS=1 swift test --filter VisualRegression)  # accept an intended look change (Tests/AGENTS.md)
+(cd Packages/EmulsionCore && swift run emulsion-fit negative --stock kodak-vision3-250d-5207 --out /tmp/fit)  # fit a stock; also `list`, `check`
 swift format lint --recursive Packages Apps Tools            # style (config: .swift-format)
 ```
+Stock-data checks and `emulsion-fit` read the local reference data (traced curves, never committed) from `EMULSION_REFERENCE_DATA`, else `~/Documents/Emulsion Research/datasheet-tracings`; `swift test` skips those checks when the folder is missing.
 
 ## The Apple way
 - **Apple's documentation is the reference.** Before using an API, check its current page on developer.apple.com (availability, deprecations, recommended replacement). Follow the Human Interface Guidelines for UI, and Apple's sample code and WWDC guidance for patterns.
@@ -64,6 +67,7 @@ swift format lint --recursive Packages Apps Tools            # style (config: .s
   - UI changes: before/after screenshots or a short screen recording from the iOS Simulator (`xcrun simctl io booted screenshot|recordVideo`), and from a device when it matters;
   - engine changes: before/after renders of a reference fixture, plus the measured numbers;
   - docs-only changes: say "no visual change".
+  - for third-party-derived data, publish residual numbers, not plots of the source curves.
   - Proof images and recordings go on a `proof/<issue>` branch (e.g. `proof/mov-54`), linked from the PR by a commit-pinned `raw.githubusercontent.com/.../<sha>/...` URL. Never commit them to `main` or a feature branch (MOV-131).
 - **CI test crashes:** inspect the `test-diagnostics-<run>-<attempt>` artifact for the test log and macOS crash reports (MOV-127). Keep the failing exit status; don't mask crashes with retries.
 - **Run the app in the Simulator** for any app change; don't stop at "it compiles". Use the iPhone 17 Pro and iPhone Duo simulators.

@@ -1,5 +1,11 @@
 # Decisions
 
+## 12 November 2026: traced datasheet curves stay local (owner)
+
+12 Nov 2026: publish fitted stock parameters and tools; keep traced datasheet curves local until MOV-94 counsel review; then reconsider publishing them with attribution.
+
+The repository keeps each stock's manifest, which pins its traced CSVs by SHA-256; the CSVs are local reference data outside git (`EMULSION_REFERENCE_DATA`, else `~/Documents/Emulsion Research/datasheet-tracings`), and the tests that need them run only where that folder exists.
+
 ## 10 November 2026: minimal glass editing (owner)
 
 The owner chose an ultra-minimal editor with an immersive photo, generous native Apple Liquid Glass and controls revealed on demand. Use Photos-style adjustment rulers: one active adjustment, a horizontal tick-mark scale, fixed indicator, value readout and neutral detent. Ordinary stacked sliders are not the final design. Keep full-image aspect fitting and a neutral surround for judging the edit; do not add an ambient blurred-photo background. Rulers must support accessible increments and reset, and retain the selected control and edit through hiding and rotation. Look recipes remain MOV-65. Duo uses its own expanded composition and reserved-region APIs; show regular, folded and unfolded concepts to the owner before implementing that layout (MOV-119).
