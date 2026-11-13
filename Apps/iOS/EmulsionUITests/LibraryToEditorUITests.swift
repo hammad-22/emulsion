@@ -6,17 +6,16 @@ import XCTest
 /// Screenshots are kept in the result bundle as PR proof. Run on a fresh install
 /// with an isolated test bundle identifier so the owner's library stays untouched.
 final class LibraryToEditorUITests: XCTestCase {
+    /// Every text on the empty library, the Import label included, passes the contrast audit.
     @MainActor
-    func testEmptyLibraryExplanationContrast() throws {
+    func testEmptyLibraryContrast() throws {
         let app = XCUIApplication.launchLibrary()
         guard app.buttons["Try Sample Photos"].waitForExistence(timeout: 5) else {
             throw XCTSkip("Needs an empty library; uninstall the isolated proof app first.")
         }
-        let explanation = "Import a photo, or try a sample, to develop it as a film negative and print."
-        // This regression targets the explanation; full-screen contrast findings remain in MOV-59/MOV-135.
-        try app.performAccessibilityAudit(for: .contrast) { issue in
-            issue.element?.label != explanation
-        }
+        // The sample prints fade in as they render; the audit reads pixels.
+        sleep(3)
+        try app.audit(.contrast)
     }
 
     @MainActor

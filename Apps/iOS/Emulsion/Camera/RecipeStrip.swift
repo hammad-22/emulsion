@@ -69,5 +69,7 @@ private struct RecipeChip: View {
         .glassEffect(.regular.interactive(), in: .capsule)
         .accessibilityLabel(recipe.name)
         .accessibilityAddTraits(isSelected ? .isSelected : [])
+        // The strip stops growing at the first accessibility size; a long press shows the name large.
+        .accessibilityShowsLargeContentViewer { Text(recipe.name) }
     }
 }

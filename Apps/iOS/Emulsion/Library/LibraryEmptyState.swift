@@ -9,6 +9,7 @@ struct LibraryEmptyState: View {
 
     @Environment(PhotoStore.self) private var store
     @Environment(\.dynamicTypeSize) private var dynamicTypeSize
+    @Environment(\.colorScheme) private var colorScheme
     /// Both actions share a scaled width, constrained by the available canvas.
     @ScaledMetric private var buttonWidth: CGFloat = 260
 
@@ -28,6 +29,10 @@ struct LibraryEmptyState: View {
                     VStack(spacing: FilmLabLayout.gap) {
                         PhotoImportButton(fillsWidth: true) { error = $0.localizedDescription }
                             .buttonStyle(.glassProminent)
+                            // Neutral, like the editor's Save: white on the system blue measured
+                            // under 4.5:1 (MOV-59 audit); primary on background is far over it.
+                            .tint(.primary)
+                            .foregroundStyle(colorScheme == .dark ? .black : .white)
                         Button(action: addSamples) {
                             Label("Try Sample Photos", systemImage: "photo.stack")
                                 .frame(maxWidth: .infinity)
