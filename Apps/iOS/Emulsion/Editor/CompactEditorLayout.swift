@@ -22,27 +22,27 @@ struct CompactEditorLayout<Photo: View>: View {
     /// Stacked, the photo keeps at least half the height; at accessibility text sizes the
     /// panel scrolls instead of shrinking the photo further.
     private let maximumPanelFraction: CGFloat = 0.5
+    @State private var panelHeight: CGFloat = 0
 
     var body: some View {
         layout {
             photo().padding(isWide ? FilmLabLayout.inset : 0)
             controls
                 .disabled(!isEditable)
-                .frame(
-                    maxWidth: isWide ? (showsAdjustments ? sidePanelWidth : 0) : .infinity,
-                    maxHeight: showsAdjustments ? (isWide ? .infinity : height * maximumPanelFraction) : 0
-                )
-                .fixedSize(horizontal: false, vertical: !isWide)
+                .frame(maxWidth: isWide ? (showsAdjustments ? sidePanelWidth : 0) : .infinity)
                 .layoutPriority(1)
         }
     }
 
+    /// Stacked, the panel is as tall as its content up to the cap, and scrolls past it (large
+    /// text). Beside the photo it has the full height, centred while it fits.
     private var controls: some View {
-        ViewThatFits(in: .vertical) {
-            panel
-            ScrollView { panel }
+        ScrollView {
+            panel.onGeometryChange(for: CGFloat.self, of: \.size.height) { panelHeight = $0 }
         }
-        .frame(height: showsAdjustments ? nil : 0)
+        .scrollBounceBehavior(.basedOnSize)
+        .defaultScrollAnchor(.center, for: .alignment)
+        .frame(height: showsAdjustments ? (isWide ? nil : min(panelHeight, height * maximumPanelFraction)) : 0)
         .clipped()
         .opacity(showsAdjustments ? 1 : 0)
         .allowsHitTesting(showsAdjustments)

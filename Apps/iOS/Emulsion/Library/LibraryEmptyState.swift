@@ -8,13 +8,16 @@ struct LibraryEmptyState: View {
     @Binding var error: String?
 
     @Environment(PhotoStore.self) private var store
+    @Environment(\.dynamicTypeSize) private var dynamicTypeSize
     /// Both actions share a scaled width, constrained by the available canvas.
     @ScaledMetric private var buttonWidth: CGFloat = 260
 
     var body: some View {
         ScrollView {
             VStack(spacing: FilmLabLayout.generous) {
-                SamplePrints()
+                // At accessibility text sizes the decorative prints give way, so the two
+                // actions aren't pushed off screen (MOV-140).
+                if !dynamicTypeSize.isAccessibilitySize { SamplePrints() }
                 VStack(spacing: FilmLabLayout.gap) {
                     Text("Make room for light")
                         .font(.largeTitle.weight(.semibold))

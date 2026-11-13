@@ -8,8 +8,7 @@ import XCTest
 final class LibraryToEditorUITests: XCTestCase {
     @MainActor
     func testEmptyLibraryExplanationContrast() throws {
-        let app = XCUIApplication()
-        app.launch()
+        let app = XCUIApplication.launchLibrary()
         guard app.buttons["Try Sample Photos"].waitForExistence(timeout: 5) else {
             throw XCTSkip("Needs an empty library; uninstall the isolated proof app first.")
         }
@@ -22,8 +21,7 @@ final class LibraryToEditorUITests: XCTestCase {
 
     @MainActor
     func testEmptyLibraryTextScalingAndLabels() throws {
-        let app = XCUIApplication()
-        app.launch()
+        let app = XCUIApplication.launchLibrary()
         guard app.buttons["Try Sample Photos"].waitForExistence(timeout: 5) else {
             throw XCTSkip("Needs an empty library; uninstall the isolated proof app first.")
         }
@@ -90,9 +88,7 @@ final class LibraryToEditorUITests: XCTestCase {
 
     @MainActor
     func testSamplesEditCompareAndSave() throws {
-        let app = XCUIApplication()
-        app.launchArguments = ["--library"]
-        app.launch()
+        let app = XCUIApplication.launchLibrary()
         XCTAssertTrue(app.navigationBars["Library"].waitForExistence(timeout: 5))
 
         let samples = app.buttons["Try Sample Photos"]
@@ -191,8 +187,7 @@ final class LibraryToEditorUITests: XCTestCase {
 
     @MainActor
     private func launchSampleLibrary() throws -> XCUIApplication {
-        let app = XCUIApplication()
-        app.launch()
+        let app = XCUIApplication.launchLibrary()
         guard app.buttons["Try Sample Photos"].waitForExistence(timeout: 5) else {
             throw XCTSkip("Needs an empty library; uninstall the isolated proof app first.")
         }
