@@ -28,8 +28,11 @@ struct PhotoEditor: View {
                 .padding()
                 .frame(minWidth: minimumPhotoSize, minHeight: minimumPhotoSize)
             ScrollView {
-                AdjustmentPanel(adjustments: $session.adjustments, group: $group, selection: $selection)
-                    .padding()
+                AdjustmentPanel(
+                    adjustments: $session.adjustments, group: $group, selection: $selection,
+                    whiteBalanceAsShot: session.asShotWhiteBalance
+                )
+                .padding()
             }
             .frame(minWidth: minimumPanelWidth, idealWidth: minimumPanelWidth, maxWidth: maximumPanelWidth)
         }
@@ -38,13 +41,14 @@ struct PhotoEditor: View {
             Toggle("Compare", systemImage: "square.split.2x1", isOn: $showsOriginal)
             Button("Reset Edits", systemImage: "arrow.counterclockwise") { session.reset() }
         }
+        .task { await session.editorAppeared() }
         .onDisappear { session.close() }
         .onChange(of: scenePhase) { _, phase in
-            if phase != .active { session.close() }
+            if phase != .active { session.save() }
         }
         // Quitting doesn't change the scene phase, so a pending edit is written here.
         .onReceive(NotificationCenter.default.publisher(for: NSApplication.willTerminateNotification)) { _ in
-            session.close()
+            session.save()
         }
     }
 }

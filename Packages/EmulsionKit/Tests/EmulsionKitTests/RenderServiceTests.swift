@@ -137,9 +137,11 @@ extension RenderServiceTests {
 // MARK: RAW white balance (MOV-10)
 
 extension RenderServiceTests {
-    static var tungstenWhiteBalance: Adjustments {
+    static var tungstenWhiteBalance: Adjustments { whiteBalance(SyntheticDNG.illuminantAKelvin) }
+
+    static func whiteBalance(_ kelvin: Double, tint: Double = 0) -> Adjustments {
         var adjustments = Adjustments.neutral
-        adjustments.whiteBalance = CameraWhiteBalance(temperature: SyntheticDNG.illuminantAKelvin, tint: 0)
+        adjustments.whiteBalance = CameraWhiteBalance(temperature: kelvin, tint: tint)
         return adjustments
     }
 
@@ -223,5 +225,158 @@ extension RenderServiceTests {
         #expect(corrected < asShot, "gray cast \(corrected) codes at 2856 K, \(asShot) as shot")
         // Measured 0 codes at 2856 K, 98 as shot.
         #expect(corrected <= 1, "gray cast \(corrected) codes at 2856 K")
+    }
+}
+
+// MARK: Interactive RAW white balance (MOV-137)
+
+extension RenderServiceTests {
+    /// Each step of a white balance drag on the open photo matches a develop from the file
+    /// (a service that hasn't opened it), without reading the file again.
+    @Test func theOpenPhotoChangesWhiteBalanceWithoutReadingTheFileAgain() async throws {
+        let library = TestLibrary()
+        let url = library.store.url(for: try await library.store.add(TestPhoto.anchoredRAW, fileExtension: "dng"))
+        let service = library.renderService
+        let fromTheFile = TestLibrary().renderService
+        service.open(url)
+
+        let asShot = try await service.image(url, .neutral, maxDimension: 1200)
+        for kelvin in [3000.0, 3400, 4200, 9000] {
+            let step = try await service.image(url, Self.whiteBalance(kelvin, tint: 12), maxDimension: 1200)
+            let reference = try await fromTheFile.image(url, Self.whiteBalance(kelvin, tint: 12), maxDimension: 1200)
+            #expect(TestPixels.rgba(step) == TestPixels.rgba(reference), "\(kelvin) K")
+        }
+        #expect(await service.fileReadCount == 1)
+        #expect(await service.developCount == 5, "every step is a new develop of the kept decoder")
+        #expect(await fromTheFile.fileReadCount == 4, "a photo that isn't open reads its file for each")
+
+        let backToAsShot = try await service.image(url, .neutral, maxDimension: 1200)
+        // Back at as shot is within 1e-6 of the untouched develop, not bit-exact (`RAWDecoder`).
+        #expect(TestPixels.difference(backToAsShot, asShot).max <= 1)
+        let untouched = try await fromTheFile.image(url, .neutral, maxDimension: 1200)
+        #expect(TestPixels.rgba(asShot) == TestPixels.rgba(untouched), "the first develop is the file's own neutral")
+        #expect(await service.fileReadCount == 1)
+        #expect(await service.developCount == 6, "as shot again is developed, not looked up")
+    }
+
+    @Test func theOpenPhotoMeasuresItsExposureAnchorOnceAndExportsWithIt() async throws {
+        let library = TestLibrary()
+        let url = library.store.url(for: try await library.store.add(TestPhoto.anchoredRAW, fileExtension: "dng"))
+        let service = library.renderService
+        service.open(url)
+
+        _ = try await service.image(url, .neutral, maxDimension: 512)
+        let anchor = try #require(service.exposureAnchor(url))
+        #expect(anchor != 0)
+        _ = try await service.image(url, Self.tungstenWhiteBalance, maxDimension: 512)
+        #expect(service.exposureAnchor(url) == anchor)
+        #expect(await service.exposureAnchorMeasurements == 1, "measured once and reported for the record (MOV-141)")
+
+        let exported = try await service.export(url, Self.tungstenWhiteBalance, format: .jpeg)
+        let exportedFresh = try await TestLibrary().renderService.export(url, Self.tungstenWhiteBalance, format: .jpeg)
+        #expect(TestPixels.rgba(try Self.decoded(exported)) == TestPixels.rgba(try Self.decoded(exportedFresh)))
+    }
+
+    /// The export's full-size decode isn't held beside the editor's decoder.
+    @Test func exportingTheOpenPhotoReleasesItsDecoderUntilTheNextPreview() async throws {
+        let library = TestLibrary()
+        let url = library.store.url(for: try await library.store.add(TestRAW.tungstenTaggedAsDaylight, fileExtension: "dng"))
+        let service = library.renderService
+        service.open(url)
+
+        _ = try await service.image(url, .neutral, maxDimension: 900)
+        _ = try await service.export(url, Self.tungstenWhiteBalance, format: .jpeg)
+        #expect(await service.keptDecoderURL == nil)
+        _ = try await service.image(url, Self.tungstenWhiteBalance, maxDimension: 900)
+        #expect(await service.keptDecoderURL == url)
+    }
+
+    @Test func onlyTheOpenPhotoKeepsADecoder() async throws {
+        let library = TestLibrary()
+        let first = library.store.url(for: try await library.store.add(TestRAW.tungstenTaggedAsDaylight, fileExtension: "dng"))
+        let second = library.store.url(for: try await library.store.add(TestPhoto.anchoredRAW, fileExtension: "dng"))
+        let jpeg = library.store.url(for: try await library.store.add(TestPhoto.jpeg, fileExtension: "jpg"))
+        let service = library.renderService
+
+        _ = try await service.image(first, .neutral, maxDimension: 900)
+        #expect(await service.keptDecoderURL == nil, "a photo nobody opened keeps none")
+
+        service.open(first)
+        _ = try await service.image(first, Self.tungstenWhiteBalance, maxDimension: 900)
+        #expect(await service.keptDecoderURL == first)
+        _ = try await service.image(second, .neutral, maxDimension: 300)
+        #expect(await service.keptDecoderURL == first, "a thumbnail of another photo doesn't take it")
+
+        service.open(second)
+        _ = try await service.image(second, Self.tungstenWhiteBalance, maxDimension: 900)
+        #expect(await service.keptDecoderURL == second, "one decoder: the newly opened photo's replaces it")
+
+        service.open(jpeg)
+        _ = try await service.image(jpeg, .neutral, maxDimension: 900)
+        #expect(await service.keptDecoderURL == nil, "a photo that isn't RAW has no decoder")
+        let reads = await service.fileReadCount
+        _ = try await service.image(jpeg, .neutral, maxDimension: 1400)
+        #expect(await service.fileReadCount == reads + 1, "its file is read once to develop, not again to look for a decoder")
+    }
+
+    @Test func closingOrForgettingThePhotoReleasesItsDecoder() async throws {
+        let library = TestLibrary()
+        let url = library.store.url(for: try await library.store.add(TestRAW.tungstenTaggedAsDaylight, fileExtension: "dng"))
+        let service = library.renderService
+
+        service.open(url)
+        _ = try await service.image(url, .neutral, maxDimension: 900)
+        await service.close(url).value
+        #expect(await service.keptDecoderURL == nil)
+
+        service.open(url)
+        _ = try await service.image(url, Self.tungstenWhiteBalance, maxDimension: 900)
+        #expect(await service.keptDecoderURL == url)
+        await service.forget(url)
+        #expect(await service.keptDecoderURL == nil)
+    }
+
+    /// A close that lands after the photo was opened again (the editor reopened at once)
+    /// leaves the new editor's decoder alone.
+    @Test func aLateCloseDoesNotReleaseAReopenedPhoto() async throws {
+        let library = TestLibrary()
+        let url = library.store.url(for: try await library.store.add(TestRAW.tungstenTaggedAsDaylight, fileExtension: "dng"))
+        let service = library.renderService
+
+        service.open(url)
+        _ = try await service.image(url, .neutral, maxDimension: 900)
+        let closing = service.close(url)
+        service.open(url)
+        await closing.value
+        #expect(await service.keptDecoderURL == url)
+    }
+
+    /// A smaller preview of the open photo (its library thumbnail beside the editor) is resized
+    /// from the kept decoder; only a larger one reads the file again.
+    @Test func smallerPreviewsOfTheOpenPhotoReuseItsDecoder() async throws {
+        let library = TestLibrary()
+        let url = library.store.url(for: try await library.store.add(TestRAW.tungstenTaggedAsDaylight, fileExtension: "dng"))
+        let service = library.renderService
+        service.open(url)
+
+        _ = try await service.image(url, .neutral, maxDimension: 300)
+        _ = try await service.image(url, Self.tungstenWhiteBalance, maxDimension: 200)
+        #expect(await service.fileReadCount == 1)
+        _ = try await service.image(url, Self.tungstenWhiteBalance, maxDimension: 300)
+        #expect(await service.fileReadCount == 1)
+        _ = try await service.image(url, Self.tungstenWhiteBalance, maxDimension: 600)
+        #expect(await service.fileReadCount == 2, "a larger preview needs a larger decode")
+    }
+
+    @Test func asShotWhiteBalanceIsReadFromRAWFilesOnly() async throws {
+        let library = TestLibrary()
+        let raw = library.store.url(for: try await library.store.add(TestRAW.tungstenTaggedAsDaylight, fileExtension: "dng"))
+        let jpeg = library.store.url(for: try await library.store.add(TestPhoto.jpeg, fileExtension: "jpg"))
+        let service = library.renderService
+
+        let asShot = try #require(await service.asShotWhiteBalance(raw))
+        #expect(abs(asShot.temperature - TestRAW.taggedKelvin) < TestRAW.asShotTemperatureTolerance)
+        #expect(await service.asShotWhiteBalance(jpeg) == nil)
+        #expect(await service.asShotWhiteBalance(library.folder.appending(path: "missing.dng")) == nil)
     }
 }
