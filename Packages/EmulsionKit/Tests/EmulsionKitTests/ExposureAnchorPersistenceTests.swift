@@ -67,9 +67,7 @@ struct ExposureAnchorPersistenceTests {
         let url = library.store.url(for: photo)
         _ = try await library.renderService.image(url, .init(), maxDimension: 256)
         let stale = try await Self.storedAnchor(of: photo.id, in: library.store)
-        let replaced = RAWDevelopChart.dng(
-            .bayerRGGB, chart: RAWDevelopChart.chart(), baselineStops: 0.5, profile: SyntheticDNG.Profile(gainTableGain: 8))
-        try replaced.write(to: url)
+        try Self.brighterRAW.write(to: url)
 
         let reopened = library.reopened()
         _ = try await reopened.renderService.image(url, .init(), maxDimension: 256)
@@ -79,27 +77,57 @@ struct ExposureAnchorPersistenceTests {
         #expect(fresh.source != stale.source)
     }
 
+    /// Within a session too: the service checks the file at each develop.
+    @Test func anOriginalChangedDuringASessionIsMeasuredAgain() async throws {
+        let library = TestLibrary()
+        let photo = try await library.store.add(TestPhoto.anchoredRAW, fileExtension: "dng")
+        let url = library.store.url(for: photo)
+        let service = library.renderService
+        _ = try await service.image(url, .init(), maxDimension: 256)
+        try Self.brighterRAW.write(to: url)
+
+        _ = try await service.image(url, .init(), maxDimension: 512)
+
+        #expect(await service.exposureAnchorMeasurements == 2)
+    }
+
+    /// Anchors measured together reach the index in one save.
+    @Test func anchorsMeasuredTogetherAreSavedTogether() async throws {
+        let library = TestLibrary()
+        let first = try await library.store.add(TestPhoto.anchoredRAW, fileExtension: "dng")
+        let second = try await library.store.add(TestPhoto.anchoredRAW, fileExtension: "dng")
+        for photo in [first, second] {
+            _ = try await library.renderService.image(library.store.url(for: photo), .init(), maxDimension: 256)
+        }
+        _ = try await Self.storedAnchor(of: first.id, in: library.store)
+
+        #expect(library.store.photo(second.id)?.exposureAnchor != nil)
+    }
+
     @Test func photosThatArentRAWStoreNoAnchor() async throws {
         let library = TestLibrary()
         let photo = try await library.store.add(TestPhoto.jpeg, fileExtension: "jpg")
         _ = try await library.renderService.image(library.store.url(for: photo), .init(), maxDimension: 256)
-        await Self.settle()
+        try await Task.sleep(for: PhotoStore.exposureAnchorSaveDelay * 2)
 
         #expect(library.store.photo(photo.id)?.exposureAnchor == nil)
     }
 
-    /// The anchor reaches the record on the main actor after the develop that measured it.
+    /// The anchor fixture with a stronger gain table: a different file at the same path.
+    private static let brighterRAW = RAWDevelopChart.dng(
+        .bayerRGGB, chart: RAWDevelopChart.chart(), baselineStops: 0.5, profile: SyntheticDNG.Profile(gainTableGain: 8))
+
+    /// The anchor reaches the record once the store saves it, `exposureAnchorSaveDelay` after the
+    /// develop that measured it.
     private static func storedAnchor(
         of id: UUID, in store: PhotoStore, where accepted: (StoredExposureAnchor) -> Bool = { _ in true }
     ) async throws -> StoredExposureAnchor {
-        for _ in 0..<1000 {
+        let deadline = ContinuousClock.now + .seconds(60)
+        while ContinuousClock.now < deadline {
             if let anchor = store.photo(id)?.exposureAnchor, accepted(anchor) { return anchor }
-            await Task.yield()
+            try await Task.sleep(for: .milliseconds(20))
         }
-        return try #require(store.photo(id)?.exposureAnchor.flatMap { accepted($0) ? $0 : nil }, "anchor never saved")
-    }
-
-    private static func settle() async {
-        for _ in 0..<100 { await Task.yield() }
+        Issue.record("anchor never saved")
+        throw CancellationError()
     }
 }

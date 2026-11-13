@@ -25,12 +25,12 @@ public actor RenderService {
     /// Preview sizes are rounded up to this step, so resizes (iPhone Duo fold/unfold, Mac
     /// windows) reuse a cached develop instead of decoding the RAW again for every size.
     private let previewSizeStep: CGFloat = 256
-    /// Each file's exposure anchor, restored from its photo record or kept from its first develop,
-    /// so later develops (other sizes, white balances, export, relaunches) skip measuring it.
-    /// Outside the actor so `PhotoStore` can restore anchors before the first render.
-    private nonisolated let exposureAnchors = Mutex<[URL: Double]>([:])
+    /// Each file's exposure anchor, restored from its photo record or measured on its first develop,
+    /// so later develops (other sizes, white balances, export, relaunches) skip measuring it while
+    /// the file is unchanged. Outside the actor so `PhotoStore` can restore anchors before the first render.
+    private nonisolated let exposureAnchors = Mutex<[URL: StoredExposureAnchor]>([:])
     /// Told each anchor the service measures, so the photo store can save it (MOV-141).
-    private nonisolated let anchorMeasured = Mutex<(@Sendable (URL, Double) -> Void)?>(nil)
+    private nonisolated let anchorMeasured = Mutex<(@Sendable (URL, StoredExposureAnchor) -> Void)?>(nil)
     private nonisolated let thumbnails: ThumbnailCache
     private nonisolated let latestRenders: LatestRenderCache
 
@@ -173,27 +173,29 @@ public actor RenderService {
     }
 
     /// Develops the file with its exposure anchor, measuring, remembering and reporting it when
-    /// it isn't known yet; the anchor is measured as shot, so a white balance change reuses it.
+    /// none is known for the file as it is now; the anchor is measured as shot, so a white balance
+    /// change reuses it.
     private func develop(_ url: URL, maxDimension: CGFloat?, whiteBalance: CameraWhiteBalance?) throws -> Negative {
-        let known = exposureAnchor(url)
+        let source = StoredExposureAnchor.Source(url)
+        let known = exposureAnchors.withLock { $0[url] }.flatMap { $0.source == source ? $0.stops : nil }
         let developed = try engine().developer.develop(
             Data(contentsOf: url), maxDimension: maxDimension, whiteBalance: whiteBalance, exposureAnchorStops: known)
-        guard known == nil else { return developed }
+        guard known == nil, let source else { return developed }
         exposureAnchorMeasurements += 1
-        let stops = developed.exposureAnchorStops
-        exposureAnchors.withLock { $0[url] = stops }
-        anchorMeasured.withLock { $0 }?(url, stops)
+        let anchor = StoredExposureAnchor(stops: developed.exposureAnchorStops, source: source)
+        exposureAnchors.withLock { $0[url] = anchor }
+        anchorMeasured.withLock { $0 }?(url, anchor)
         return developed
     }
 
-    /// Develops `url` with `stops` instead of measuring its anchor: one saved with its photo.
-    nonisolated func restoreExposureAnchor(_ stops: Double, for url: URL) {
-        exposureAnchors.withLock { $0[url] = stops }
+    /// Develops `url` with a saved anchor instead of measuring it, while the file still matches.
+    nonisolated func restoreExposureAnchor(_ anchor: StoredExposureAnchor, for url: URL) {
+        exposureAnchors.withLock { $0[url] = anchor }
     }
 
     /// Calls `handler`, off the main actor, with each anchor the service measures. Replaces any
     /// earlier handler: the app has one photo store.
-    nonisolated func onExposureAnchorMeasured(_ handler: @escaping @Sendable (URL, Double) -> Void) {
+    nonisolated func onExposureAnchorMeasured(_ handler: @escaping @Sendable (URL, StoredExposureAnchor) -> Void) {
         anchorMeasured.withLock { $0 = handler }
     }
 
@@ -214,6 +216,6 @@ public actor RenderService {
     private(set) var developCount = 0
     /// Develops that had no anchor to reuse and measured one; for tests.
     private(set) var exposureAnchorMeasurements = 0
-    /// The file's remembered exposure anchor.
-    nonisolated func exposureAnchor(_ url: URL) -> Double? { exposureAnchors.withLock { $0[url] } }
+    /// The file's remembered exposure anchor; for tests.
+    nonisolated func exposureAnchor(_ url: URL) -> Double? { exposureAnchors.withLock { $0[url]?.stops } }
 }

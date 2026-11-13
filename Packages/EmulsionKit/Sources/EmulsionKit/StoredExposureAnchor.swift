@@ -12,16 +12,14 @@ struct StoredExposureAnchor: Codable, Equatable, Sendable {
         let byteCount: Int
         let modified: Date
 
-        /// Nil when the file can't be read.
+        /// Nil when the file can't be read. Read from the file system each time: `URL.resourceValues`
+        /// caches on the URL, which would hide a change.
         init?(_ file: URL) {
-            guard let values = try? file.resourceValues(forKeys: [.fileSizeKey, .contentModificationDateKey]),
-                let byteCount = values.fileSize, let modified = values.contentModificationDate
+            guard let attributes = try? FileManager.default.attributesOfItem(atPath: file.path(percentEncoded: false)),
+                let byteCount = (attributes[.size] as? NSNumber)?.intValue, let modified = attributes[.modificationDate] as? Date
             else { return nil }
             self.byteCount = byteCount
             self.modified = modified
         }
     }
-
-    /// Whether this anchor still describes `file`.
-    func matches(_ file: URL) -> Bool { Source(file) == source }
 }
