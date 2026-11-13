@@ -186,7 +186,8 @@ public actor RenderService {
         let known = exposureAnchors.withLock { $0[url] }.flatMap { $0.source == source ? $0.stops : nil }
         let developed = try engine().developer.develop(
             Data(contentsOf: url), maxDimension: maxDimension, whiteBalance: whiteBalance, exposureAnchorStops: known)
-        guard known == nil, let source else { return developed }
+        // Only RAW has an anchor (non-RAW develops report no as-shot white balance).
+        guard known == nil, developed.asShotWhiteBalance != nil, let source else { return developed }
         exposureAnchorMeasurements += 1
         let anchor = StoredExposureAnchor(stops: developed.exposureAnchorStops, source: source)
         exposureAnchors.withLock { $0[url] = anchor }
@@ -214,7 +215,7 @@ public actor RenderService {
     var cachedPreviewKeys: [String] { lruKeys }
     /// Previews developed so far, cache misses; for tests.
     private(set) var developCount = 0
-    /// Develops that had no anchor to reuse and measured one; for tests.
+    /// RAW develops that had no anchor to reuse and measured one; for tests.
     private(set) var exposureAnchorMeasurements = 0
     /// The file's remembered exposure anchor; for tests.
     nonisolated func exposureAnchor(_ url: URL) -> Double? { exposureAnchors.withLock { $0[url]?.stops } }

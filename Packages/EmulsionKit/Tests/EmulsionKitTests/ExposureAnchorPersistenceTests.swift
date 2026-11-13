@@ -91,34 +91,66 @@ struct ExposureAnchorPersistenceTests {
         #expect(await service.exposureAnchorMeasurements == 2)
     }
 
-    /// Anchors measured together reach the index in one save.
-    @Test func anchorsMeasuredTogetherAreSavedTogether() async throws {
+    /// The first anchor is saved at once; the rest of a burst follows in a batch.
+    @Test func everyAnchorOfABurstIsSaved() async throws {
         let library = TestLibrary()
-        let first = try await library.store.add(TestPhoto.anchoredRAW, fileExtension: "dng")
-        let second = try await library.store.add(TestPhoto.anchoredRAW, fileExtension: "dng")
-        for photo in [first, second] {
+        let photos = [
+            try await library.store.add(TestPhoto.anchoredRAW, fileExtension: "dng"),
+            try await library.store.add(TestPhoto.anchoredRAW, fileExtension: "dng"),
+            try await library.store.add(TestPhoto.anchoredRAW, fileExtension: "dng"),
+        ]
+        for photo in photos {
             _ = try await library.renderService.image(library.store.url(for: photo), .init(), maxDimension: 256)
         }
-        _ = try await Self.storedAnchor(of: first.id, in: library.store)
+        for photo in photos { _ = try await Self.storedAnchor(of: photo.id, in: library.store) }
 
-        #expect(library.store.photo(second.id)?.exposureAnchor != nil)
+        let reopened = library.reopened()
+        #expect(photos.allSatisfy { reopened.photo($0.id)?.exposureAnchor != nil })
+    }
+
+    @Test func aFailedAnchorSaveIsReported() async throws {
+        let library = TestLibrary()
+        let photo = try await library.store.add(TestPhoto.anchoredRAW, fileExtension: "dng")
+        // A folder where the index should be makes every index write fail.
+        try FileManager.default.removeItem(at: library.store.indexURL)
+        try FileManager.default.createDirectory(at: library.store.indexURL, withIntermediateDirectories: false)
+
+        _ = try await library.renderService.image(library.store.url(for: photo), .init(), maxDimension: 256)
+        let deadline = ContinuousClock.now + .seconds(60)
+        while library.store.lastError == nil, ContinuousClock.now < deadline { try await Task.sleep(for: .milliseconds(20)) }
+
+        #expect(library.store.lastError == .librarySaveFailed)
+        #expect(library.store.photo(photo.id)?.exposureAnchor == nil)
     }
 
     @Test func photosThatArentRAWStoreNoAnchor() async throws {
         let library = TestLibrary()
         let photo = try await library.store.add(TestPhoto.jpeg, fileExtension: "jpg")
         _ = try await library.renderService.image(library.store.url(for: photo), .init(), maxDimension: 256)
-        try await Task.sleep(for: PhotoStore.exposureAnchorSaveDelay * 2)
 
+        #expect(await library.renderService.exposureAnchorMeasurements == 0)
         #expect(library.store.photo(photo.id)?.exposureAnchor == nil)
+    }
+
+    /// Records from before `isRAW` was saved read as not RAW; their anchors are still kept.
+    @Test func aRAWRecordWithoutItsKindStillKeepsItsAnchor() async throws {
+        let library = TestLibrary()
+        let photo = try await library.store.add(TestPhoto.anchoredRAW, fileExtension: "dng")
+        let olderIndex = #"[{"id": "\#(photo.id)", "fileName": "\#(photo.fileName)"}]"#
+        try Data(olderIndex.utf8).write(to: library.store.indexURL)
+
+        let migrated = library.reopened()
+        _ = try await migrated.renderService.image(migrated.url(for: photo), .init(), maxDimension: 256)
+
+        _ = try await Self.storedAnchor(of: photo.id, in: migrated)
     }
 
     /// The anchor fixture with a stronger gain table: a different file at the same path.
     private static let brighterRAW = RAWDevelopChart.dng(
         .bayerRGGB, chart: RAWDevelopChart.chart(), baselineStops: 0.5, profile: SyntheticDNG.Profile(gainTableGain: 8))
 
-    /// The anchor reaches the record once the store saves it, `exposureAnchorSaveDelay` after the
-    /// develop that measured it.
+    /// The anchor reaches the record once the store saves it, on the main actor after the develop
+    /// that measured it.
     private static func storedAnchor(
         of id: UUID, in store: PhotoStore, where accepted: (StoredExposureAnchor) -> Bool = { _ in true }
     ) async throws -> StoredExposureAnchor {
@@ -127,7 +159,6 @@ struct ExposureAnchorPersistenceTests {
             if let anchor = store.photo(id)?.exposureAnchor, accepted(anchor) { return anchor }
             try await Task.sleep(for: .milliseconds(20))
         }
-        Issue.record("anchor never saved")
-        throw CancellationError()
+        return try #require(nil as StoredExposureAnchor?, "anchor never saved")
     }
 }

@@ -20,7 +20,7 @@ public final class PhotoStore {
     /// Set once a failed save is reported and cleared when one succeeds, so a full disk is
     /// reported once rather than on every slider rest.
     private var hasReportedSaveFailure = false
-    /// Measured anchors waiting for `exposureAnchorSave`, by photo.
+    /// Measured anchors waiting for the save `exposureAnchorSave` holds back, by photo.
     private var unsavedExposureAnchors: [UUID: StoredExposureAnchor] = [:]
     private var exposureAnchorSave: Task<Void, Never>?
     static let exposureAnchorSaveDelay = Duration.seconds(1)
@@ -159,24 +159,32 @@ public final class PhotoStore {
         }
     }
 
-    /// Saves a RAW photo's newly measured anchor with its record, with any others measured within
-    /// `exposureAnchorSaveDelay`: opening a library of unmeasured RAWs then writes the index once a
-    /// second, not once per photo. It's a cache: if the save fails, the next launch measures again,
-    /// so the failure isn't reported.
+    /// Saves a newly measured anchor with its photo's record: at once, then with any others measured
+    /// within `exposureAnchorSaveDelay`, so opening a library of unmeasured RAWs writes the index
+    /// about once a second, not once per photo.
     private func keepExposureAnchor(_ anchor: StoredExposureAnchor, for file: URL) {
-        guard let photo = photos.first(where: { $0.fileName == file.lastPathComponent }), photo.isRAW else { return }
+        guard let photo = photos.first(where: { $0.fileName == file.lastPathComponent }) else { return }
         unsavedExposureAnchors[photo.id] = anchor
         guard exposureAnchorSave == nil else { return }
+        saveExposureAnchors()
         exposureAnchorSave = Task {
             try? await Task.sleep(for: Self.exposureAnchorSaveDelay)
             exposureAnchorSave = nil
-            let anchors = unsavedExposureAnchors
-            unsavedExposureAnchors = [:]
-            try? commit { photos in
+            if !unsavedExposureAnchors.isEmpty { saveExposureAnchors() }
+        }
+    }
+
+    private func saveExposureAnchors() {
+        let anchors = unsavedExposureAnchors
+        unsavedExposureAnchors = [:]
+        do {
+            try commit { photos in
                 for i in photos.indices {
                     if let anchor = anchors[photos[i].id] { photos[i].exposureAnchor = anchor }
                 }
             }
+        } catch {
+            report(error)
         }
     }
 
