@@ -198,7 +198,7 @@ final class LibraryToEditorUITests: XCTestCase {
         for page in 1...5 {
             app.collectionViews["looks-collection"].swipeUp()
             keepScreenshot(app, named: "Looks text layout \(page)")
-            try app.performAccessibilityAudit(for: .textClipped)
+            try app.performAccessibilityAudit(for: [.contrast, .textClipped])
         }
     }
 

@@ -84,6 +84,7 @@ struct LooksPicker: View {
                 Section { Text(loadError.localizedDescription).foregroundStyle(Color.primary) }
             }
         }
+        .scrollEdgeEffectStyle(.hard, for: .all)
         .accessibilityIdentifier("looks-collection")
     }
 
