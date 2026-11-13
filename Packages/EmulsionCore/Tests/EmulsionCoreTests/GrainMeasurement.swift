@@ -129,7 +129,11 @@ enum GrainMeasurement {
                 }
             }
         }
-        return (0..<bands).map { ((Double($0) + 0.5) * 0.5 / Double(bands), sums[$0] / max(counts[$0], 1)) }
+        return (0..<bands).map { band -> (frequency: Double, power: Double) in
+            let frequency: Double = (Double(band) + 0.5) * 0.5 / Double(bands)
+            let power: Double = sums[band] / max(counts[band], 1)
+            return (frequency, power)
+        }
     }
 
     // MARK: Renders
