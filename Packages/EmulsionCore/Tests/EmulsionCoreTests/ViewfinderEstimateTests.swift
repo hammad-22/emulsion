@@ -31,13 +31,27 @@ struct ViewfinderEstimateTests {
         #expect(error.mean <= Self.meanDeltaE)
     }
 
-    /// The estimate itself, in stops, on the gray ramp (white reaches about +4 stops, so values
-    /// above 1 must survive the curves filter).
-    @Test func grayEstimateMatchesInStops() throws {
+    /// The estimate itself on the gray ramp (white reaches about +4 stops, so values above 1 must
+    /// survive the curves filter), in stops where the display is above the print's black, and in
+    /// encoded display value below it.
+    @Test func grayEstimateMatchesInStopsAboveThePrintsBlack() throws {
         let fast = Fixtures.encodedFloats(renderer.developer.viewfinderNegative(from: Self.grayRamp).image, space: SceneFixtures.linearP3)
         let exact = Fixtures.encodedFloats(try renderer.developer.sceneFromDisplay(Self.grayRamp).image, space: SceneFixtures.linearP3)
-        let stops = zip(fast, exact).flatMap { f, e in (0..<3).map { abs(log2(max(f[$0], 1e-9) / max(e[$0], 1e-9))) } }
-        #expect((stops.max() ?? 0) <= Self.maxStops)
+        let model = FilmLook.stock
+        // Display values at or below the print's black F_n(floor) (= softEnds.compress(0)) are squeezed onto its flat toe,
+        // where an exposure is ill-conditioned, so there the estimate is compared after printing it back to display.
+        let black = model.softEnds.compress(0)
+        var (maxStops, maxBlackDisplayError) = (0.0, 0.0)
+        for (step, (f, e)) in zip(fast, exact).enumerated() {
+            if Self.displayLinear(step) > black {
+                maxStops = max(maxStops, (0..<3).map { abs(log2(max(f[$0], 1e-9) / max(e[$0], 1e-9))) }.max() ?? 0)
+            } else {
+                let (a, b) = (model.display(fromSceneEstimate: f), model.display(fromSceneEstimate: e))
+                maxBlackDisplayError = max(maxBlackDisplayError, (0..<3).map { abs(Self.encoded(a[$0]) - Self.encoded(b[$0])) }.max() ?? 0)
+            }
+        }
+        #expect(maxStops <= Self.maxStops)
+        #expect(maxBlackDisplayError <= Self.maxBlackDisplayError)
         #expect((fast.last?.y ?? 0) > 2, "white keeps its estimate above 1")
     }
 
@@ -74,19 +88,29 @@ struct ViewfinderEstimateTests {
 
     // MARK: Tolerances: twice the worst measured on the Mac (M-series GPU)
 
-    /// Measured max: gray ramp 0.036, primaries/secondaries and patches 0.029, hue sweep 0.032,
-    /// out-of-range light 0.011. A visible step is about 1.
+    /// Measured max: gray ramp 0.036, primaries/secondaries and patches 0.017, hue sweep 0.026,
+    /// out-of-range light 0.007. A visible step is about 1.
     static let maxDeltaE = 0.07
-    /// Measured mean: gray ramp 0.0071, saturated 0.0074, hue sweep 0.0104.
+    /// Measured mean: gray ramp 0.0075, saturated 0.0053, hue sweep 0.0060.
     static let meanDeltaE = 0.02
-    /// Measured: 0.003 stops on the gray ramp; white 2.8785 against 2.8800.
-    static let maxStops = 0.006
+    /// Measured: 0.0026 stops on the gray ramp above the print's black; white 2.8785 against 2.8800.
+    /// Below the print's black (the first 119 steps) it misses by up to 0.001 stops.
+    static let maxStops = 0.01
+    /// Encoded display value (0…1) of the two estimates printed back to display, at or below the
+    /// print's black. Measured: 3.9e-5 (0.16 of a 12-bit code).
+    static let maxBlackDisplayError = 1.5e-4
 
     // MARK: Fixtures
 
+    /// Display-linear value of `grayRamp`'s step.
+    static func displayLinear(_ step: Int) -> Double { InputColorSpace.displayP3.decode(signal: Double(step) / Double(grayRampSteps - 1)) }
+
+    static func encoded(_ linear: Double) -> Double { Double(Fixtures.encode(Float(linear))) }
+
     /// 4096 steps of encoded P3 gray: four per table entry, so it samples between them; the
-    /// first steps are deep shadows near the −9-stop floor.
-    static let grayRamp = Fixtures.row(Fixtures.grayRamp(steps: 4096), space: DisplayFixtures.displayP3)
+    /// first steps are deep shadows near the −6-stop floor.
+    static let grayRampSteps = 4096
+    static let grayRamp = Fixtures.row(Fixtures.grayRamp(steps: grayRampSteps), space: DisplayFixtures.displayP3)
 
     /// P3 primaries and secondaries at several encoded levels, plus the display patches.
     static let saturated: CIImage = {

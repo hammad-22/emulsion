@@ -24,10 +24,10 @@ the curves; the loader rejects a CSV whose SHA-256 differs from its manifest. Wh
 missing only the manifest checks run.
 
 The camera negatives' folders also hold `negative-fit.stock.json`: the engine's negative
-characteristic parameters fitted to the traced curves by `emulsion-fit negative --fit-date 2026-11-12`,
-with provenance and residual statistics measured against the traced curves (no samples). Neither
-the engine nor the apps load them: the bundled default stock is unchanged, and bundling fitted
-stocks under neutral ids is MOV-25.
+characteristic curves and printing-density matrix fitted to the traced curves by
+`emulsion-fit negative --fit-date 2026-11-12` (stock format 2), with provenance and residual statistics
+measured against the traced curves (no samples). The bundled default stock is the 250D fit under a
+neutral name (MOV-25); the apps don't load these files.
 
 ## Sources
 

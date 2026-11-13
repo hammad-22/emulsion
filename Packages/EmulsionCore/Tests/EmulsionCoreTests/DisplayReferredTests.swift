@@ -73,10 +73,13 @@ struct DisplayReferredTests {
         }
     }
 
-    /// A fiftieth of a stop up and down from zero changes every channel by nearly the same factor
-    /// (log-slope in linear P3): no slope jump where the edit changes direction. The step is
-    /// small so the film's own curvature stays below the bound. Measured: 1.6% at worst; the
-    /// earlier two-branch formula jumped by up to 12.9% (rise above fall).
+    /// Stepping exposure up and down from zero changes every channel by nearly the same factor
+    /// (log-slope in linear P3): no slope jump where the edit changes direction. The asymmetry the
+    /// film's own curvature gives shrinks in proportion to the step; a slope jump does not shrink at
+    /// all. So halving the step must about halve the asymmetry, and at a hundredth of a stop it stays
+    /// within 4%. Measured (worst channel): 4.0% at a fiftieth, 1.0% at a hundredth; at most 0.0019
+    /// above half the fiftieth's (the first patch's red). The lift before MOV-25's fix jumped by
+    /// (1 − g)²/g, up to 7% here; the two-branch formula before it by 12.9%.
     @Test func exposureResponseIsSmoothThroughZeroEdits() throws {
         let patches: [SIMD3<Float>] = [[0.2, 0.5, 1], [0.3, 0.7, 0.3], [0.9, 0.3, 0.2], [0.6, 0.45, 0.35], [0.3, 0.35, 0.75]]
         let negative = try developed(Fixtures.row(patches, space: DisplayFixtures.displayP3))
@@ -85,18 +88,82 @@ struct DisplayReferredTests {
             a.exposure = stops
             return Fixtures.encodedFloats(try renderer.render(negative, a), space: SceneFixtures.linearP3)
         }
-        let (down, zero, up) = (try out(-0.02), try out(0), try out(0.02))
+        let zero = try out(0)
+        /// (rise − fall) / mean of the two, per patch and channel, for a step of `stops`.
+        func asymmetry(_ stops: Double) throws -> [[Double]] {
+            let (down, up) = (try out(-stops), try out(stops))
+            return patches.indices.map { i in
+                (0..<3).map { c in
+                    let (rise, fall) = (log(up[i][c] / zero[i][c]), log(zero[i][c] / down[i][c]))
+                    return (rise - fall) / ((rise + fall) / 2)
+                }
+            }
+        }
+        let (step, half) = (try asymmetry(Self.smoothnessStep), try asymmetry(Self.smoothnessStep / 2))
         for i in patches.indices {
             for c in 0..<3 {
-                let (rise, fall) = (log(up[i][c] / zero[i][c]), log(zero[i][c] / down[i][c]))
-                #expect(abs(rise - fall) <= 0.04 * (rise + fall) / 2, "\(patches[i]) channel \(c): up \(rise), down \(fall)")
+                let label = "\(patches[i]) channel \(c): \(step[i][c]) at the step, \(half[i][c]) at half"
+                #expect(abs(half[i][c]) <= abs(step[i][c]) / 2 + Self.asymmetryNotShrinking, "\(label)")
+                #expect(abs(half[i][c]) <= Self.maxAsymmetry, "\(label)")
+            }
+        }
+    }
+
+    /// A fiftieth of a stop; the bound below applies at half of it.
+    static let smoothnessStep = 0.02
+    static let maxAsymmetry = 0.04
+    /// How much of the asymmetry may fail to halve with the step: twice the 0.0019 measured. A slope jump
+    /// larger than twice this would fail.
+    static let asymmetryNotShrinking = 0.004
+
+    /// The per-channel relative print (`FilmModel.relative`) for a photo darker than its print by g:
+    /// zero edits give the photo, the output never goes negative or falls as the edited print rises,
+    /// and for g ≥ (3 − √5)/2 the slope is continuous through zero edits; below it, darkening is
+    /// never steeper than brightening.
+    @Test(arguments: [0, 0.1, 0.3, 0.382, 0.5, 0.72, 0.9])
+    func relativePrintIsMonotoneNonNegativeAndSmooth(_ g: Double) {
+        let base = 0.4
+        let photo = g * base
+        func out(_ print: Double) -> Double { FilmModel.relative(print: print, base: base, photo: photo) }
+        #expect(abs(out(base) - photo) < 1e-15)
+        var previous = -Double.infinity
+        for step in 0...400 {
+            let value = out(Double(step) / 200 * base)
+            #expect(value >= 0 && value >= previous - 1e-15, "print \(Double(step) / 200 * base): \(value)")
+            previous = value
+        }
+        let h = 1e-7
+        let (rising, falling) = ((out(base + h) - photo) / h, (photo - out(base - h)) / h)
+        if g >= (3 - 5.0.squareRoot()) / 2 {
+            #expect(abs(rising - falling) <= 1e-6, "slopes \(rising), \(falling)")
+        } else {
+            #expect(falling >= -1e-9 && falling <= rising + 1e-9, "slopes \(rising), \(falling)")
+        }
+    }
+
+    /// Lifting edits keep adjacent 8-bit codes near black together: display black's estimate sits
+    /// where the print still responds (`FilmLook.displayFloorStops`), not on its flat toe, where
+    /// codes 0 and 1 were estimated stops apart. One pixel high, so local tone lifts pointwise (its
+    /// most). Measured largest step, at codes 0→1: 4.83 codes at +3 EV, 6.85 at +2 EV with shadows +1
+    /// (at a −9-stop floor: 11.36 and 32.19).
+    @Test(arguments: [(3.0, 0.0, 5.1), (2, 1, 7.3)])
+    func liftingNearBlackKeepsAdjacentCodesTogether(exposure: Double, shadows: Double, maxStep: Double) throws {
+        let ramp = Fixtures.row((0...24).map { SIMD3<Float>(repeating: Float($0) / 255) }, space: DisplayFixtures.displayP3)
+        var a = Adjustments.neutral
+        a.exposure = exposure
+        a.shadows = shadows
+        let out = try renderedCodes(ramp, a)
+        for (code, (next, previous)) in zip(out.dropFirst(), out).enumerated() {
+            for c in 0..<3 {
+                let step = next[c] - previous[c]
+                #expect(step >= 0 && step <= maxStep, "code \(code)→\(code + 1) channel \(c): step \(step)")
             }
         }
     }
 
     /// Display white is estimated as a +4-stop light, above the halation threshold, so a clipped
     /// white in a photo still glows (as `HalationTests` does for scene light). Measured just
-    /// outside the disc: +(10.1, 4.0, 1.5) codes; far away: 0.
+    /// outside the disc: +(9.9, 4.5, 2.2) codes; far away: 0.
     @Test func clippedHighlightsInAPhotoStillGlow() throws {
         let size = 400
         let picture = Fixtures.image(width: size, height: size, space: DisplayFixtures.displayP3) { x, y in
@@ -124,7 +191,7 @@ struct DisplayReferredTests {
 
     // MARK: Scene estimate
 
-    /// Measured: white → 2.879 on every channel (the largest of the cube corners), black → 0.18·2⁻⁹.
+    /// Measured: white → 2.879 on every channel (the largest of the cube corners), black → 0.18·2⁻⁶.
     @Test func sceneEstimateIsBounded() throws {
         let corners: [SIMD3<Float>] = (0..<8).map { (corner: Int) -> SIMD3<Float> in
             let red = Float(corner & 1)
