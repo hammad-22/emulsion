@@ -58,8 +58,7 @@ struct BandingTests {
         let ramps: [Ramp]
 
         static func load() throws -> Reference {
-            let url = try #require(Bundle.module.url(forResource: "banding-mov25", withExtension: "json", subdirectory: "References"))
-            return try JSONDecoder().decode(Reference.self, from: Data(contentsOf: url))
+            try JSONDecoder().decode(Reference.self, from: ColorReferences.reference("banding-mov25"))
         }
     }
 
@@ -82,18 +81,13 @@ struct BandingTests {
 
     // MARK: The engine's ramps
 
-    private static func adjusted(_ change: (inout Adjustments) -> Void) -> Adjustments {
-        var a = Adjustments.neutral
-        change(&a)
-        return a
-    }
-
     /// Point edits only: grain would add steps of its own, and halation needs area.
     static let edits: [(name: String, adjustments: Adjustments)] = [
-        ("neutral", .neutral), ("exposure +2", adjusted { $0.exposure = 2 }), ("exposure +3", adjusted { $0.exposure = 3 }),
-        ("exposure −2", adjusted { $0.exposure = -2 }), ("shadows +1", adjusted { $0.shadows = 1 }),
-        ("exposure +2, shadows +1", adjusted { ($0.exposure, $0.shadows) = (2, 1) }),
-        ("highlights −1", adjusted { $0.highlights = -1 }), ("color +0.7", adjusted { $0.color = 0.7 }),
+        ("neutral", .neutral), ("exposure +2", RegressionCase.adjust { $0.exposure = 2 }),
+        ("exposure +3", RegressionCase.adjust { $0.exposure = 3 }),
+        ("exposure −2", RegressionCase.adjust { $0.exposure = -2 }), ("shadows +1", RegressionCase.adjust { $0.shadows = 1 }),
+        ("exposure +2, shadows +1", RegressionCase.adjust { ($0.exposure, $0.shadows) = (2, 1) }),
+        ("highlights −1", RegressionCase.adjust { $0.highlights = -1 }), ("color +0.7", RegressionCase.adjust { $0.color = 0.7 }),
     ]
 
     /// Scene-referred ramps: 1,024 samples evenly spaced in stops around mid-gray.

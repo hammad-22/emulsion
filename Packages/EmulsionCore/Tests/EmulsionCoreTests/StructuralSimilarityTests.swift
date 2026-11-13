@@ -31,8 +31,7 @@ struct StructuralSimilarityTests {
     /// Against scikit-image 0.26 (`References/ssim.json`). Measured largest difference 2e-6 (this
     /// implementation works in Float).
     @Test func matchesScikitImage() throws {
-        let url = try #require(Bundle.module.url(forResource: "ssim", withExtension: "json", subdirectory: "References"))
-        let reference = try JSONDecoder().decode(Reference.self, from: Data(contentsOf: url))
+        let reference = try JSONDecoder().decode(Reference.self, from: ColorReferences.reference("ssim"))
         func plane(_ f: (Double, Double) -> Double) -> [Float] {
             (0..<reference.height).flatMap { i in (0..<reference.width).map { j in Float(f(Double(i), Double(j))) } }
         }

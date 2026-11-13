@@ -14,7 +14,7 @@ enum GrainStatistics {
     /// Tile edge for the spectrum, a power of two; frequencies step by 1 / `tile` cycles per pixel.
     static let tile = 64
 
-    struct Patch: Codable, Equatable {
+    struct Patch: Codable {
         let meanDensity: Double
         let rmsDensity: Double
         /// Radially averaged noise power, bin k at k / `tile` cycles per pixel, k = 0…tile/2.
@@ -37,13 +37,13 @@ enum GrainStatistics {
         }
     }
 
-    /// −log10 of display luminance per pixel, top row first. Luminance is floored at 1e-6 (density 6).
-    static func densities(_ image: RegressionImage) -> [Double] {
-        image.encoded.map { -log10(max(ColorDifference.xyz(fromDisplayP3: $0).y, 1e-6)) }
-    }
+    /// Luminance floor before −log10, so black reads as density 6, not infinity.
+    static let darkestLuminance = 1e-6
 
+    /// The patch's statistics, from −log10 of display luminance per pixel.
     static func patch(_ image: RegressionImage) -> Patch {
-        Patch(densities: densities(image), width: image.width, height: image.height)
+        let densities = image.encoded.map { -log10(max(ColorDifference.xyz(fromDisplayP3: $0).y, darkestLuminance)) }
+        return Patch(densities: densities, width: image.width, height: image.height)
     }
 
     /// Mean of |FFT|² / tile² over every whole `tile` × `tile` tile (each with its own mean removed),
@@ -65,8 +65,8 @@ enum GrainStatistics {
                     let start = (top + row) * width + left
                     real.replaceSubrange(row * tile..<(row + 1) * tile, with: plane[start..<start + tile])
                 }
-                real = vDSP.add(-vDSP.mean(real), real)
-                imaginary = [Double](repeating: 0, count: n)
+                vDSP.add(-vDSP.mean(real), real, result: &real)
+                vDSP.fill(&imaginary, with: 0)
                 real.withUnsafeMutableBufferPointer { re in
                     imaginary.withUnsafeMutableBufferPointer { im in
                         guard let realp = re.baseAddress, let imagp = im.baseAddress else { return }
@@ -74,7 +74,7 @@ enum GrainStatistics {
                         vDSP_fft2d_zipD(setup, &split, 1, 0, log2n, log2n, FFTDirection(kFFTDirection_Forward))
                     }
                 }
-                for i in 0..<n { power[i] += (real[i] * real[i] + imaginary[i] * imaginary[i]) / Double(n) }
+                vDSP.add(power, vDSP.multiply(1 / Double(n), vDSP.add(vDSP.square(real), vDSP.square(imaginary))), result: &power)
                 tiles += 1
             }
         }

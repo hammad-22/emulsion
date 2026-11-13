@@ -9,30 +9,19 @@ import Foundation
 enum StructuralSimilarity {
     static let windowSigma: Float = 1.5
     static let windowRadius = 5
+    static let windowSize = 2 * windowRadius + 1
     static let dynamicRange: Float = 100
     static let c1 = (0.01 * dynamicRange) * (0.01 * dynamicRange)
     static let c2 = (0.03 * dynamicRange) * (0.03 * dynamicRange)
 
-    /// Mean SSIM of two images' L* planes (1 = identical structure).
-    static func index(_ a: RegressionImage, _ b: RegressionImage) -> Double {
-        precondition(a.width == b.width && a.height == b.height)
-        return index(lightness(a), lightness(b), width: a.width, height: a.height)
-    }
-
-    /// L* per pixel, top row first.
-    static func lightness(_ image: RegressionImage) -> [Float] {
-        image.encoded.map { Float(ColorDifference.lab(fromDisplayP3: $0).x) }
-    }
-
     /// Mean SSIM of two planes of `width` × `height`, over the pixels whose whole window lies inside
     /// the image (as the paper and scikit-image do), so the edge handling of the blur does not count.
     static func index(_ x: [Float], _ y: [Float], width: Int, height: Int) -> Double {
-        let blur = { (plane: [Float]) in gaussian(plane, width: width, height: height) }
-        let muX = blur(x)
-        let muY = blur(y)
-        let xx = blur(vDSP.multiply(x, x))
-        let yy = blur(vDSP.multiply(y, y))
-        let xy = blur(vDSP.multiply(x, y))
+        let muX = gaussian(x, width: width, height: height)
+        let muY = gaussian(y, width: width, height: height)
+        let xx = gaussian(vDSP.multiply(x, x), width: width, height: height)
+        let yy = gaussian(vDSP.multiply(y, y), width: width, height: height)
+        let xy = gaussian(vDSP.multiply(x, y), width: width, height: height)
         var total = 0.0
         let rows = windowRadius..<(height - windowRadius)
         let columns = windowRadius..<(width - windowRadius)
@@ -51,7 +40,7 @@ enum StructuralSimilarity {
         return total / Double(rows.count * columns.count)
     }
 
-    /// Normalised Gaussian window, `2 · windowRadius + 1` taps.
+    /// Normalised Gaussian window, `windowSize` taps.
     static let kernel: [Float] = {
         let taps = (-windowRadius...windowRadius).map { exp(-Float($0 * $0) / (2 * windowSigma * windowSigma)) }
         let sum = taps.reduce(0, +)

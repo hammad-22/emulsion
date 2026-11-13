@@ -53,7 +53,7 @@ struct VisualRegressionTests {
             var adjustments = regressionCase.adjustments
             change(&adjustments)
             let edited = RegressionImage(rendering: try VisualRegression.renderer.render(negative, adjustments))
-            let comparison = try #require(VisualRegression.compare(reference, edited))
+            let comparison = try #require(VisualRegression.compare(reference, edited, structure: true))
             let ssim = try #require(comparison.structuralSimilarity)
             print(String(format: "structure %@ %@: SSIM %.5f, ΔE00 max %.3f", name, edit, ssim, comparison.summary.max))
             #expect(VisualRegression.thresholds.accepts(comparison.summary), "\(name) \(edit): ΔE00 alone already fails")
@@ -73,7 +73,7 @@ struct VisualRegressionTests {
             pixels[i] = pixels[i] &+ SIMD3(repeating: min(lift, UInt16.max - pixels[i].max()))
         }
         let comparison = try #require(
-            VisualRegression.compare(golden, RegressionImage(width: golden.width, height: golden.height, pixels: pixels)))
+            VisualRegression.compare(golden, RegressionImage(width: golden.width, height: golden.height, pixels: pixels), structure: true))
         print(
             String(format: "outliers %@: SSIM %.5f, ΔE00 max %.2f", name, comparison.structuralSimilarity ?? .nan, comparison.summary.max))
         #expect(comparison.summary.max > VisualRegression.thresholds.max)
@@ -97,15 +97,18 @@ struct VisualRegressionTests {
 
     /// The CI failure (hammad-22/emulsion#31): 15 isolated pixels of 43,200 up to 4.67 ΔE00 off
     /// fail the strict thresholds and pass the photo local-tone ones; two pixels in a thousand fail both.
+    /// ΔE00 only (structure passes here); the SSIM side is `isolatedOutliersPassThePhotoLocalToneStructuralFloor`.
     @Test func isolatedOutliersPassOnlyThePhotoLocalToneThresholds() {
         let pixelCount = 43_200
         func summary(outliers: Int) -> ColorDifference.Summary {
             ColorDifference.Summary((0..<pixelCount).map { $0 < outliers ? 4.67 : 0.005 })
         }
         let seenOnCI = summary(outliers: 15)
+        let localTone = VisualRegression.photoLocalToneThresholds
         #expect(!VisualRegression.thresholds.accepts(seenOnCI))
-        #expect(VisualRegression.photoLocalToneThresholds.accepts(seenOnCI))
-        #expect(!VisualRegression.photoLocalToneThresholds.accepts(summary(outliers: pixelCount / 500)))
+        #expect(localTone.accepts(seenOnCI, structuralSimilarity: 1))
+        #expect(!localTone.accepts(summary(outliers: pixelCount / 500), structuralSimilarity: 1))
+        #expect(!localTone.accepts(seenOnCI), "a photo case without SSIM must fail")
     }
 
     // MARK: Noise floor
@@ -117,7 +120,8 @@ struct VisualRegressionTests {
             let c = try RegressionCase.named(name)
             let scene = try c.scene()
             let comparison = try #require(
-                VisualRegression.compare(VisualRegression.render(scene, c.adjustments), VisualRegression.render(scene, c.adjustments)))
+                VisualRegression.compare(
+                    VisualRegression.render(scene, c.adjustments), VisualRegression.render(scene, c.adjustments), structure: true))
             floors.append(("\(name) rendered twice", comparison.summary))
             #expect(c.thresholds.accepts(comparison.summary, structuralSimilarity: comparison.structuralSimilarity))
         }

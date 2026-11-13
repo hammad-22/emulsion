@@ -67,7 +67,7 @@ struct GrainStatisticsTests {
     struct Tracked: Codable {
         let caseName: String
         let grain: Double
-        let exposureStops: [Double]
+        /// One per `GrainStatisticsTests.exposures`.
         let patches: [GrainStatistics.Patch]
     }
 
@@ -88,18 +88,24 @@ struct GrainStatisticsTests {
             let adjustments = try RegressionCase.named(name).adjustments
             let patches = try Self.measure(adjustments)
             #expect(patches[midGray].rmsDensity > 0.005, "\(name): grain not measurable at mid-gray")
-            tracked.append(Tracked(caseName: name, grain: adjustments.grain, exposureStops: Self.exposures, patches: patches))
+            tracked.append(Tracked(caseName: name, grain: adjustments.grain, patches: patches))
         }
         let byGrain = tracked.sorted { $0.grain < $1.grain }.map { $0.patches[midGray].rmsDensity }
         #expect(byGrain == byGrain.sorted(), "σ(D) at mid-gray does not rise with the grain amount: \(byGrain)")
         try Self.write(tracked, to: VisualRegression.reportDirectory)
     }
 
+    private struct Document: Codable {
+        let exposureStops: [Double]
+        let cases: [Tracked]
+    }
+
     private static func write(_ tracked: [Tracked], to directory: URL) throws {
         try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
         let encoder = JSONEncoder()
         encoder.outputFormatting = [.prettyPrinted, .sortedKeys]
-        try encoder.encode(tracked).write(to: directory.appending(path: "grain-statistics.json"))
+        try encoder.encode(Document(exposureStops: exposures, cases: tracked))
+            .write(to: directory.appending(path: "grain-statistics.json"))
         var lines = [
             "### Grain statistics", "",
             "Visual density D = −log10(display luminance) of flat \(patchWidth) × \(patchHeight) patches; σ(D) per pixel; "
@@ -107,15 +113,13 @@ struct GrainStatisticsTests {
             "| Case | Grain | Stops | Mean D | σ(D) | High/low |", "| --- | ---: | ---: | ---: | ---: | ---: |",
         ]
         for t in tracked {
-            for (stops, p) in zip(t.exposureStops, t.patches) {
+            for (stops, p) in zip(exposures, t.patches) {
                 lines.append(
                     String(
                         format: "| %@ | %.2f | %+.0f | %.3f | %.4f | %.3f |", t.caseName, t.grain, stops, p.meanDensity, p.rmsDensity,
                         p.highToLowPower))
             }
         }
-        try (lines.joined(separator: "\n") + "\n").write(
-            to: directory.appending(path: "grain-statistics.md"), atomically: true, encoding: .utf8)
-        print(lines.joined(separator: "\n"))
+        try ReportFiles(directory: directory).write(lines.joined(separator: "\n") + "\n", to: "grain-statistics.md")
     }
 }

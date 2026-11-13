@@ -22,7 +22,7 @@ extension RegressionCase {
         try #require(all.first { $0.name == name }, "no regression case named \(name)")
     }
 
-    private static func adjust(_ base: Adjustments = .neutral, _ change: (inout Adjustments) -> Void) -> Adjustments {
+    static func adjust(_ base: Adjustments = .neutral, _ change: (inout Adjustments) -> Void) -> Adjustments {
         var a = base
         change(&a)
         return a
@@ -85,13 +85,11 @@ extension RegressionCase {
     }
 
     private static let realSceneCases: [RegressionCase] = RealScene.allCases.flatMap { scene in
-        [
+        let photo = VisualRegression.photoThresholds
+        return [
             RegressionCase(
-                name: "\(scene.rawValue).default-look", scene: { try scene.image() }, adjustments: defaultLook,
-                thresholds: VisualRegression.photoThresholds),
-            RegressionCase(
-                name: "\(scene.rawValue).graded", scene: { try scene.image() }, adjustments: graded,
-                thresholds: VisualRegression.photoThresholds),
+                name: "\(scene.rawValue).default-look", scene: { try scene.image() }, adjustments: defaultLook, thresholds: photo),
+            RegressionCase(name: "\(scene.rawValue).graded", scene: { try scene.image() }, adjustments: graded, thresholds: photo),
             RegressionCase(
                 name: "\(scene.rawValue).localtone", scene: { try scene.image() },
                 adjustments: adjust { ($0.highlights, $0.shadows) = (0.5, 0.4) }, thresholds: VisualRegression.photoLocalToneThresholds),
