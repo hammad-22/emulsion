@@ -1,10 +1,12 @@
 import EmulsionKit
+import EmulsionUI
 import SwiftUI
 import UIKit
 
 /// The live camera picture, aspect-fit. Frames go straight into a layer, so 30 frames a
 /// second never pass through SwiftUI. Tap to focus and expose there. `accessory` is laid over
 /// the picture's bottom edge (the recipe strip), outside the picture's own accessibility element.
+/// While the system pauses the camera, the frozen picture is blurred and says why.
 struct ViewfinderView<Accessory: View>: View {
     let model: CameraModel
     @ViewBuilder let accessory: Accessory
@@ -36,10 +38,23 @@ struct ViewfinderView<Accessory: View>: View {
             .accessibilityHint("Double-tap to focus and expose on the centre")
             .accessibilityAction { focus(at: CGPoint(x: size.width / 2, y: size.height / 2)) }
             .accessibilityIdentifier("viewfinder")
+            // Outside the viewfinder's element, so VoiceOver reads why the camera paused.
+            .overlay { paused }
+            .overlay(alignment: .top) { coolingNote }
             .overlay(alignment: .bottom) { accessory }
             .frame(maxWidth: .infinity, maxHeight: .infinity)
             .task { await model.attachViewfinder(ViewfinderLayer(display.view.layer)) }
             .task(id: pixels) { await showFrames(maxDimension: pixels) }
+    }
+
+    @ViewBuilder private var paused: some View {
+        if case .interrupted(let interruption) = model.status {
+            CameraPausedView(interruption: interruption)
+        }
+    }
+
+    @ViewBuilder private var coolingNote: some View {
+        if model.pressure >= .critical { CoolingNote().padding(FilmLabLayout.gap) }
     }
 
     @ViewBuilder private var timingOverlay: some View {
@@ -66,6 +81,18 @@ struct ViewfinderView<Accessory: View>: View {
         guard size.width > 0, size.height > 0 else { return }
         let point = CGPoint(x: location.x / size.width, y: location.y / size.height)
         Task { await model.focus(at: point) }
+    }
+}
+
+/// Says why the viewfinder has slowed down under critical system pressure.
+private struct CoolingNote: View {
+    var body: some View {
+        Label("Preview slowed while iPhone cools", systemImage: "thermometer.medium")
+            .font(.caption.weight(.semibold))
+            .padding(.horizontal, FilmLabLayout.gap)
+            .padding(.vertical, FilmLabLayout.compact)
+            .glassEffect(.regular, in: .capsule)
+            .allowsHitTesting(false)
     }
 }
 
