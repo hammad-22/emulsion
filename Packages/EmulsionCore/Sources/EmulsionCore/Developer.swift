@@ -162,7 +162,7 @@ public struct Developer {
     /// sharpening, lens correction and the decoder version stay at the file's defaults (the
     /// opt-in RAW decoder 9 is deliberately not used: docs/ENGINE.md, MOV-10). Measured on
     /// synthetic DNGs and 25 real files (MOV-79, `RAWDevelopTests`).
-    private static func bypassAppleRendering(_ raw: CIRAWFilter) {
+    static func bypassAppleRendering(_ raw: CIRAWFilter) {
         raw.boostAmount = 0
         // 1 is neutral (below 1 darkens the shadows; the file default is 0.9). It has no effect
         // while boost is 0 (pixel-identical develop, MOV-134) and only matters for the exposure

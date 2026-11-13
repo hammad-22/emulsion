@@ -131,8 +131,9 @@ extension AdjustmentGroupTests {
         #expect(extreme.clamped() == extreme, "the rulers stay inside what the engine clamps to")
     }
 
-    @Test func theTwoTintsHaveDifferentVoiceOverLabels() throws {
-        let labels = AdjustmentGroup.allCases.flatMap { $0.controls(whiteBalanceAsShot: Self.asShot) }.map(\.accessibilityLabel)
-        #expect(Set(labels).count == labels.count)
+    @Test func theTwoTintsHaveDifferentVoiceOverLabelsAndIdentities() throws {
+        let controls = AdjustmentGroup.allCases.flatMap { $0.controls(whiteBalanceAsShot: Self.asShot) }
+        #expect(Set(controls.map(\.accessibilityLabel)).count == controls.count)
+        #expect(Set(controls.map(\.id)).count == controls.count)
     }
 }

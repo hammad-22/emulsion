@@ -175,6 +175,9 @@ public actor RenderService {
     /// Full-resolution develop and encode, look baked in.
     public func export(_ url: URL, _ adjustments: Adjustments, format: Renderer.ExportFormat) throws -> Data {
         let renderer = try engine()
+        // The full-size decode isn't held beside the editor's own: the next preview develop
+        // makes that decoder again.
+        if openDecoder?.url == url { openDecoder = nil }
         let full = try develop(url, maxDimension: nil, whiteBalance: adjustments.whiteBalance)
         return try renderer.export(renderer.render(full, adjustments), format: format)
     }
@@ -192,8 +195,7 @@ public actor RenderService {
 
     /// The open photo's decoder, large enough for `maxDimension`: the kept one, or a new one made
     /// by reading the file. Nil when `url` isn't the open photo or isn't RAW. A kept decoder that
-    /// is too small or no longer the open photo's is released first, so two files' decodes are
-    /// never held at once.
+    /// is too small or no longer the open photo's is released first, so two are never kept.
     private func openDecoder(for url: URL, maxDimension: CGFloat) throws -> RAWDecoder? {
         let open = openPhoto.withLock { $0 }
         if let kept = openDecoder, kept.url != open || (kept.url == url && kept.maxDimension < maxDimension) { openDecoder = nil }

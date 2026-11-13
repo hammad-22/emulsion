@@ -89,7 +89,8 @@ public struct AdjustmentControl: Identifiable {
     public let range: ClosedRange<Double>
     let unit: Unit
 
-    public var id: String { title }
+    /// Unique across groups, which the title isn't: both tints are titled "Tint".
+    public var id: String { accessibilityLabel }
 
     init(
         title: String, accessibilityLabel: String? = nil, keyPath: WritableKeyPath<Adjustments, Double>, range: ClosedRange<Double>,

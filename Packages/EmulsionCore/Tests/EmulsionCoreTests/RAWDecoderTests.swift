@@ -2,6 +2,7 @@ import CoreImage
 import EmulsionFixtures
 import Foundation
 import Testing
+import simd
 
 @testable import EmulsionCore
 
@@ -22,6 +23,32 @@ struct RAWDecoderTests {
         nil, tungsten, CameraWhiteBalance(temperature: 4200, tint: 25), CameraWhiteBalance(temperature: 9000, tint: -40), nil,
     ]
 
+    /// Largest channel difference between two renders of the same size.
+    static func worstDifference(_ a: CIImage, _ b: CIImage) -> Double {
+        zip(Fixtures.linear(a), Fixtures.linear(b)).map { abs($0 - $1).max() }.max() ?? .nan
+    }
+
+    /// Back at as shot after another white balance, against the file's own untouched neutral:
+    /// measured 6.0e-7 on the linear file and 9.5e-7 on the Bayer one (about 2× the worst).
+    static let backToAsShotTolerance = 2e-6
+
+    /// `Developer.develop` is itself one `negative` of a decoder, so the reference for as shot
+    /// is a `CIRAWFilter` nothing has set a neutral on.
+    @Test(arguments: SyntheticDNG.Mosaic.allCases)
+    func asShotIsTheUntouchedFilesNeutral(mosaic: SyntheticDNG.Mosaic) throws {
+        let data = Self.file(mosaic)
+        let untouched = try #require(CIRAWFilter(imageData: data, identifierHint: Developer.dngTypeIdentifier))
+        Developer.bypassAppleRendering(untouched)
+        let reference = Developer.normalized(try #require(untouched.outputImage))
+        let decoder = try #require(Self.developer.rawDecoder(data, maxDimension: nil, anchor: .none))
+
+        #expect(Self.worstDifference(try decoder.negative().image, reference) == 0)
+        let moved = try decoder.negative(whiteBalance: Self.tungsten)
+        #expect(Self.worstDifference(moved.image, reference) > 0.1, "the white balance changes the develop")
+        let back = Self.worstDifference(try decoder.negative().image, reference)
+        #expect(back <= Self.backToAsShotTolerance, "back at as shot: \(back)")
+    }
+
     @Test(arguments: SyntheticDNG.Mosaic.allCases, [nil, 256] as [CGFloat?])
     func everyWhiteBalanceMatchesADevelopFromTheFile(mosaic: SyntheticDNG.Mosaic, maxDimension: CGFloat?) throws {
         let data = Self.file(mosaic)
@@ -29,18 +56,14 @@ struct RAWDecoderTests {
         for whiteBalance in Self.whiteBalances {
             let kept = try decoder.negative(whiteBalance: whiteBalance)
             let fresh = try Self.developer.develop(data, maxDimension: maxDimension, whiteBalance: whiteBalance)
-            #expect(Fixtures.linear(kept.image) == Fixtures.linear(fresh.image), "white balance \(String(describing: whiteBalance))")
+            let difference = Self.worstDifference(kept.image, fresh.image)
+            // Exact at every white balance; as shot again is within the return tolerance.
+            #expect(difference <= Self.backToAsShotTolerance, "white balance \(String(describing: whiteBalance)): \(difference)")
+            if whiteBalance != nil { #expect(difference == 0, "white balance \(String(describing: whiteBalance))") }
             #expect(kept.exposureAnchorStops == fresh.exposureAnchorStops)
             #expect(kept.asShotWhiteBalance == fresh.asShotWhiteBalance)
             #expect(kept.contract == .sceneReferred)
         }
-    }
-
-    @Test func theWhiteBalanceChangesTheDevelop() throws {
-        let decoder = try #require(Self.developer.rawDecoder(Self.file(.linearRGB)))
-        let asShot = Fixtures.linear(try decoder.negative().image)
-        let corrected = Fixtures.linear(try decoder.negative(whiteBalance: Self.tungsten).image)
-        #expect(asShot != corrected)
     }
 
     @Test func theAnchorIsMeasuredOnceAndKeptAcrossWhiteBalances() throws {

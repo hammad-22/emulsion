@@ -251,7 +251,10 @@ extension RenderServiceTests {
         #expect(await fromTheFile.fileReadCount == 4, "a photo that isn't open reads its file for each")
 
         let backToAsShot = try await service.image(url, .neutral, maxDimension: 1200)
-        #expect(TestPixels.rgba(backToAsShot) == TestPixels.rgba(asShot))
+        // Back at as shot is within 1e-6 of the untouched develop, not bit-exact (`RAWDecoder`).
+        #expect(TestPixels.difference(backToAsShot, asShot).max <= 1)
+        let untouched = try await fromTheFile.image(url, .neutral, maxDimension: 1200)
+        #expect(TestPixels.rgba(asShot) == TestPixels.rgba(untouched), "the first develop is the file's own neutral")
         #expect(await service.fileReadCount == 1)
         #expect(await service.developCount == 6, "as shot again is developed, not looked up")
     }
@@ -271,6 +274,20 @@ extension RenderServiceTests {
         let exported = try await service.export(url, Self.tungstenWhiteBalance, format: .jpeg)
         let exportedFresh = try await TestLibrary().renderService.export(url, Self.tungstenWhiteBalance, format: .jpeg)
         #expect(TestPixels.rgba(try Self.decoded(exported)) == TestPixels.rgba(try Self.decoded(exportedFresh)))
+    }
+
+    /// The export's full-size decode isn't held beside the editor's decoder.
+    @Test func exportingTheOpenPhotoReleasesItsDecoderUntilTheNextPreview() async throws {
+        let library = TestLibrary()
+        let url = library.store.url(for: try await library.store.add(TestRAW.tungstenTaggedAsDaylight, fileExtension: "dng"))
+        let service = library.renderService
+        service.open(url)
+
+        _ = try await service.image(url, .neutral, maxDimension: 900)
+        _ = try await service.export(url, Self.tungstenWhiteBalance, format: .jpeg)
+        #expect(await service.keptDecoderURL == nil)
+        _ = try await service.image(url, Self.tungstenWhiteBalance, maxDimension: 900)
+        #expect(await service.keptDecoderURL == url)
     }
 
     @Test func onlyTheOpenPhotoKeepsADecoder() async throws {

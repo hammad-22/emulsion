@@ -41,7 +41,7 @@ struct PhotoEditor: View {
             Toggle("Compare", systemImage: "square.split.2x1", isOn: $showsOriginal)
             Button("Reset Edits", systemImage: "arrow.counterclockwise") { session.reset() }
         }
-        .task { await session.readAsShotWhiteBalance() }
+        .task { await session.editorAppeared() }
         .onDisappear { session.close() }
         .onChange(of: scenePhase) { _, phase in
             if phase != .active { session.save() }

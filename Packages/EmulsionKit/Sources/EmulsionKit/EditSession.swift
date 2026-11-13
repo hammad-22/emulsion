@@ -12,7 +12,7 @@ public final class EditSession {
         didSet { scheduleSave() }
     }
     /// The white balance a RAW photo was shot at, where its Temperature and Tint rulers rest;
-    /// nil until `readAsShotWhiteBalance()` has read it, and for photos that aren't RAW.
+    /// nil until `editorAppeared()` has read it, and for photos that aren't RAW.
     public private(set) var asShotWhiteBalance: CameraWhiteBalance?
 
     private let store: PhotoStore
@@ -27,10 +27,13 @@ public final class EditSession {
         store.renderService.open(store.url(for: photo))
     }
 
-    /// Reads a RAW photo's as-shot white balance, which gives the editor its White Balance
-    /// rulers. Call from the editor's `.task`; the file is read off the main actor.
-    public func readAsShotWhiteBalance() async {
-        guard photo.isRAW, asShotWhiteBalance == nil else { return }
+    /// Call from the editor's `.task`. Marks the photo open again (an editor that disappeared
+    /// under another screen closed it) and reads a RAW photo's as-shot white balance, which gives
+    /// the editor its White Balance rulers. The file is read off the main actor, whatever the
+    /// record says: records saved before `isRAW` existed have it false.
+    public func editorAppeared() async {
+        store.renderService.open(url)
+        guard asShotWhiteBalance == nil else { return }
         asShotWhiteBalance = await store.renderService.asShotWhiteBalance(url)
     }
 
