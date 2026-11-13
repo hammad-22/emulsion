@@ -60,6 +60,26 @@ final class WhiteBalanceUITests: XCTestCase {
         XCTAssertFalse(reset.isEnabled)
     }
 
+    /// The inspector (every group at once, as on an unfolded iPhone Duo) in the debug component
+    /// gallery, which stands in a RAW photo's as-shot white balance.
+    @MainActor
+    func testInspectorShowsWhiteBalanceRulers() throws {
+        let app = XCUIApplication()
+        app.launchArguments = ["--component-gallery"]
+        app.launch()
+        let rulers = app.otherElements.matching(identifier: "adjustment-ruler")
+        let temperature = rulers.matching(NSPredicate(format: "label == 'Temperature'")).firstMatch
+        let tint = rulers.matching(NSPredicate(format: "label == 'White Balance Tint'")).firstMatch
+        XCTAssertTrue(app.staticTexts["White Balance"].waitForExistence(timeout: 5))
+        for _ in 0..<4 where !tint.isHittable { app.swipeUp() }
+        XCTAssertTrue(temperature.exists)
+        XCTAssertTrue(tint.isHittable)
+        XCTAssertEqual(temperature.value as? String, "5,200 kelvin")
+        XCTAssertEqual(tint.value as? String, "+8")
+        keepScreenshot(app, named: "WB 5 Inspector")
+        try app.performAccessibilityAudit(for: [.sufficientElementDescription, .trait, .hitRegion])
+    }
+
     @MainActor
     private func drag(_ ruler: XCUIElement, from start: CGFloat, to end: CGFloat) {
         ruler.coordinate(withNormalizedOffset: CGVector(dx: start, dy: 0.7))
