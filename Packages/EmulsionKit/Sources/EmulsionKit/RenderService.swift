@@ -35,7 +35,8 @@ public actor RenderService {
     /// reading or decoding the file again (MOV-137). Only ever one: it holds the file's bytes and
     /// Apple's decode. `maxDimension` is the largest preview asked for so far; smaller ones are
     /// resized from it.
-    private var openDecoder: (url: URL, maxDimension: CGFloat, decoder: RAWDecoder)?
+    /// A nil decoder records that the open photo isn't RAW, so its file isn't read to find out again.
+    private var openDecoder: (url: URL, maxDimension: CGFloat, decoder: RAWDecoder?)?
     private nonisolated let thumbnails: ThumbnailCache
     private nonisolated let latestRenders: LatestRenderCache
 
@@ -201,13 +202,11 @@ public actor RenderService {
         if let kept = openDecoder, kept.url != open || (kept.url == url && kept.maxDimension < maxDimension) { openDecoder = nil }
         guard open == url else { return nil }
         if let kept = openDecoder { return kept.decoder }
-        guard
-            let decoder = try engine().developer.rawDecoder(
-                Self.contents(of: url), maxDimension: maxDimension, exposureAnchorStops: exposureAnchors[url])
-        else { return nil }
+        let decoder = try engine().developer.rawDecoder(
+            Self.contents(of: url), maxDimension: maxDimension, exposureAnchorStops: exposureAnchors[url])
         fileReadCount += 1
-        exposureAnchors[url] = decoder.exposureAnchorStops
-        openDecoder = (url, maxDimension, decoder)
+        openDecoder = (url, decoder == nil ? .infinity : maxDimension, decoder)
+        if let decoder { exposureAnchors[url] = decoder.exposureAnchorStops }
         return decoder
     }
 
@@ -260,7 +259,7 @@ public actor RenderService {
     /// Times a file was read to develop a preview or an export, or to make a decoder; for tests.
     private(set) var fileReadCount = 0
     /// The photo whose RAW decoder is kept; for tests.
-    var keptDecoderURL: URL? { openDecoder?.url }
+    var keptDecoderURL: URL? { openDecoder?.decoder == nil ? nil : openDecoder?.url }
     /// The file's remembered exposure anchor; for tests.
     func exposureAnchor(_ url: URL) -> Double? { exposureAnchors[url] }
 }

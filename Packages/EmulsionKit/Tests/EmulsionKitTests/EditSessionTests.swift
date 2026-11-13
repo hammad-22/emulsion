@@ -97,6 +97,22 @@ struct EditSessionTests {
         #expect(!session.isEdited)
     }
 
+    @Test func anEditorThatLeftBeforeItsTaskRanDoesNotOpenThePhoto() async throws {
+        let library = TestLibrary()
+        let session = EditSession(
+            photo: try await library.store.add(TestRAW.tungstenTaggedAsDaylight, fileExtension: "dng"), store: library.store)
+        let service = library.renderService
+        session.close()
+        await service.close(session.url).value
+
+        let task = Task { await session.editorAppeared() }
+        task.cancel()
+        await task.value
+
+        _ = try await service.image(session.url, session.adjustments, maxDimension: 900)
+        #expect(await service.keptDecoderURL == nil)
+    }
+
     /// A record saved before `isRAW` existed says false for a RAW file.
     @Test func aRAWFileGetsWhiteBalanceWhateverItsRecordSays() async throws {
         let library = TestLibrary()

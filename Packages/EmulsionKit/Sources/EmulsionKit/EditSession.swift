@@ -32,6 +32,9 @@ public final class EditSession {
     /// the editor its White Balance rulers. The file is read off the main actor, whatever the
     /// record says: records saved before `isRAW` existed have it false.
     public func editorAppeared() async {
+        // A `.task` cancelled before it ran (the editor left at once) still runs: it mustn't
+        // mark a photo open after its editor closed it.
+        guard !Task.isCancelled else { return }
         store.renderService.open(url)
         guard asShotWhiteBalance == nil else { return }
         asShotWhiteBalance = await store.renderService.asShotWhiteBalance(url)

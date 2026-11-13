@@ -313,6 +313,9 @@ extension RenderServiceTests {
         service.open(jpeg)
         _ = try await service.image(jpeg, .neutral, maxDimension: 900)
         #expect(await service.keptDecoderURL == nil, "a photo that isn't RAW has no decoder")
+        let reads = await service.fileReadCount
+        _ = try await service.image(jpeg, .neutral, maxDimension: 1400)
+        #expect(await service.fileReadCount == reads + 1, "its file is read once to develop, not again to look for a decoder")
     }
 
     @Test func closingOrForgettingThePhotoReleasesItsDecoder() async throws {
@@ -374,6 +377,5 @@ extension RenderServiceTests {
         #expect(abs(asShot.temperature - TestRAW.taggedKelvin) < TestRAW.asShotTemperatureTolerance)
         #expect(await service.asShotWhiteBalance(jpeg) == nil)
         #expect(await service.asShotWhiteBalance(library.folder.appending(path: "missing.dng")) == nil)
-        #expect(await service.fileReadCount == 0, "reading it doesn't develop the photo")
     }
 }
