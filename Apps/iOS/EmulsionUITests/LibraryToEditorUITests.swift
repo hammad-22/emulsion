@@ -189,6 +189,59 @@ final class LibraryToEditorUITests: XCTestCase {
     }
 
     @MainActor
+    func testLooksContrastAndTextClipping() throws {
+        let app = try launchSampleLibrary()
+        defer { removeSamples(app) }
+        let photo = app.buttons.matching(NSPredicate(format: "label BEGINSWITH 'Photo from'")).firstMatch
+        XCTAssertTrue(photo.waitForExistence(timeout: 10))
+        photo.tap()
+        app.buttons["Looks"].tap()
+        XCTAssertTrue(app.navigationBars["Looks"].waitForExistence(timeout: 5))
+        keepScreenshot(app, named: "Looks initial readability")
+        try app.performAccessibilityAudit(for: [.contrast, .textClipped])
+        for page in 1...5 {
+            app.collectionViews["looks-collection"].swipeUp()
+            keepScreenshot(app, named: "Looks text layout \(page)")
+            try app.performAccessibilityAudit(for: .textClipped)
+        }
+    }
+
+    @MainActor
+    func testLooksSaveApplyAndDelete() throws {
+        let app = try launchSampleLibrary()
+        defer { removeSamples(app) }
+        let photo = app.buttons.matching(NSPredicate(format: "label BEGINSWITH 'Photo from'")).firstMatch
+        photo.tap()
+        app.buttons["Looks"].tap()
+        let warm = app.buttons.matching(NSPredicate(format: "label BEGINSWITH 'Warm Light'")).firstMatch
+        XCTAssertTrue(warm.waitForExistence(timeout: 5))
+        warm.tap()
+        app.buttons["Looks"].tap()
+        XCTAssertTrue(warm.waitForExistence(timeout: 5))
+        XCTAssertTrue(warm.isSelected)
+        app.buttons["Save Look"].tap()
+        let save = app.alerts["Save Look"]
+        XCTAssertTrue(save.waitForExistence(timeout: 5))
+        save.textFields.firstMatch.tap()
+        save.textFields.firstMatch.typeText("Readability Test")
+        save.buttons["Save"].tap()
+        let saved = app.buttons.matching(NSPredicate(format: "label BEGINSWITH 'Readability Test'")).firstMatch
+        XCTAssertTrue(saved.waitForExistence(timeout: 5))
+        XCTAssertTrue(saved.isHittable, "Saving scrolls to the new look")
+        keepScreenshot(app, named: "Saved look")
+        saved.tap()
+        XCTAssertFalse(app.navigationBars["Looks"].exists)
+        app.buttons["Looks"].tap()
+        for _ in 0..<5 where !saved.isHittable { app.collectionViews["looks-collection"].swipeUp() }
+        XCTAssertTrue(saved.isSelected)
+        app.buttons["Options for Readability Test"].tap()
+        XCTAssertTrue(app.buttons["Share Look"].waitForExistence(timeout: 5))
+        app.buttons["Delete Look"].tap()
+        app.buttons["Delete Look"].tap()
+        XCTAssertFalse(saved.exists)
+    }
+
+    @MainActor
     private func launchSampleLibrary() throws -> XCUIApplication {
         let app = XCUIApplication()
         app.launch()

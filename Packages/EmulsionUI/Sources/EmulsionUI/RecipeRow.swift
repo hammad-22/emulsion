@@ -15,7 +15,7 @@ struct RecipeRow: View {
                 HStack(spacing: FilmLabLayout.gap) {
                     VStack(alignment: .leading, spacing: FilmLabLayout.hairline) {
                         Text(recipe.name).font(.headline)
-                        if !recipe.summary.isEmpty { Text(recipe.summary).font(.subheadline).foregroundStyle(.secondary) }
+                        if !recipe.summary.isEmpty { Text(recipe.summary).font(.subheadline).foregroundStyle(Color.primary) }
                     }
                     .frame(maxWidth: .infinity, alignment: .leading)
                     if isApplied { Image(systemName: "checkmark").accessibilityLabel("Applied") }
