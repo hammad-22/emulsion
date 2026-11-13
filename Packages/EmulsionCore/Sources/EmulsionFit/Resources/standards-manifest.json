@@ -1,0 +1,38 @@
+{
+  "formatVersion": 1,
+  "note": "Provenance of the standards tables emulsion-fit reads from --standards <dir>. The tables themselves are not committed (MOV-94); the loader checks each file's SHA-256 against this list.",
+  "files": [
+    {
+      "file": "iso5-3-1995-status-m.csv",
+      "standard": "ISO 5-3",
+      "edition": "1995",
+      "table": "Table 4, Status M log10 spectral products (normalized to 5.000 at the peak), transcribed from ANSI/ISO 5-3-1995, ANSI/NAPM IT2.18-1996 p. 8",
+      "source": "https://law.resource.org/pub/us/cfr/ibr/001/aimm.it2.18.1996.pdf",
+      "sha256": "f12c93a9867bbf57561abc97d4c0a908657a78b33cc335f28e14aa1b7c126f2f"
+    },
+    {
+      "file": "iso5-3-1995-status-m.slopes.json",
+      "standard": "ISO 5-3",
+      "edition": "1995",
+      "table": "Table 4, log10 slopes per nm below and above each channel's tabulated span",
+      "source": "https://law.resource.org/pub/us/cfr/ibr/001/aimm.it2.18.1996.pdf",
+      "sha256": "0342d9ec39f23b41354c167b4821560710e29ade998cb9cbb443a8c8557f5aca"
+    },
+    {
+      "file": "st2065-2a-2020.csv",
+      "standard": "SMPTE ST 2065-2",
+      "edition": "2020",
+      "table": "Element a, APD spectral responsivities at 2 nm",
+      "source": "https://pub.smpte.org/latest/st2065-2/",
+      "sha256": "17a1f139aa2205d0eedffa378a3a65b6d8b7b2e6056d9c8c11dc6ac92bfbb347"
+    },
+    {
+      "file": "rp180-1999-table1.csv",
+      "standard": "SMPTE RP 180",
+      "edition": "1999 (archived 2006)",
+      "table": "Table 1, printing density responsivities at 10 nm, peak-normalized",
+      "source": "https://pub.smpte.org/pub/rp180/rp0180-1999_stable2006.pdf",
+      "sha256": "6da5a3c3abfa0a88ee98d5c60c541bafd8f557131ade992c3085fdd127a82897"
+    }
+  ]
+}

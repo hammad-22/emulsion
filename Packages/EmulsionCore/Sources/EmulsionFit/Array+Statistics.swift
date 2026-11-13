@@ -7,6 +7,9 @@ extension Array where Element == Double {
     /// Root mean square; 0 for an empty array.
     var rms: Double { (sumOfSquares / Double(Swift.max(count, 1))).squareRoot() }
 
+    /// Largest absolute value; 0 for an empty array.
+    var maxAbs: Double { map(abs).max() ?? 0 }
+
     /// Euclidean length.
     var norm: Double { sumOfSquares.squareRoot() }
 

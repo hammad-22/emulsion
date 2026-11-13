@@ -26,9 +26,8 @@ struct DigitizedStock: Sendable, Equatable {
 
     /// `flag` if given, else a non-empty `environment`, else `defaultReferenceDataPath` under `home`.
     static func referenceDataDirectory(flag: URL?, environment: String?, home: URL) -> URL {
-        if let flag { return flag }
-        if let environment, !environment.isEmpty { return URL(filePath: environment, directoryHint: .isDirectory) }
-        return home.appending(path: defaultReferenceDataPath, directoryHint: .isDirectory)
+        URL.resolve(
+            flag: flag, environment: environment, fallback: home.appending(path: defaultReferenceDataPath, directoryHint: .isDirectory))
     }
 
     /// Every stock directory under `directory` that holds a manifest, sorted by id.
@@ -49,10 +48,8 @@ struct DigitizedStock: Sendable, Equatable {
                 throw .invalidManifest(file: manifestFile.path, reason: "no \(kind.rawValue) chart.")
             }
             let file = stockData.appending(path: entry.file)
-            let data = try read(file)
-            let digest = DigitizedChart.sha256(of: data)
-            guard digest == entry.sha256 else { throw .tracingMismatch(file: file.path, expected: entry.sha256, found: digest) }
-            return try DigitizedChart(kind: kind, entry: entry, file: file.path, data: data, sha256: digest)
+            let text = try readVerifiedText(file, sha256: entry.sha256)
+            return try DigitizedChart(kind: kind, entry: entry, file: file.path, text: text, sha256: entry.sha256)
         }
         return try DigitizedStock(
             id: id, manifest: manifest, characteristic: chart(.characteristic), spectralSensitivity: chart(.spectralSensitivity),
@@ -68,5 +65,14 @@ struct DigitizedStock: Sendable, Equatable {
         } catch {
             throw .unreadableFile(url.path, reason: error.localizedDescription)
         }
+    }
+
+    /// Reads `url`, checks its SHA-256 against the `expected` digest a manifest pins, and decodes it as UTF-8 text.
+    static func readVerifiedText(_ url: URL, sha256 expected: String) throws(FitError) -> String {
+        let data = try read(url)
+        let digest = DigitizedChart.sha256(of: data)
+        guard digest == expected else { throw .checksumMismatch(file: url.path, expected: expected, found: digest) }
+        guard let text = String(data: data, encoding: .utf8) else { throw .unreadableFile(url.path, reason: "not UTF-8 text.") }
+        return text
     }
 }

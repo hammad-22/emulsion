@@ -26,6 +26,8 @@ struct DyeSumCheck: Sendable, Equatable {
         var wavelengths: ClosedRange<Double>?
         /// nil: fit non-negative scales; otherwise use these.
         var fixedScales: [Double]?
+        /// nil: every drawn wavelength; otherwise only multiples of this step (nm).
+        var wavelengthStep: Double?
     }
 
     let comparison: Comparison
@@ -38,7 +40,7 @@ struct DyeSumCheck: Sendable, Equatable {
 
     var rms: Double { residuals.rms }
     var meanResidual: Double { residuals.reduce(0, +) / Double(residuals.count) }
-    var maxAbsResidual: Double { residuals.map(abs).max() ?? 0 }
+    var maxAbsResidual: Double { residuals.maxAbs }
     var wavelengthOfMax: Double {
         residuals.indices.max { abs(residuals[$0]) < abs(residuals[$1]) }.map { wavelengths[$0] } ?? .nan
     }
@@ -85,9 +87,9 @@ struct DyeSumCheck: Sendable, Equatable {
             let active = dyes.indices.filter { subset & (1 << $0) != 0 }
             var scales = [Double](repeating: 0, count: dyes.count)
             if !active.isEmpty {
-                let columns = active.map { samples.dyes[$0] }
-                let a = columns.flatMap { c in columns.map { c.dot($0) } }
-                guard let solution = NormalEquations.solve(a, columns.map { $0.dot(samples.neutral) }),
+                guard
+                    let solution = NormalEquations.solveLeastSquares(
+                        columns: active.map { samples.dyes[$0] }, rhs: samples.neutral),
                     solution.allSatisfy({ $0 >= 0 })
                 else { continue }
                 for (index, value) in zip(active, solution) { scales[index] = value }
@@ -109,7 +111,10 @@ struct DyeSumCheck: Sendable, Equatable {
         guard let neutralName = neutrals.first(where: { chart.curve(named: $0) != nil }) else { return nil }
         let extra = comparison.subtractsMinimumDensity ? [minimumDensity] : []
         guard let aligned = chart.aligned(dyes + [neutralName] + extra) else { return nil }
-        let kept = aligned.x.indices.filter { comparison.wavelengths?.contains(aligned.x[$0]) ?? true }
+        let kept = aligned.x.indices.filter { i in
+            (comparison.wavelengths?.contains(aligned.x[i]) ?? true)
+                && (comparison.wavelengthStep.map { aligned.x[i].truncatingRemainder(dividingBy: $0) == 0 } ?? true)
+        }
         guard !kept.isEmpty else { return nil }
         let neutral = kept.map { i in
             aligned.columns[dyes.count][i] - (comparison.subtractsMinimumDensity ? aligned.columns[dyes.count + 1][i] : 0)

@@ -6,12 +6,13 @@ enum FitError: LocalizedError, Equatable {
     case missingFile(String)
     case unreadableFile(String, reason: String)
     case invalidManifest(file: String, reason: String)
-    case tracingMismatch(file: String, expected: String, found: String)
     case badHeader(file: String, expected: [[String]], found: [String])
     case wrongCellCount(file: String, line: Int, expected: Int, found: Int)
     case nonNumericCell(file: String, line: Int, column: String, text: String)
     case nonAscendingX(file: String, line: Int, previous: Double, value: Double)
     case emptyCurve(file: String, column: String)
+    case checksumMismatch(file: String, expected: String, found: String)
+    case invalidTable(file: String, reason: String)
 
     var errorDescription: String? {
         switch self {
@@ -29,8 +30,6 @@ enum FitError: LocalizedError, Equatable {
             return "Can't read \(path): \(reason)"
         case .invalidManifest(let file, let reason):
             return "\(file): invalid manifest: \(reason)"
-        case .tracingMismatch(let file, let expected, let found):
-            return "\(file): this local tracing is not the one its manifest describes: SHA-256 \(found), manifest pins \(expected)."
         case .badHeader(let file, let expected, let found):
             let options = expected.map { $0.joined(separator: ",") }.joined(separator: "\" or \"")
             return "\(file): header is \"\(found.joined(separator: ","))\", expected \"\(options)\"."
@@ -42,6 +41,10 @@ enum FitError: LocalizedError, Equatable {
             return "\(file):\(line): x = \(value) does not ascend from the previous row's \(previous)."
         case .emptyCurve(let file, let column):
             return "\(file): column \(column) has no values."
+        case .checksumMismatch(let file, let expected, let found):
+            return "\(file): this is not the file its manifest describes: SHA-256 \(found), manifest pins \(expected)."
+        case .invalidTable(let file, let reason):
+            return "\(file): \(reason)"
         }
     }
 }

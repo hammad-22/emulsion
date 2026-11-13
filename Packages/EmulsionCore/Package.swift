@@ -13,7 +13,9 @@ let package = Package(
         .target(name: "EmulsionCore", resources: [.process("Resources")]),
         .target(name: "EmulsionFixtures"),
         // Offline stock fitting. Deliberately not a library product: the datasheet data must never reach an app bundle.
-        .target(name: "EmulsionFit", dependencies: ["EmulsionCore"], resources: [.copy("Resources/StockData")]),
+        .target(
+            name: "EmulsionFit", dependencies: ["EmulsionCore"],
+            resources: [.copy("Resources/StockData"), .copy("Resources/standards-manifest.json")]),
         .executableTarget(name: "emulsion-fit", dependencies: ["EmulsionFit"]),
         .testTarget(
             name: "EmulsionCoreTests", dependencies: ["EmulsionCore", "EmulsionFixtures"],

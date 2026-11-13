@@ -19,6 +19,20 @@ struct FitCommandTests {
                         midGrayLogExposure: -1.25, fitDate: "2026-11-10", name: "Warm test")))
     }
 
+    @Test func dyesParsesEveryOption() throws {
+        let command = try FitCommand(arguments: [
+            "dyes", "--stock", "s", "--out", "/tmp/o", "--standards", "/tmp/st", "--data", "/tmp/d", "--manifests", "/tmp/m",
+        ])
+        #expect(
+            command
+                == .dyes(
+                    .init(
+                        stock: "s", out: URL(filePath: "/tmp/o", directoryHint: .isDirectory),
+                        manifests: URL(filePath: "/tmp/m", directoryHint: .isDirectory),
+                        data: URL(filePath: "/tmp/d", directoryHint: .isDirectory),
+                        standards: URL(filePath: "/tmp/st", directoryHint: .isDirectory))))
+    }
+
     static let badCommandLines: [([String], CommandLineError)] = [
         ([], .missingCommand),
         (["fit"], .unknownCommand("fit")),
@@ -30,6 +44,8 @@ struct FitCommandTests {
         (["negative", "--stock", "a", "--stock", "b"], .duplicateOption("--stock")),
         (["negative", "--out", "o"], .missingOption("--stock", command: "negative")),
         (["negative", "--stock", "s"], .missingOption("--out", command: "negative")),
+        (["dyes", "--stock", "s"], .missingOption("--out", command: "dyes")),
+        (["dyes", "--stock", "s", "--out", "o", "--base", "b"], .unknownOption("--base", command: "dyes")),
         (
             ["negative", "--stock", "s", "--out", "o", "--mid-gray-log-exposure", "gray"],
             .invalidNumber(option: "--mid-gray-log-exposure", text: "gray")

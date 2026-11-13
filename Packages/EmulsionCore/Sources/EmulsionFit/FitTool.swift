@@ -32,11 +32,12 @@ public enum FitTool {
     }
 
     /// - Parameters:
-    ///   - environment: `EMULSION_REFERENCE_DATA`, and `home` the home directory; passed in so tests don't depend on
-    ///     the machine.
+    ///   - environment: `EMULSION_REFERENCE_DATA`, `standardsEnvironment` `EMULSION_STANDARDS_DIR` and `home` the home
+    ///     directory; passed in so tests don't depend on the machine.
     static func perform(
         _ command: FitCommand,
         environment: String? = ProcessInfo.processInfo.environment[DigitizedStock.referenceDataEnvironmentVariable],
+        standardsEnvironment: String? = ProcessInfo.processInfo.environment[StandardsTables.environmentVariable],
         home: URL = FileManager.default.homeDirectoryForCurrentUser
     ) throws -> (text: String, succeeded: Bool) {
         let manifests = { () throws(CommandLineError) -> URL in try manifestsDirectory(command.manifestsDirectory) }
@@ -52,6 +53,11 @@ public enum FitTool {
         case .list: return list(try manifests(), referenceData: referenceData, tried: resolved)
         case .check: return check(try manifests(), referenceData: try requiredReferenceData())
         case .negative(let options): return (try negative(options, in: manifests(), referenceData: requiredReferenceData()), true)
+        case .dyes(let options):
+            let referenceData = try requiredReferenceData()
+            let standards = StandardsTables.directory(flag: options.standards, environment: standardsEnvironment, referenceData: resolved)
+            guard standards.isExistingDirectory else { throw CommandLineError.noStandardsDirectory(standards.path) }
+            return (try dyes(options, in: manifests(), referenceData: referenceData, standards: standards), true)
         }
     }
 
@@ -177,17 +183,33 @@ public enum FitTool {
         let report = try NegativeFitReport.fitting(stock, midGrayLogExposure: options.midGrayLogExposure, tool: toolName)
         let fitted = try FittedStock.make(base: baseStock(options.base), report: report, fitDate: options.fitDate, name: options.name)
 
-        do {
-            try FileManager.default.createDirectory(at: options.out, withIntermediateDirectories: true)
-        } catch {
-            throw NegativeFitError.writeFailed(path: options.out.path, reason: error.localizedDescription)
-        }
+        try createDirectory(options.out)
         try write(fitted.encoded(), to: options.out.appending(path: "\(stock.id).stock.json"))
-        try write(report.encoded(), to: options.out.appending(path: "\(stock.id).negative-fit.json"))
+        try write(report.reportJSON(), to: options.out.appending(path: "\(stock.id).negative-fit.json"))
         try write(Data(report.plotTable().utf8), to: options.out.appending(path: "\(stock.id).negative-fit.csv"))
         return NegativeFitSummary.text(report)
             + "\nWrote \(stock.id).stock.json, .negative-fit.json, .negative-fit.csv to \(options.out.path)\n"
             + "The report and plot table contain traced samples: keep them out of the repository.\n"
+    }
+
+    private static func dyes(_ options: FitCommand.DyesOptions, in directory: URL, referenceData: URL, standards: URL) throws -> String {
+        let standards = try StandardsTables.load(from: standards)
+        let stock = try DigitizedStock.load(id: options.stock, from: directory, referenceData: referenceData)
+        let report = try NegativeDyeSetReport.making(stock, standards: standards, tool: toolName)
+        let summary = NegativeDyeSetSummary.text(report)
+        try createDirectory(options.out)
+        try write(report.reportJSON(), to: options.out.appending(path: "\(stock.id).dye-set.json"))
+        try write(Data(summary.utf8), to: options.out.appending(path: "\(stock.id).dye-set.md"))
+        try write(Data(report.neutralScaleTable().utf8), to: options.out.appending(path: "\(stock.id).neutral-scale.csv"))
+        return summary + "\nWrote \(stock.id).dye-set.json, .dye-set.md, .neutral-scale.csv to \(options.out.path)\n"
+    }
+
+    private static func createDirectory(_ url: URL) throws(NegativeFitError) {
+        do {
+            try FileManager.default.createDirectory(at: url, withIntermediateDirectories: true)
+        } catch {
+            throw .writeFailed(path: url.path, reason: error.localizedDescription)
+        }
     }
 
     private static func baseStock(_ url: URL?) throws -> FilmStock {
