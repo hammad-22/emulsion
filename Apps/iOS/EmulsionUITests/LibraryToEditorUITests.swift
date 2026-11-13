@@ -239,6 +239,7 @@ final class LibraryToEditorUITests: XCTestCase {
 
     @MainActor
     private func launchLibrary() -> XCUIApplication {
+        XCUIDevice.shared.orientation = .portrait
         let app = XCUIApplication()
         app.launchArguments = ["--library"]
         app.launch()
