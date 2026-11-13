@@ -14,20 +14,10 @@ public enum FilmLook {
         }
     }()
     /// Width of the assumed frame: the full-aperture 35 mm camera gate, 0.980 in. The image's long
-    /// edge maps to it. Other gauges are MOV-31.
+    /// edge maps to it (halation's spread, grain's pixel size). Other gauges are MOV-31.
     static let frameWidthMillimetres = 24.89
-    /// Film base thickness. Estimated: a typical triacetate camera-film base; the VISION3 sheets
-    /// do not state it.
-    static let baseThicknessMicrometres = 140.0
-    /// Share of diffuse light entering a base of index 1.48 that its back surface returns to the
-    /// emulsion (Fresnel plus total internal reflection), derived in `Tools/halation-kernel`
-    /// (`geometry.returned_fraction`).
-    static let halationReturnFraction = 0.584
-    /// Green layer's share of the red layer's halation. Estimated: the green layer sits above the
-    /// red one, so the returning light reaches it second.
-    static let halationGreenShare = 0.25
-    /// Grain cell size as a fraction of the long edge (≈1.7 px at 4032).
-    public static let grainCell = 1.0 / 2400
+    /// Pixel side on the film in µm: the image's long edge spans the assumed frame width.
+    static func micrometresPerPixel(longEdge: Double) -> Double { frameWidthMillimetres * 1000 / longEdge }
     /// Printer points per unit of the Warmth/Tint controls (log10 print exposure).
     public static let printerPoint = 0.05
     /// Saturation gain per unit of the Color control, above and below zero.

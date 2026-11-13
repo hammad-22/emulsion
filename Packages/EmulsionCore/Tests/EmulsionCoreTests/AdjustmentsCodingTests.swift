@@ -25,8 +25,8 @@ struct AdjustmentsCodingTests {
         let saved = try JSONDecoder().decode(Adjustments.self, from: Data(#"{"halation": 0.5}"#.utf8))
         #expect(saved.backing == .remJet)
         var unbacked = Adjustments()
-        unbacked.backing = .none
-        #expect(try JSONDecoder().decode(Adjustments.self, from: JSONEncoder().encode(unbacked)).backing == AntihalationBacking.none)
+        unbacked.backing = .unbacked
+        #expect(try JSONDecoder().decode(Adjustments.self, from: JSONEncoder().encode(unbacked)).backing == .unbacked)
     }
 
     @Test func everyFieldRoundTrips() throws {

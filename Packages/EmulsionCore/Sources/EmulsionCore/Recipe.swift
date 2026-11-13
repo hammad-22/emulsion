@@ -3,7 +3,10 @@ import Foundation
 /// An artistic adjustment snapshot for the single built-in film model. A photo owns its grain
 /// seed and its RAW white balance, which describes the light it was shot under.
 public struct Recipe: Codable, Equatable, Identifiable, Sendable {
-    public static let formatVersion = 1
+    /// The format written. Format 2 added the required `backing` (MOV-32).
+    public static let formatVersion = 2
+    /// Formats read: format 1 (no backing) prints with rem-jet.
+    static let readableFormatVersions: ClosedRange<Int> = 1...formatVersion
     public static let engineModel = "emulsion-default-v1"
     public static let maximumFileSize = 65_536
 
@@ -26,7 +29,8 @@ public struct Recipe: Codable, Equatable, Identifiable, Sendable {
             name.utf8.count + summary.utf8.count <= Self.maximumMetadataSize,
             !name.unicodeScalars.contains(where: { CharacterSet.controlCharacters.contains($0) }),
             !summary.unicodeScalars.contains(where: { CharacterSet.controlCharacters.contains($0) }),
-            Field.amounts.allSatisfy({ settings[keyPath: $0].isFinite }), settings.clamped() == settings
+            // Also rejects NaN and ±infinity: clamping changes them (NaN never equals itself).
+            settings.clamped() == settings
         else { throw .invalidRecipe }
         self.id = id
         self.name = name
@@ -62,20 +66,17 @@ public struct Recipe: Codable, Equatable, Identifiable, Sendable {
 
     public init(from decoder: any Decoder) throws {
         let container = try decoder.container(keyedBy: CodingKeys.self)
-        guard try container.decode(Int.self, forKey: .formatVersion) == Self.formatVersion else {
-            throw EmulsionError.recipeVersionUnsupported
-        }
+        let version = try container.decode(Int.self, forKey: .formatVersion)
+        guard Self.readableFormatVersions.contains(version) else { throw EmulsionError.recipeVersionUnsupported }
         guard try container.decode(String.self, forKey: .engineModel) == Self.engineModel else {
             throw EmulsionError.recipeModelUnsupported
         }
         let settings = try container.nestedContainer(keyedBy: Field.self, forKey: .adjustments)
         var adjustments = Adjustments()
-        for key in Field.allCases {
-            guard let path = key.amount else { continue }
-            adjustments[keyPath: path] = try settings.decode(Double.self, forKey: key)
-        }
-        // Optional in format 1: recipes written before the backing existed render as before (rem-jet).
-        adjustments.backing = try settings.decodeIfPresent(AntihalationBacking.self, forKey: .backing) ?? adjustments.backing
+        for field in Self.numericFields { adjustments[keyPath: field.path] = try settings.decode(Double.self, forKey: field.key) }
+        // Format 1 has no backing (a `backing` key there is unknown and ignored, as format 1
+        // readers ignore it) and prints with rem-jet; format 2 requires it (docs/RECIPES.md).
+        adjustments.backing = version == 1 ? .remJet : try settings.decode(AntihalationBacking.self, forKey: .backing)
         try self.init(
             id: container.decode(UUID.self, forKey: .id), name: container.decode(String.self, forKey: .name),
             summary: container.decode(String.self, forKey: .summary), adjustments: adjustments)
@@ -89,29 +90,19 @@ public struct Recipe: Codable, Equatable, Identifiable, Sendable {
         try container.encode(name, forKey: .name)
         try container.encode(summary, forKey: .summary)
         var settings = container.nestedContainer(keyedBy: Field.self, forKey: .adjustments)
-        for key in Field.allCases {
-            guard let path = key.amount else { continue }
-            try settings.encode(adjustments[keyPath: path], forKey: key)
-        }
+        for field in Self.numericFields { try settings.encode(adjustments[keyPath: field.path], forKey: field.key) }
         try settings.encode(adjustments.backing, forKey: .backing)
     }
 
-    private enum Field: String, CodingKey, CaseIterable {
+    /// The keys of the `adjustments` object: the numeric adjustments and the backing.
+    private enum Field: String, CodingKey {
         case exposure, warmth, tint, color, highlights, shadows, grain, halation, backing
-        static var amounts: [WritableKeyPath<Adjustments, Double>] { allCases.compactMap(\.amount) }
-        /// The numeric adjustment this key stores; nil for `backing`, a choice.
-        var amount: WritableKeyPath<Adjustments, Double>? {
-            switch self {
-            case .exposure: \.exposure
-            case .warmth: \.warmth
-            case .tint: \.tint
-            case .color: \.color
-            case .highlights: \.highlights
-            case .shadows: \.shadows
-            case .grain: \.grain
-            case .halation: \.halation
-            case .backing: nil
-            }
-        }
+    }
+
+    private static var numericFields: [(key: Field, path: WritableKeyPath<Adjustments, Double>)] {
+        [
+            (.exposure, \.exposure), (.warmth, \.warmth), (.tint, \.tint), (.color, \.color), (.highlights, \.highlights),
+            (.shadows, \.shadows), (.grain, \.grain), (.halation, \.halation),
+        ]
     }
 }

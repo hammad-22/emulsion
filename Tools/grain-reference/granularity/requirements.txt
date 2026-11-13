@@ -1,0 +1,5 @@
+# Offline digitizing tool only; never shipped. Also needs poppler's `pdfimages` on PATH (GPL tool, run as an external program, not linked or vendored).
+# NumPy: BSD-3-Clause.
+numpy==2.5.4
+# Pillow: MIT-CMU (HPND) licence.
+pillow==13.0.0

@@ -34,7 +34,7 @@ public enum CuratedLooks {
             $0.shadows = 0.3
             $0.highlights = 0.25
             $0.halation = 0.65
-            $0.backing = .none
+            $0.backing = .unbacked
             $0.grain = 0.45
         },
     ].compactMap { $0 }

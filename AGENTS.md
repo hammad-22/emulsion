@@ -20,7 +20,7 @@ iOS 26 / macOS 26 only, iPhone 17 Pro and iPhone Duo as targets. Swift 6.4 toolc
 - `Packages/EmulsionUI/`: shared SwiftUI components (rendered photo, sliders, photo import).
 - `Apps/iOS/`: the iOS app (`Emulsion.xcodeproj`, sources in `Emulsion/`, UI walkthrough in `EmulsionUITests/`). Opens on the camera; the library and editor are behind it.
 - `Apps/macOS/`: minimal native Mac shell on the same packages (`Emulsion.xcodeproj`); library, edit and compare.
-- `Tools/`: `build-kernels.sh` rebuilds the metallibs; `make-sample-photos.swift` regenerates the bundled sample photos; `color-references/` generates the colour-science test references and `halation-kernel/` derives the halation profile and its Gaussian fit (offline Python, never shipped).
+- `Tools/`: `build-kernels.sh` rebuilds the metallibs; `make-sample-photos.swift` regenerates the bundled sample photos; `color-references/` generates the colour-science test references, `halation-kernel/` derives the halation profile and its Gaussian fit, and `grain-reference/` digitizes the datasheet granularity and simulates the Boolean-model grain reference (offline Python, never shipped).
 
 ## Commands
 Run these yourself to verify every change. A change isn't done until they pass.
@@ -33,6 +33,9 @@ sh Tools/build-kernels.sh                                    # after any .metal 
 .venv/bin/python -I Tools/color-references/generate_input_references.py    # after changing input reference samples
 .venv/bin/python -I Tools/color-references/generate_delta_e_references.py  # after changing ΔE / chart references (both: pip install -r Tools/color-references/requirements.txt)
 .venv/bin/python -I Tools/halation-kernel/halation_kernel.py              # after changing the halation derivation; writes the tool's JSON and Tests/.../References/halation-kernel.json (pip install -r Tools/halation-kernel/requirements.txt)
+# Grain references (see each tool's README; needs the Kodak PDFs / about 2 min), then copy the JSON to Tests/.../References/:
+.venv/bin/python -I Tools/grain-reference/granularity/digitize_granularity.py --pdf-dir <PDFs> --out Tools/grain-reference/granularity
+.venv/bin/python -I Tools/grain-reference/boolean-model/boolean_grain_reference.py --out Tools/grain-reference/boolean-model/grain-boolean-model.json
 (cd Packages/EmulsionCore && EMULSION_PERF=1 swift test --filter PerformanceProbe)  # Mac timings
 (cd Packages/EmulsionCore && EMULSION_UPDATE_GOLDENS=1 swift test --filter VisualRegression)  # accept an intended look change (Tests/AGENTS.md)
 (cd Packages/EmulsionCore && swift run emulsion-fit dyes --stock <id> --out <dir>)  # dye set + printing density (MOV-88; local standards tables, `--standards`)
