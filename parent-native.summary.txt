@@ -1,0 +1,20 @@
+Test Case '-[EmulsionUITests.LibraryToEditorUITests testAdjustmentGroupValueAndHitRegions]' started.
+Test Case '-[EmulsionUITests.LibraryToEditorUITests testAdjustmentGroupValueAndHitRegions]' passed (30.429 seconds).
+Test Case '-[EmulsionUITests.LibraryToEditorUITests testAppliedLookHasSelectedTrait]' started.
+Test Case '-[EmulsionUITests.LibraryToEditorUITests testAppliedLookHasSelectedTrait]' passed (31.379 seconds).
+Test Case '-[EmulsionUITests.LibraryToEditorUITests testEmptyLibraryExplanationContrast]' started.
+Test Case '-[EmulsionUITests.LibraryToEditorUITests testEmptyLibraryExplanationContrast]' passed (11.081 seconds).
+Test Case '-[EmulsionUITests.LibraryToEditorUITests testEmptyLibraryTextScalingAndLabels]' started.
+Test Case '-[EmulsionUITests.LibraryToEditorUITests testEmptyLibraryTextScalingAndLabels]' passed (12.627 seconds).
+Test Case '-[EmulsionUITests.LibraryToEditorUITests testLibraryEditorLooksLabelsTraitsAndHitRegions]' started.
+Test Case '-[EmulsionUITests.LibraryToEditorUITests testLibraryEditorLooksLabelsTraitsAndHitRegions]' passed (33.508 seconds).
+Test Case '-[EmulsionUITests.LibraryToEditorUITests testLooksContrastAndTextClipping]' started.
+Test Case '-[EmulsionUITests.LibraryToEditorUITests testLooksContrastAndTextClipping]' passed (42.464 seconds).
+Test Case '-[EmulsionUITests.LibraryToEditorUITests testLooksSaveApplyAndDelete]' started.
+Test Case '-[EmulsionUITests.LibraryToEditorUITests testLooksSaveApplyAndDelete]' passed (45.547 seconds).
+Test Case '-[EmulsionUITests.LibraryToEditorUITests testSamplesEditCompareAndSave]' started.
+Test Case '-[EmulsionUITests.LibraryToEditorUITests testSamplesEditCompareAndSave]' passed (66.545 seconds).
+	 Executed 8 tests, with 0 failures (0 unexpected) in 273.580 (273.639) seconds
+	 Executed 8 tests, with 0 failures (0 unexpected) in 273.580 (273.641) seconds
+	 Executed 8 tests, with 0 failures (0 unexpected) in 273.580 (273.664) seconds
+** TEST SUCCEEDED **

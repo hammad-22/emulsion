@@ -1,0 +1,6 @@
+<unknown>:0: error: -[EmulsionUITests.LibraryToEditorUITests testLooksContrastAndTextClipping] : Contrast failed
+<unknown>:0: error: -[EmulsionUITests.LibraryToEditorUITests testLooksContrastAndTextClipping] : Text clipped
+	 Executed 1 test, with 2 failures (0 unexpected) in 17.173 (17.174) seconds
+	 Executed 1 test, with 2 failures (0 unexpected) in 17.173 (17.174) seconds
+	 Executed 1 test, with 2 failures (0 unexpected) in 17.173 (17.176) seconds
+** TEST FAILED **

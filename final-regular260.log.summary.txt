@@ -1,0 +1,4 @@
+	 Executed 2 tests, with 0 failures (0 unexpected) in 79.035 (79.037) seconds
+	 Executed 2 tests, with 0 failures (0 unexpected) in 79.035 (79.038) seconds
+	 Executed 2 tests, with 0 failures (0 unexpected) in 79.035 (79.039) seconds
+** TEST SUCCEEDED **
