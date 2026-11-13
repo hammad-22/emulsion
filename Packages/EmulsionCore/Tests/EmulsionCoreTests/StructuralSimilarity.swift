@@ -17,6 +17,7 @@ enum StructuralSimilarity {
     /// Mean SSIM of two planes of `width` × `height`, over the pixels whose whole window lies inside
     /// the image (as the paper and scikit-image do), so the edge handling of the blur does not count.
     static func index(_ x: [Float], _ y: [Float], width: Int, height: Int) -> Double {
+        precondition(min(width, height) >= windowSize && x.count == width * height && y.count == x.count)
         let muX = gaussian(x, width: width, height: height)
         let muY = gaussian(y, width: width, height: height)
         let xx = gaussian(vDSP.multiply(x, x), width: width, height: height)

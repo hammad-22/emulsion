@@ -19,7 +19,7 @@ struct ReviewRenders {
     static var label: String { environment["EMULSION_REVIEW_LABEL"] ?? "render" }
     static var samplesDirectory: URL {
         environment["EMULSION_REVIEW_SAMPLES"].map { URL(fileURLWithPath: $0, isDirectory: true) }
-            ?? FileManager.default.homeDirectoryForCurrentUser.appending(path: "Documents/Emulsion Research/samples/proraw-misc")
+            ?? URL.homeDirectory.appending(path: "Documents/Emulsion Research/samples/proraw-misc")
     }
 
     /// The default look with a fixed grain seed, so a pair differs only by the engine.
