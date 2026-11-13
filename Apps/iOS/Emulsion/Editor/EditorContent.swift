@@ -43,8 +43,11 @@ struct EditorContent: View {
             ArrangementWorkspace(showsInspector: showsAdjustments) {
                 photo.padding(FilmLabLayout.inset)
             } inspector: {
-                AdjustmentInspector(adjustments: $session.adjustments, group: $group, selection: $selection)
-                    .disabled(showsOriginal)
+                AdjustmentInspector(
+                    adjustments: $session.adjustments, group: $group, selection: $selection,
+                    whiteBalanceAsShot: session.asShotWhiteBalance
+                )
+                .disabled(showsOriginal)
             }
         } else if #available(iOS 27.1, *) {
             // Always wrapped, so an occlusion appearing doesn't rebuild the photo; the panel's
@@ -66,7 +69,7 @@ struct EditorContent: View {
     private func compactLayout(height: CGFloat, showsAdjustments: Bool) -> some View {
         CompactEditorLayout(
             height: height, showsAdjustments: showsAdjustments, isEditable: !showsOriginal,
-            adjustments: $session.adjustments, group: $group, selection: $selection
+            whiteBalanceAsShot: session.asShotWhiteBalance, adjustments: $session.adjustments, group: $group, selection: $selection
         ) {
             photo
         }

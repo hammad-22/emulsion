@@ -67,4 +67,52 @@ struct EditSessionTests {
         session.reset()
         #expect(!session.isEdited)
     }
+
+    @Test func aRAWPhotoLearnsItsAsShotWhiteBalance() async throws {
+        let library = TestLibrary()
+        let raw = EditSession(
+            photo: try await library.store.add(TestRAW.tungstenTaggedAsDaylight, fileExtension: "dng"), store: library.store)
+        let jpeg = EditSession(photo: try await library.store.add(TestPhoto.jpeg, fileExtension: "jpg"), store: library.store)
+        #expect(jpeg.asShotRead == nil, "white balance doesn't apply to a photo that isn't RAW")
+
+        await raw.asShotRead?.value
+
+        let asShot = try #require(raw.asShotWhiteBalance)
+        // The file is tagged D65 (6504 K); Apple reads 6502 K (MOV-10).
+        #expect(abs(asShot.temperature - 6504) < 15)
+        #expect(jpeg.asShotWhiteBalance == nil)
+    }
+
+    @Test func draggingWhiteBalanceBackToAsShotLeavesThePhotoUnedited() async throws {
+        let library = TestLibrary()
+        let session = EditSession(
+            photo: try await library.store.add(TestRAW.tungstenTaggedAsDaylight, fileExtension: "dng"), store: library.store)
+        await session.asShotRead?.value
+        let temperature = try #require(AdjustmentGroup.whiteBalance.controls(whiteBalanceAsShot: session.asShotWhiteBalance).first)
+        let asShotValue = session.adjustments[keyPath: temperature.keyPath]
+
+        session.adjustments[keyPath: temperature.keyPath] = asShotValue + 40
+        #expect(session.isEdited)
+        session.adjustments[keyPath: temperature.keyPath] = asShotValue
+        #expect(!session.isEdited)
+    }
+
+    /// The editor's photo keeps its RAW decoder until the editor closes.
+    @Test func theOpenPhotoKeepsItsDecoderUntilTheSessionCloses() async throws {
+        let library = TestLibrary()
+        let photo = try await library.store.add(TestRAW.tungstenTaggedAsDaylight, fileExtension: "dng")
+        let session = EditSession(photo: photo, store: library.store)
+        let service = library.renderService
+
+        _ = try await service.image(session.url, session.adjustments, maxDimension: 900)
+        #expect(await service.keptDecoderURL == session.url)
+
+        session.close()
+        await service.close(session.url).value
+        #expect(await service.keptDecoderURL == nil)
+
+        session.adjustments.exposure = 1
+        _ = try await service.image(session.url, session.adjustments, maxDimension: 1200)
+        #expect(await service.keptDecoderURL == session.url, "an editor that closed to save and carried on is open again")
+    }
 }

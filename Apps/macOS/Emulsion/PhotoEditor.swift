@@ -28,8 +28,11 @@ struct PhotoEditor: View {
                 .padding()
                 .frame(minWidth: minimumPhotoSize, minHeight: minimumPhotoSize)
             ScrollView {
-                AdjustmentPanel(adjustments: $session.adjustments, group: $group, selection: $selection)
-                    .padding()
+                AdjustmentPanel(
+                    adjustments: $session.adjustments, group: $group, selection: $selection,
+                    whiteBalanceAsShot: session.asShotWhiteBalance
+                )
+                .padding()
             }
             .frame(minWidth: minimumPanelWidth, idealWidth: minimumPanelWidth, maxWidth: maximumPanelWidth)
         }

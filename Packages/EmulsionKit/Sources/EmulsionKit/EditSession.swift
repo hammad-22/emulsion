@@ -9,11 +9,19 @@ import Observation
 public final class EditSession {
     public let photo: PhotoRecord
     public var adjustments: Adjustments {
-        didSet { scheduleSave() }
+        didSet {
+            // An editor that closed to save (the Mac window going inactive) and carried on.
+            store.renderService.open(url)
+            scheduleSave()
+        }
     }
+    /// The white balance a RAW photo was shot at, where its Temperature and Tint rulers rest;
+    /// nil until it's read from the file, and for photos that aren't RAW.
+    public private(set) var asShotWhiteBalance: CameraWhiteBalance?
 
     private let store: PhotoStore
     @ObservationIgnored private(set) var pendingSave: Task<Void, Never>?
+    @ObservationIgnored private(set) var asShotRead: Task<Void, Never>?
     /// Long enough to skip the writes during a drag, short enough to survive a crash.
     static let saveDelay: Duration = .milliseconds(300)
 
@@ -21,6 +29,14 @@ public final class EditSession {
         self.photo = photo
         self.store = store
         adjustments = photo.adjustments
+        let (renderService, url) = (store.renderService, store.url(for: photo))
+        renderService.open(url)
+        if photo.isRAW {
+            asShotRead = Task { [weak self] in
+                let asShot = await renderService.asShotWhiteBalance(url)
+                self?.asShotWhiteBalance = asShot
+            }
+        }
     }
 
     public var url: URL { store.url(for: photo) }
@@ -38,11 +54,13 @@ public final class EditSession {
         adjustments = recipe.applying(to: adjustments)
     }
 
-    /// Writes any pending change now. Call when the editor goes away.
+    /// Writes any pending change now and lets go of the photo's RAW decoder. Call when the
+    /// editor goes away.
     public func close() {
         pendingSave?.cancel()
         pendingSave = nil
         store.update(photo.id, adjustments: adjustments)
+        store.renderService.close(url)
     }
 
     /// Develops at full resolution with the current edit and adds the result to Photos.

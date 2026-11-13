@@ -10,6 +10,7 @@ struct CompactEditorLayout<Photo: View>: View {
     let height: CGFloat
     let showsAdjustments: Bool
     let isEditable: Bool
+    let whiteBalanceAsShot: CameraWhiteBalance?
     @Binding var adjustments: Adjustments
     @Binding var group: AdjustmentGroup
     @Binding var selection: [AdjustmentGroup: String]
@@ -50,7 +51,7 @@ struct CompactEditorLayout<Photo: View>: View {
     }
 
     private var panel: some View {
-        AdjustmentPanel(adjustments: $adjustments, group: $group, selection: $selection)
+        AdjustmentPanel(adjustments: $adjustments, group: $group, selection: $selection, whiteBalanceAsShot: whiteBalanceAsShot)
             .padding(.horizontal, FilmLabLayout.inset)
     }
 

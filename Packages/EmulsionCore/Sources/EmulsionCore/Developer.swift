@@ -70,46 +70,14 @@ public struct Developer {
     public func develop(
         _ data: Data, maxDimension: CGFloat? = nil, whiteBalance: CameraWhiteBalance? = nil, exposureAnchorStops: Double? = nil
     ) throws -> Negative {
-        try develop(
-            data, maxDimension: maxDimension, whiteBalance: whiteBalance,
-            anchor: exposureAnchorStops.map { .known(stops: $0) } ?? .measured)
+        try develop(data, maxDimension: maxDimension, whiteBalance: whiteBalance, anchor: Self.anchorChoice(exposureAnchorStops))
     }
 
     func develop(
         _ data: Data, maxDimension: CGFloat?, whiteBalance: CameraWhiteBalance? = nil, anchor: ExposureAnchor.Choice
     ) throws -> Negative {
-        if let raw = Self.rawFilter(data) {
-            Self.bypassAppleRendering(raw)
-            var anchorStops = 0.0
-            var measuresAnchor = false
-            switch anchor {
-            // isLocalToneMapSupported: Apple can apply a gain table (ProfileGainTableMap) for this
-            // file. Deliberately excluded, anchor 0: a DNG with a tone curve but no gain table, and
-            // non-DNG RAW, where Apple's boost is its own look curve rather than the file's profile.
-            case .measured where raw.isLocalToneMapSupported:
-                Self.applyPreviewScale(raw, maxDimension: ExposureAnchor.thumbnailLongEdge, allowsDraftMode: false)
-                anchorStops = ExposureAnchor.stops(of: raw, context: context)
-                measuresAnchor = true
-            case .known(let stops):
-                anchorStops = stops
-            case .measured, .none:
-                break
-            }
-            // Draft mode stays off after the anchor's thumbnails: switching it on decodes the file again.
-            Self.applyPreviewScale(raw, maxDimension: maxDimension, allowsDraftMode: !measuresAnchor)
-            let asShot = CameraWhiteBalance(temperature: Double(raw.neutralTemperature), tint: Double(raw.neutralTint))
-            // After the anchor, which stays measured as shot whatever the white balance. Setting it
-            // here doesn't make the filter decode the file again (measured, MOV-10).
-            if let whiteBalance { Self.apply(whiteBalance, to: raw) }
-            guard var output = raw.outputImage, !output.extent.isEmpty, !output.extent.isInfinite else {
-                throw EmulsionError.unsupportedPhoto
-            }
-            if anchorStops != 0 {
-                output = output.applyingFilter("CIExposureAdjust", parameters: [kCIInputEVKey: anchorStops])
-            }
-            return Negative(
-                image: Self.normalized(output), contract: .sceneReferred, exposureAnchorStops: anchorStops,
-                asShotWhiteBalance: asShot)
+        if let decoder = rawDecoder(data, maxDimension: maxDimension, anchor: anchor) {
+            return try decoder.negative(whiteBalance: whiteBalance)
         }
         // Known limitation: HDR stills are read as their SDR rendition (a gain map is ignored,
         // PQ/HLG stills are tone-mapped by Core Image), so HDR headroom is discarded until MOV-49.
@@ -125,17 +93,58 @@ public struct Developer {
         return try sceneFromDisplay(Self.normalized(image))
     }
 
+    /// The decoder of a RAW file, kept by the caller to develop it again at other white balances
+    /// without decoding it again; nil when `data` isn't RAW. `develop` is one `negative` of a
+    /// decoder, so both give the same pixels (a preview that measures its anchor: within the
+    /// draft tolerance). `maxDimension` and `exposureAnchorStops` as in `develop`.
+    public func rawDecoder(_ data: Data, maxDimension: CGFloat? = nil, exposureAnchorStops: Double? = nil) -> RAWDecoder? {
+        guard exposureAnchorStops == nil, maxDimension != nil else {
+            return rawDecoder(data, maxDimension: maxDimension, anchor: Self.anchorChoice(exposureAnchorStops))
+        }
+        // Measuring the anchor leaves draft mode off (switching it on decodes the file again), and
+        // every develop of the kept decoder would then render the full-size decode: 3 to 4 times
+        // slower per white balance step on a 12 MP file (Mac, MOV-137). So the anchor is measured
+        // on one decoder and a second, in draft mode, is kept.
+        guard let measured = rawDecoder(data, maxDimension: ExposureAnchor.thumbnailLongEdge, anchor: .measured) else { return nil }
+        return rawDecoder(data, maxDimension: maxDimension, anchor: .known(stops: measured.exposureAnchorStops))
+    }
+
+    func rawDecoder(_ data: Data, maxDimension: CGFloat?, anchor: ExposureAnchor.Choice) -> RAWDecoder? {
+        guard let raw = Self.rawFilter(data) else { return nil }
+        Self.bypassAppleRendering(raw)
+        var anchorStops = 0.0
+        var measuresAnchor = false
+        switch anchor {
+        // isLocalToneMapSupported: Apple can apply a gain table (ProfileGainTableMap) for this
+        // file. Deliberately excluded, anchor 0: a DNG with a tone curve but no gain table, and
+        // non-DNG RAW, where Apple's boost is its own look curve rather than the file's profile.
+        case .measured where raw.isLocalToneMapSupported:
+            Self.applyPreviewScale(raw, maxDimension: ExposureAnchor.thumbnailLongEdge, allowsDraftMode: false)
+            anchorStops = ExposureAnchor.stops(of: raw, context: context)
+            measuresAnchor = true
+        case .known(let stops):
+            anchorStops = stops
+        case .measured, .none:
+            break
+        }
+        // Draft mode stays off after the anchor's thumbnails: switching it on decodes the file again.
+        Self.applyPreviewScale(raw, maxDimension: maxDimension, allowsDraftMode: !measuresAnchor)
+        // The anchor was measured as shot; the decoder sets each develop's white balance after it.
+        return RAWDecoder(raw, exposureAnchorStops: anchorStops)
+    }
+
+    /// The white balance a RAW file reports, read without developing it; nil when `data` isn't RAW.
+    public static func asShotWhiteBalance(of data: Data) -> CameraWhiteBalance? {
+        rawFilter(data).map(RAWDecoder.whiteBalance(of:))
+    }
+
+    private static func anchorChoice(_ exposureAnchorStops: Double?) -> ExposureAnchor.Choice {
+        exposureAnchorStops.map { .known(stops: $0) } ?? .measured
+    }
+
     /// Apple's RAW decoder for `data`, or nil when it isn't RAW.
     private static func rawFilter(_ data: Data) -> CIRAWFilter? {
         rawTypeIdentifier(of: data).flatMap { CIRAWFilter(imageData: data, identifierHint: $0) }
-    }
-
-    /// Sets the decoder's neutral from a temperature and tint, which Apple converts to a camera
-    /// neutral and applies in the camera's colour space.
-    private static func apply(_ whiteBalance: CameraWhiteBalance, to raw: CIRAWFilter) {
-        let clamped = whiteBalance.clamped()
-        raw.neutralTemperature = Float(clamped.temperature)
-        raw.neutralTint = Float(clamped.tint)
     }
 
     /// Decodes at most `maxDimension` on the long edge (nil: full size), in RAW draft mode when
