@@ -36,8 +36,8 @@ public final class PhotoStore {
         try? FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
         loadIndex()
         restoreExposureAnchors()
-        renderService.onExposureAnchorMeasured { [weak self] file, anchor in
-            Task { @MainActor in self?.keepExposureAnchor(anchor, for: file) }
+        Task { [weak self, anchors = renderService.measuredExposureAnchors] in
+            for await (file, anchor) in anchors { self?.keepExposureAnchor(anchor, for: file) }
         }
     }
 

@@ -29,8 +29,10 @@ public actor RenderService {
     /// so later develops (other sizes, white balances, export, relaunches) skip measuring it while
     /// the file is unchanged. Outside the actor so `PhotoStore` can restore anchors before the first render.
     private nonisolated let exposureAnchors = Mutex<[URL: StoredExposureAnchor]>([:])
-    /// Told each anchor the service measures, so the photo store can save it (MOV-141).
-    private nonisolated let anchorMeasured = Mutex<(@Sendable (URL, StoredExposureAnchor) -> Void)?>(nil)
+    /// Each anchor the service measures, in order, for the photo store to save (MOV-141). One
+    /// consumer: the app has one photo store.
+    nonisolated let measuredExposureAnchors: AsyncStream<(URL, StoredExposureAnchor)>
+    private nonisolated let measuredExposureAnchor: AsyncStream<(URL, StoredExposureAnchor)>.Continuation
     private nonisolated let thumbnails: ThumbnailCache
     private nonisolated let latestRenders: LatestRenderCache
 
@@ -43,7 +45,11 @@ public actor RenderService {
         self.renderer = renderer
         self.thumbnails = thumbnails
         self.latestRenders = latestRenders
+        (measuredExposureAnchors, measuredExposureAnchor) = AsyncStream.makeStream()
     }
+
+    /// Ends the photo store's wait for anchors.
+    deinit { measuredExposureAnchor.finish() }
 
     private func engine() throws -> Renderer {
         if let renderer { return renderer }
@@ -184,19 +190,13 @@ public actor RenderService {
         exposureAnchorMeasurements += 1
         let anchor = StoredExposureAnchor(stops: developed.exposureAnchorStops, source: source)
         exposureAnchors.withLock { $0[url] = anchor }
-        anchorMeasured.withLock { $0 }?(url, anchor)
+        measuredExposureAnchor.yield((url, anchor))
         return developed
     }
 
     /// Develops `url` with a saved anchor instead of measuring it, while the file still matches.
     nonisolated func restoreExposureAnchor(_ anchor: StoredExposureAnchor, for url: URL) {
         exposureAnchors.withLock { $0[url] = anchor }
-    }
-
-    /// Calls `handler`, off the main actor, with each anchor the service measures. Replaces any
-    /// earlier handler: the app has one photo store.
-    nonisolated func onExposureAnchorMeasured(_ handler: @escaping @Sendable (URL, StoredExposureAnchor) -> Void) {
-        anchorMeasured.withLock { $0 = handler }
     }
 
     /// Drops every cached preview and the exposure anchor of a photo (after it's deleted or its
