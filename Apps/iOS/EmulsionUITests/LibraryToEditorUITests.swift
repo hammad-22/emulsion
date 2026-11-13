@@ -8,8 +8,7 @@ import XCTest
 final class LibraryToEditorUITests: XCTestCase {
     @MainActor
     func testEmptyLibraryExplanationContrast() throws {
-        let app = XCUIApplication()
-        app.launch()
+        let app = launchLibrary()
         guard app.buttons["Try Sample Photos"].waitForExistence(timeout: 5) else {
             throw XCTSkip("Needs an empty library; uninstall the isolated proof app first.")
         }
@@ -22,8 +21,7 @@ final class LibraryToEditorUITests: XCTestCase {
 
     @MainActor
     func testEmptyLibraryTextScalingAndLabels() throws {
-        let app = XCUIApplication()
-        app.launch()
+        let app = launchLibrary()
         guard app.buttons["Try Sample Photos"].waitForExistence(timeout: 5) else {
             throw XCTSkip("Needs an empty library; uninstall the isolated proof app first.")
         }
@@ -90,10 +88,7 @@ final class LibraryToEditorUITests: XCTestCase {
 
     @MainActor
     func testSamplesEditCompareAndSave() throws {
-        let app = XCUIApplication()
-        app.launchArguments = ["--library"]
-        app.launch()
-        XCTAssertTrue(app.navigationBars["Library"].waitForExistence(timeout: 5))
+        let app = launchLibrary()
 
         let samples = app.buttons["Try Sample Photos"]
         guard samples.waitForExistence(timeout: 2) else { throw XCTSkip("Needs an empty library; uninstall the app first.") }
@@ -243,9 +238,17 @@ final class LibraryToEditorUITests: XCTestCase {
     }
 
     @MainActor
-    private func launchSampleLibrary() throws -> XCUIApplication {
+    private func launchLibrary() -> XCUIApplication {
         let app = XCUIApplication()
+        app.launchArguments = ["--library"]
         app.launch()
+        XCTAssertTrue(app.navigationBars["Library"].waitForExistence(timeout: 5), "Library tests must open the library")
+        return app
+    }
+
+    @MainActor
+    private func launchSampleLibrary() throws -> XCUIApplication {
+        let app = launchLibrary()
         guard app.buttons["Try Sample Photos"].waitForExistence(timeout: 5) else {
             throw XCTSkip("Needs an empty library; uninstall the isolated proof app first.")
         }
