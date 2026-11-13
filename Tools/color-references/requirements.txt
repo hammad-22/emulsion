@@ -1,3 +1,6 @@
-# Offline test-reference tooling only; never shipped. colour-science is BSD-3-Clause, NumPy BSD-3-Clause.
+# Offline test-reference tooling only; never shipped. colour-science, NumPy, scikit-image and SciPy are BSD-3-Clause
+# (scikit-image, with SciPy, is the independent SSIM implementation for generate_ssim_references.py).
 colour-science==0.4.7
 numpy==2.5.4
+scikit-image==0.26.0
+scipy==1.18.1
