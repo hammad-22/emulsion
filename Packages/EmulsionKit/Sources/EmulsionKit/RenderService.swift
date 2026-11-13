@@ -25,9 +25,14 @@ public actor RenderService {
     /// Preview sizes are rounded up to this step, so resizes (iPhone Duo fold/unfold, Mac
     /// windows) reuse a cached develop instead of decoding the RAW again for every size.
     private let previewSizeStep: CGFloat = 256
-    /// Each file's exposure anchor from its first develop, so later develops (other sizes, white
-    /// balances, export) skip measuring it. In memory only; keeping it on the photo record is a follow-up.
-    private var exposureAnchors: [URL: Double] = [:]
+    /// Each file's exposure anchor, restored from its photo record or measured on its first develop,
+    /// so later develops (other sizes, white balances, export, relaunches) skip measuring it while
+    /// the file is unchanged. Outside the actor so `PhotoStore` can restore anchors before the first render.
+    private nonisolated let exposureAnchors = Mutex<[URL: StoredExposureAnchor]>([:])
+    /// Each anchor the service measures, in order, for the photo store to save (MOV-141). One
+    /// consumer: the app has one photo store.
+    nonisolated let measuredExposureAnchors: AsyncStream<(URL, StoredExposureAnchor)>
+    private nonisolated let measuredExposureAnchor: AsyncStream<(URL, StoredExposureAnchor)>.Continuation
     private nonisolated let thumbnails: ThumbnailCache
     private nonisolated let latestRenders: LatestRenderCache
 
@@ -40,7 +45,11 @@ public actor RenderService {
         self.renderer = renderer
         self.thumbnails = thumbnails
         self.latestRenders = latestRenders
+        (measuredExposureAnchors, measuredExposureAnchor) = AsyncStream.makeStream()
     }
+
+    /// Ends the photo store's wait for anchors.
+    deinit { measuredExposureAnchor.finish() }
 
     private func engine() throws -> Renderer {
         if let renderer { return renderer }
@@ -169,20 +178,32 @@ public actor RenderService {
         return try renderer.export(renderer.render(full, adjustments), format: format)
     }
 
-    /// Develops the file with its exposure anchor, measuring and remembering it the first time;
-    /// the anchor is measured as shot, so a white balance change reuses it.
+    /// Develops the file with its exposure anchor, measuring, remembering and reporting it when
+    /// none is known for the file as it is now; the anchor is measured as shot, so a white balance
+    /// change reuses it.
     private func develop(_ url: URL, maxDimension: CGFloat?, whiteBalance: CameraWhiteBalance?) throws -> Negative {
+        let source = StoredExposureAnchor.Source(url)
+        let known = exposureAnchors.withLock { $0[url] }.flatMap { $0.source == source ? $0.stops : nil }
         let developed = try engine().developer.develop(
-            Data(contentsOf: url), maxDimension: maxDimension, whiteBalance: whiteBalance,
-            exposureAnchorStops: exposureAnchors[url])
-        exposureAnchors[url] = developed.exposureAnchorStops
+            Data(contentsOf: url), maxDimension: maxDimension, whiteBalance: whiteBalance, exposureAnchorStops: known)
+        // Only RAW has an anchor (non-RAW develops report no as-shot white balance).
+        guard known == nil, developed.asShotWhiteBalance != nil, let source else { return developed }
+        exposureAnchorMeasurements += 1
+        let anchor = StoredExposureAnchor(stops: developed.exposureAnchorStops, source: source)
+        exposureAnchors.withLock { $0[url] = anchor }
+        measuredExposureAnchor.yield((url, anchor))
         return developed
+    }
+
+    /// Develops `url` with a saved anchor instead of measuring it, while the file still matches.
+    nonisolated func restoreExposureAnchor(_ anchor: StoredExposureAnchor, for url: URL) {
+        exposureAnchors.withLock { $0[url] = anchor }
     }
 
     /// Drops every cached preview and the exposure anchor of a photo (after it's deleted or its
     /// source changes).
     public func forget(_ url: URL) {
-        exposureAnchors[url] = nil
+        exposureAnchors.withLock { $0[url] = nil }
         let prefix = url.absoluteString + "@"
         for key in previews.keys where key.hasPrefix(prefix) { previews[key] = nil }
         lruKeys.removeAll { $0.hasPrefix(prefix) }
@@ -194,6 +215,8 @@ public actor RenderService {
     var cachedPreviewKeys: [String] { lruKeys }
     /// Previews developed so far, cache misses; for tests.
     private(set) var developCount = 0
+    /// RAW develops that had no anchor to reuse and measured one; for tests.
+    private(set) var exposureAnchorMeasurements = 0
     /// The file's remembered exposure anchor; for tests.
-    func exposureAnchor(_ url: URL) -> Double? { exposureAnchors[url] }
+    nonisolated func exposureAnchor(_ url: URL) -> Double? { exposureAnchors.withLock { $0[url]?.stops } }
 }
