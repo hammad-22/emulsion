@@ -30,6 +30,14 @@ public final class PhotoStore {
         self.folder = folder
         self.renderService = renderService
         try? FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
+        loadIndex()
+        restoreExposureAnchors()
+        renderService.onExposureAnchorMeasured { [weak self] file, stops in
+            Task { @MainActor in self?.keepExposureAnchor(stops, for: file) }
+        }
+    }
+
+    private func loadIndex() {
         let saved: Data
         do {
             saved = try Data(contentsOf: indexURL)
@@ -138,6 +146,26 @@ public final class PhotoStore {
         }
         hasReportedSaveFailure = false
         photos = updated
+    }
+
+    /// Gives the render service every saved anchor that still matches its original.
+    private func restoreExposureAnchors() {
+        for photo in photos {
+            let file = url(for: photo)
+            guard let anchor = photo.exposureAnchor, anchor.matches(file) else { continue }
+            renderService.restoreExposureAnchor(anchor.stops, for: file)
+        }
+    }
+
+    /// Saves a RAW photo's newly measured anchor with its record. It's a cache: if the save
+    /// fails, the next launch measures it again, so the failure isn't reported.
+    private func keepExposureAnchor(_ stops: Double, for file: URL) {
+        guard let i = photos.firstIndex(where: { url(for: $0) == file }), photos[i].isRAW,
+            let source = StoredExposureAnchor.Source(url(for: photos[i]))
+        else { return }
+        let anchor = StoredExposureAnchor(stops: stops, source: source)
+        guard photos[i].exposureAnchor != anchor else { return }
+        try? commit { $0[i].exposureAnchor = anchor }
     }
 
     private func report(_ error: EmulsionError) {

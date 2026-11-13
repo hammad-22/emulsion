@@ -25,9 +25,12 @@ public actor RenderService {
     /// Preview sizes are rounded up to this step, so resizes (iPhone Duo fold/unfold, Mac
     /// windows) reuse a cached develop instead of decoding the RAW again for every size.
     private let previewSizeStep: CGFloat = 256
-    /// Each file's exposure anchor from its first develop, so later develops (other sizes, white
-    /// balances, export) skip measuring it. In memory only; keeping it on the photo record is a follow-up.
-    private var exposureAnchors: [URL: Double] = [:]
+    /// Each file's exposure anchor, restored from its photo record or kept from its first develop,
+    /// so later develops (other sizes, white balances, export, relaunches) skip measuring it.
+    /// Outside the actor so `PhotoStore` can restore anchors before the first render.
+    private nonisolated let exposureAnchors = Mutex<[URL: Double]>([:])
+    /// Told each anchor the service measures, so the photo store can save it (MOV-141).
+    private nonisolated let anchorMeasured = Mutex<(@Sendable (URL, Double) -> Void)?>(nil)
     private nonisolated let thumbnails: ThumbnailCache
     private nonisolated let latestRenders: LatestRenderCache
 
@@ -169,20 +172,35 @@ public actor RenderService {
         return try renderer.export(renderer.render(full, adjustments), format: format)
     }
 
-    /// Develops the file with its exposure anchor, measuring and remembering it the first time;
-    /// the anchor is measured as shot, so a white balance change reuses it.
+    /// Develops the file with its exposure anchor, measuring, remembering and reporting it when
+    /// it isn't known yet; the anchor is measured as shot, so a white balance change reuses it.
     private func develop(_ url: URL, maxDimension: CGFloat?, whiteBalance: CameraWhiteBalance?) throws -> Negative {
+        let known = exposureAnchor(url)
         let developed = try engine().developer.develop(
-            Data(contentsOf: url), maxDimension: maxDimension, whiteBalance: whiteBalance,
-            exposureAnchorStops: exposureAnchors[url])
-        exposureAnchors[url] = developed.exposureAnchorStops
+            Data(contentsOf: url), maxDimension: maxDimension, whiteBalance: whiteBalance, exposureAnchorStops: known)
+        guard known == nil else { return developed }
+        exposureAnchorMeasurements += 1
+        let stops = developed.exposureAnchorStops
+        exposureAnchors.withLock { $0[url] = stops }
+        anchorMeasured.withLock { $0 }?(url, stops)
         return developed
+    }
+
+    /// Develops `url` with `stops` instead of measuring its anchor: one saved with its photo.
+    nonisolated func restoreExposureAnchor(_ stops: Double, for url: URL) {
+        exposureAnchors.withLock { $0[url] = stops }
+    }
+
+    /// Calls `handler`, off the main actor, with each anchor the service measures. Replaces any
+    /// earlier handler: the app has one photo store.
+    nonisolated func onExposureAnchorMeasured(_ handler: @escaping @Sendable (URL, Double) -> Void) {
+        anchorMeasured.withLock { $0 = handler }
     }
 
     /// Drops every cached preview and the exposure anchor of a photo (after it's deleted or its
     /// source changes).
     public func forget(_ url: URL) {
-        exposureAnchors[url] = nil
+        exposureAnchors.withLock { $0[url] = nil }
         let prefix = url.absoluteString + "@"
         for key in previews.keys where key.hasPrefix(prefix) { previews[key] = nil }
         lruKeys.removeAll { $0.hasPrefix(prefix) }
@@ -194,6 +212,8 @@ public actor RenderService {
     var cachedPreviewKeys: [String] { lruKeys }
     /// Previews developed so far, cache misses; for tests.
     private(set) var developCount = 0
-    /// The file's remembered exposure anchor; for tests.
-    func exposureAnchor(_ url: URL) -> Double? { exposureAnchors[url] }
+    /// Develops that had no anchor to reuse and measured one; for tests.
+    private(set) var exposureAnchorMeasurements = 0
+    /// The file's remembered exposure anchor.
+    nonisolated func exposureAnchor(_ url: URL) -> Double? { exposureAnchors.withLock { $0[url] } }
 }
