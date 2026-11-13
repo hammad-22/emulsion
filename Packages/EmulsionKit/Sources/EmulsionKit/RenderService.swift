@@ -65,9 +65,14 @@ public actor RenderService {
             return cached.negative
         }
         let renderer = try engine()
+        let open = openPhoto.withLock { $0 }
+        // Only the open photo's decoder is held, and it's released before a file is read for
+        // another: never two files' decodes at once.
+        if let kept = openDecoder, kept.url != open || (kept.url == url && kept.maxDimension < maxDimension) { openDecoder = nil }
+        let kept = open == url ? openDecoder?.decoder : nil
         let developed =
-            try openNegative(url, maxDimension: maxDimension, whiteBalance: whiteBalance)
-            ?? develop(url, maxDimension: maxDimension, whiteBalance: whiteBalance)
+            try kept?.negative(whiteBalance: whiteBalance)
+            ?? develop(url, maxDimension: maxDimension, whiteBalance: whiteBalance, keepsDecoder: open == url)
         developCount += 1
         // Draft RAW decode may come back larger than asked; fit it exactly. Then render it
         // once into a half-float buffer, so slider moves don't redo the RAW develop or the
@@ -179,40 +184,32 @@ public actor RenderService {
         return try renderer.export(renderer.render(full, adjustments), format: format)
     }
 
-    /// Develops the file with its exposure anchor, measuring and remembering it the first time;
-    /// the anchor is measured as shot, so a white balance change reuses it.
-    private func develop(_ url: URL, maxDimension: CGFloat?, whiteBalance: CameraWhiteBalance?) throws -> Negative {
-        let developed = try engine().developer.develop(
-            Data(contentsOf: url), maxDimension: maxDimension, whiteBalance: whiteBalance,
-            exposureAnchorStops: exposureAnchors[url])
+    /// Reads and develops the file with its exposure anchor, measuring and remembering it the
+    /// first time; the anchor is measured as shot, so a white balance change reuses it.
+    /// `keepsDecoder` keeps a RAW file's decoder as the open photo's, for its later white balances.
+    private func develop(
+        _ url: URL, maxDimension: CGFloat?, whiteBalance: CameraWhiteBalance?, keepsDecoder: Bool = false
+    ) throws -> Negative {
+        let developer = try engine().developer
+        let data = try Data(contentsOf: url)
         fileReadCount += 1
+        let developed: Negative
+        if keepsDecoder, let maxDimension,
+            let decoder = developer.rawDecoder(data, maxDimension: maxDimension, exposureAnchorStops: exposureAnchors[url])
+        {
+            openDecoder = (url, maxDimension, decoder)
+            developed = try decoder.negative(whiteBalance: whiteBalance)
+        } else {
+            developed = try developer.develop(
+                data, maxDimension: maxDimension, whiteBalance: whiteBalance, exposureAnchorStops: exposureAnchors[url])
+        }
         exposureAnchors[url] = developed.exposureAnchorStops
         return developed
     }
 
-    /// The open photo developed from its kept decoder, which is made (reading the file once) on
-    /// the first develop, or again when a larger preview is asked for. Nil when `url` isn't the
-    /// open photo or isn't RAW.
-    private func openNegative(_ url: URL, maxDimension: CGFloat, whiteBalance: CameraWhiteBalance?) throws -> Negative? {
-        guard openPhoto.withLock({ $0 }) == url else { return nil }
-        if let kept = openDecoder, kept.url == url, kept.maxDimension >= maxDimension {
-            return try kept.decoder.negative(whiteBalance: whiteBalance)
-        }
-        // Released first, so two files' decodes are never held at once.
-        openDecoder = nil
-        guard
-            let decoder = try engine().developer.rawDecoder(
-                Data(contentsOf: url), maxDimension: maxDimension, exposureAnchorStops: exposureAnchors[url])
-        else { return nil }
-        fileReadCount += 1
-        exposureAnchors[url] = decoder.exposureAnchorStops
-        openDecoder = (url, maxDimension, decoder)
-        return try decoder.negative(whiteBalance: whiteBalance)
-    }
-
     /// Marks the photo open in the editor: its RAW decoder is kept from its next develop, so
-    /// white balance changes render without decoding the file again. One photo at a time; another
-    /// photo's decoder is released when this one develops. Call before asking for its first render.
+    /// white balance changes render without decoding the file again. One photo at a time; the
+    /// last one's decoder is released at the next develop. Call before asking for its first render.
     public nonisolated func open(_ url: URL) {
         openPhoto.withLock { $0 = url }
     }

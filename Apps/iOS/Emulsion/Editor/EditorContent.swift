@@ -35,6 +35,7 @@ struct EditorContent: View {
         .tint(.white)
         .navigationTitle(showsOriginal ? Text("Original") : Text(""))
         .navigationBarTitleDisplayMode(.inline)
+        .task { await session.readAsShotWhiteBalance() }
     }
 
     @ViewBuilder

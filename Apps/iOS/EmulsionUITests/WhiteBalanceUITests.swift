@@ -19,6 +19,7 @@ final class WhiteBalanceUITests: XCTestCase {
         let ruler = app.otherElements["adjustment-ruler"]
         XCTAssertTrue(ruler.waitForExistence(timeout: 5))
         app.buttons["Adjustment group"].tap()
+        keepScreenshot(app, named: "WB 0 Adjustment groups")
         guard app.buttons["White Balance"].waitForExistence(timeout: 2) else {
             throw XCTSkip("The first photo isn't RAW: white balance doesn't apply to it.")
         }

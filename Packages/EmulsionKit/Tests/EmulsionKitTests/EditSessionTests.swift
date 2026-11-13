@@ -73,21 +73,22 @@ struct EditSessionTests {
         let raw = EditSession(
             photo: try await library.store.add(TestRAW.tungstenTaggedAsDaylight, fileExtension: "dng"), store: library.store)
         let jpeg = EditSession(photo: try await library.store.add(TestPhoto.jpeg, fileExtension: "jpg"), store: library.store)
-        #expect(jpeg.asShotRead == nil, "white balance doesn't apply to a photo that isn't RAW")
+        #expect(raw.asShotWhiteBalance == nil, "not read until the editor asks")
 
-        await raw.asShotRead?.value
+        await raw.readAsShotWhiteBalance()
+        await jpeg.readAsShotWhiteBalance()
 
         let asShot = try #require(raw.asShotWhiteBalance)
         // The file is tagged D65 (6504 K); Apple reads 6502 K (MOV-10).
         #expect(abs(asShot.temperature - 6504) < 15)
-        #expect(jpeg.asShotWhiteBalance == nil)
+        #expect(jpeg.asShotWhiteBalance == nil, "white balance doesn't apply to a photo that isn't RAW")
     }
 
     @Test func draggingWhiteBalanceBackToAsShotLeavesThePhotoUnedited() async throws {
         let library = TestLibrary()
         let session = EditSession(
             photo: try await library.store.add(TestRAW.tungstenTaggedAsDaylight, fileExtension: "dng"), store: library.store)
-        await session.asShotRead?.value
+        await session.readAsShotWhiteBalance()
         let temperature = try #require(AdjustmentGroup.whiteBalance.controls(whiteBalanceAsShot: session.asShotWhiteBalance).first)
         let asShotValue = session.adjustments[keyPath: temperature.keyPath]
 

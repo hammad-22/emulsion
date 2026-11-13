@@ -16,12 +16,11 @@ public final class EditSession {
         }
     }
     /// The white balance a RAW photo was shot at, where its Temperature and Tint rulers rest;
-    /// nil until it's read from the file, and for photos that aren't RAW.
+    /// nil until `readAsShotWhiteBalance()` has read it, and for photos that aren't RAW.
     public private(set) var asShotWhiteBalance: CameraWhiteBalance?
 
     private let store: PhotoStore
     @ObservationIgnored private(set) var pendingSave: Task<Void, Never>?
-    @ObservationIgnored private(set) var asShotRead: Task<Void, Never>?
     /// Long enough to skip the writes during a drag, short enough to survive a crash.
     static let saveDelay: Duration = .milliseconds(300)
 
@@ -29,14 +28,14 @@ public final class EditSession {
         self.photo = photo
         self.store = store
         adjustments = photo.adjustments
-        let (renderService, url) = (store.renderService, store.url(for: photo))
-        renderService.open(url)
-        if photo.isRAW {
-            asShotRead = Task { [weak self] in
-                let asShot = await renderService.asShotWhiteBalance(url)
-                self?.asShotWhiteBalance = asShot
-            }
-        }
+        store.renderService.open(store.url(for: photo))
+    }
+
+    /// Reads a RAW photo's as-shot white balance, which gives the editor its White Balance
+    /// rulers. Call from the editor's `.task`; the file is read off the main actor.
+    public func readAsShotWhiteBalance() async {
+        guard photo.isRAW, asShotWhiteBalance == nil else { return }
+        asShotWhiteBalance = await store.renderService.asShotWhiteBalance(url)
     }
 
     public var url: URL { store.url(for: photo) }
