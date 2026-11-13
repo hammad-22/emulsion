@@ -7,6 +7,7 @@ struct Kernels {
     // Named exactly like the Metal functions in Emulsion.ci.metal.
     let filmSystem, filmSystemRelative, displayToScene, inputTransform, ycbcrInputTransform: CIColorKernel
     let halationSource, halationAdd, grain, lightnessGuide, localTone: CIColorKernel
+    let mirroredEdges: CIWarpKernel
 
     init() throws {
         #if os(macOS)
@@ -31,6 +32,7 @@ struct Kernels {
         grain = try load("grain")
         lightnessGuide = try load("lightnessGuide")
         localTone = try load("localTone")
+        mirroredEdges = try CIWarpKernel(functionName: "mirroredEdges", fromMetalLibraryData: data)
     }
 
     func run(_ kernel: CIColorKernel, _ extent: CGRect, _ arguments: [Any]) throws -> CIImage {

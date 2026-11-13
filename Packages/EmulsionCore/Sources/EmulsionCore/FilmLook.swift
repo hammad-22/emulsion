@@ -13,13 +13,19 @@ public enum FilmLook {
             fatalError("The bundled default stock is unusable: \(error.developerDescription)")
         }
     }()
-    /// Halation threshold in scene-linear luminance (~+3.5 stops over mid-gray).
-    public static let halationThreshold = 2.0
-    /// Halation: a tight core plus a soft skirt, radii as fractions of the long edge.
-    public static let halationRadius = 0.004
-    public static let halationSkirt = 0.016
-    /// Share of halation energy in the tight core; the rest goes to the soft skirt.
-    public static let halationCoreShare = 0.55
+    /// Width of the assumed frame: the full-aperture 35 mm camera gate, 0.980 in. The image's long
+    /// edge maps to it. Other gauges are MOV-31.
+    static let frameWidthMillimetres = 24.89
+    /// Film base thickness. Estimated: a typical triacetate camera-film base; the VISION3 sheets
+    /// do not state it.
+    static let baseThicknessMicrometres = 140.0
+    /// Share of diffuse light entering a base of index 1.48 that its back surface returns to the
+    /// emulsion (Fresnel plus total internal reflection), derived in `Tools/halation-kernel`
+    /// (`geometry.returned_fraction`).
+    static let halationReturnFraction = 0.584
+    /// Green layer's share of the red layer's halation. Estimated: the green layer sits above the
+    /// red one, so the returning light reaches it second.
+    static let halationGreenShare = 0.25
     /// Grain cell size as a fraction of the long edge (≈1.7 px at 4032).
     public static let grainCell = 1.0 / 2400
     /// Printer points per unit of the Warmth/Tint controls (log10 print exposure).

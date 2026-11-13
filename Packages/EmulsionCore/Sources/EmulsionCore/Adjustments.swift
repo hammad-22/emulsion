@@ -15,6 +15,8 @@ public struct Adjustments: Codable, Equatable, Sendable {
     /// Texture (0 … 1).
     public var grain: Double = 0.35
     public var halation: Double = 0.35
+    /// What stops halation at the back of the negative.
+    public var backing: AntihalationBacking = .remJet
     /// Grain pattern seed, fixed per photo so re-renders and exports match.
     public var seed: Double = 0
     /// RAW white balance, applied when the photo is developed (nil: as shot); the printer lights
@@ -58,6 +60,7 @@ extension Adjustments {
         try decode(.shadows, into: &shadows)
         try decode(.grain, into: &grain)
         try decode(.halation, into: &halation)
+        try decode(.backing, into: &backing)
         try decode(.seed, into: &seed)
         try decode(.whiteBalance, into: &whiteBalance)
     }

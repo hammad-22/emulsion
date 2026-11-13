@@ -94,9 +94,9 @@ struct DisplayReferredTests {
         }
     }
 
-    /// Display white is estimated as a +4-stop light, above the halation threshold, so a clipped
-    /// white in a photo still glows (as `HalationTests` does for scene light). Measured just
-    /// outside the disc: +(10.1, 4.0, 1.5) codes; far away: 0.
+    /// Display white is estimated as a +4-stop light, so a clipped white in a photo still glows (as
+    /// `HalationTests` does for scene light), here without a backing. Measured just outside the
+    /// disc: +(21.2, 8.1, 0.7) codes; far away: 0.
     @Test func clippedHighlightsInAPhotoStillGlow() throws {
         let size = 400
         let picture = Fixtures.image(width: size, height: size, space: DisplayFixtures.displayP3) { x, y in
@@ -104,7 +104,7 @@ struct DisplayReferredTests {
         }
         let negative = try developed(picture)
         var on = Adjustments.neutral
-        on.halation = 1
+        (on.halation, on.backing) = (1, .none)
         let with = EmulsionTestCase.codes(try renderer.render(negative, on))
         let without = EmulsionTestCase.codes(try renderer.render(negative, .neutral))
         let ring = EmulsionTestCase.pixel(x: 214, y: 200, width: size)  // ~8 px outside the disc edge

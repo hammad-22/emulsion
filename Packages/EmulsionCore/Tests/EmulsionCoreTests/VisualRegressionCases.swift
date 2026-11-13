@@ -59,6 +59,8 @@ extension RegressionCase {
         return [
             RegressionCase(name: "highlight-point.halation", scene: highlight, adjustments: adjust { $0.halation = 1 }),
             RegressionCase(
+                name: "highlight-point.halation-unbacked", scene: highlight, adjustments: adjust { ($0.halation, $0.backing) = (1, .none) }),
+            RegressionCase(
                 name: "highlight-point.halation-exposed", scene: highlight, adjustments: adjust { ($0.exposure, $0.halation) = (1.5, 0.35) }
             ),
             RegressionCase(
