@@ -57,8 +57,10 @@ struct RAWDecoderTests {
             let kept = try decoder.negative(whiteBalance: whiteBalance)
             let fresh = try Self.developer.develop(data, maxDimension: maxDimension, whiteBalance: whiteBalance)
             let difference = Self.worstDifference(kept.image, fresh.image)
-            // Exact at every white balance; as shot again is within the return tolerance.
-            #expect(difference <= Self.backToAsShotTolerance, "white balance \(String(describing: whiteBalance)): \(difference)")
+            // Exact at every white balance; as shot again is within the return tolerance, which
+            // the exposure anchor scales with every value.
+            let tolerance = Self.backToAsShotTolerance * pow(2, kept.exposureAnchorStops)
+            #expect(difference <= tolerance, "white balance \(String(describing: whiteBalance)): \(difference)")
             if whiteBalance != nil { #expect(difference == 0, "white balance \(String(describing: whiteBalance))") }
             #expect(kept.exposureAnchorStops == fresh.exposureAnchorStops)
             #expect(kept.asShotWhiteBalance == fresh.asShotWhiteBalance)
