@@ -24,6 +24,7 @@ struct LibraryScreen: View {
                     .accessibilityLabel(
                         Text("Photo \(index + 1), \(photo.created, format: .dateTime.day().month().year().hour().minute())")
                     )
+                    .accessibilityValue(photo.isEdited ? Text("Edited") : Text(""))
                     .tag(photo.id)
                 }
             }

@@ -44,6 +44,32 @@ final class AccessibilityUITests: XCTestCase {
         recipe.tap()
     }
 
+    /// Camera → library → editor → Looks at the default text size, keeping a screenshot and
+    /// the spoken elements of each screen. Run with Reduce Transparency or Reduce Motion set
+    /// on the simulator for those proofs.
+    @MainActor
+    func testWalkthroughKeepsSpokenElements() throws {
+        let camera = XCUIApplication()
+        camera.launch()
+        XCTAssertTrue(camera.buttons["Take Photo"].waitForExistence(timeout: 10))
+        sleep(1)
+        try keepProof(camera, named: "Walkthrough 1 camera")
+        camera.terminate()
+
+        let app = try launchSamples([])
+        defer { removeSamples(app) }
+        sleep(2)
+        try keepProof(app, named: "Walkthrough 2 library")
+        let ruler = try openAdjustments(app)
+        XCTAssertEqual(ruler.value as? String, "0.0 EV")
+        try keepProof(app, named: "Walkthrough 3 editor")
+        try app.audit([.sufficientElementDescription, .trait, .hitRegion, .contrast])
+        app.buttons["Looks"].tap()
+        XCTAssertTrue(app.navigationBars["Looks"].waitForExistence(timeout: 5))
+        sleep(1)
+        try keepProof(app, named: "Walkthrough 4 looks")
+    }
+
     /// The editor's toolbar and adjustment panel at the largest text size: every control stays
     /// labelled and reachable.
     @MainActor

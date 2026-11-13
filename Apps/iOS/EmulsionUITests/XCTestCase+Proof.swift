@@ -16,7 +16,8 @@ extension XCTestCase {
 
     /// Keeps a screenshot and, beside it, what assistive technology is given for the screen in
     /// reading order: each labelled element's role, label, value and state. A record of the
-    /// accessibility tree, not of a person using VoiceOver.
+    /// accessibility tree (containers and their children both appear), not of a person using
+    /// VoiceOver.
     @MainActor
     func keepProof(_ app: XCUIApplication, named name: String) throws {
         keepScreenshot(app, named: name)
@@ -26,7 +27,7 @@ extension XCTestCase {
                 let value = (element.value as? String).flatMap { $0.isEmpty ? nil : ", value \"\($0)\"" } ?? ""
                 let state = (element.isSelected ? ", selected" : "") + (element.isEnabled ? "" : ", dimmed")
                 let line = "\(Self.role(element.elementType)) \"\(element.label)\"\(value)\(state)"
-                if lines.last != line { lines.append(line) }
+                lines.append(line)
             }
             element.children.forEach(visit)
         }
