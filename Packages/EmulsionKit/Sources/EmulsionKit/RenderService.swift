@@ -26,16 +26,21 @@ public actor RenderService {
     /// Preview sizes are rounded up to this step, so resizes (iPhone Duo fold/unfold, Mac
     /// windows) reuse a cached develop instead of decoding the RAW again for every size.
     private let previewSizeStep: CGFloat = 256
-    /// Each file's exposure anchor from its first develop, so later develops (other sizes, white
-    /// balances, export) skip measuring it. In memory only; keeping it on the photo record is a follow-up.
-    private var exposureAnchors: [URL: Double] = [:]
+    /// Each file's exposure anchor, restored from its photo record or measured on its first develop,
+    /// so later develops (other sizes, white balances, export, relaunches) skip measuring it while
+    /// the file is unchanged. Outside the actor so `PhotoStore` can restore anchors before the first render.
+    private nonisolated let exposureAnchors = Mutex<[URL: StoredExposureAnchor]>([:])
+    /// Each anchor the service measures, in order, for the photo store to save (MOV-141). One
+    /// consumer: the app has one photo store.
+    nonisolated let measuredExposureAnchors: AsyncStream<(URL, StoredExposureAnchor)>
+    private nonisolated let measuredExposureAnchor: AsyncStream<(URL, StoredExposureAnchor)>.Continuation
     /// The photo open in the editor, set from the main actor before its first render is asked for.
     private nonisolated let openPhoto = Mutex<URL?>(nil)
     /// The open photo's RAW decoder, kept so a white balance drag renders each step without
     /// reading or decoding the file again (MOV-137). Only ever one: it holds the file's bytes and
     /// Apple's decode. `maxDimension` is the largest preview asked for so far; smaller ones are
-    /// resized from it.
-    /// A nil decoder records that the open photo isn't RAW, so its file isn't read to find out again.
+    /// resized from it. A nil decoder records that the open photo isn't RAW, so its file isn't
+    /// read to find out again.
     private var openDecoder: (url: URL, maxDimension: CGFloat, decoder: RAWDecoder?)?
     private nonisolated let thumbnails: ThumbnailCache
     private nonisolated let latestRenders: LatestRenderCache
@@ -49,7 +54,11 @@ public actor RenderService {
         self.renderer = renderer
         self.thumbnails = thumbnails
         self.latestRenders = latestRenders
+        (measuredExposureAnchors, measuredExposureAnchor) = AsyncStream.makeStream()
     }
+
+    /// Ends the photo store's wait for anchors.
+    deinit { measuredExposureAnchor.finish() }
 
     private func engine() throws -> Renderer {
         if let renderer { return renderer }
@@ -183,14 +192,15 @@ public actor RenderService {
         return try renderer.export(renderer.render(full, adjustments), format: format)
     }
 
-    /// Reads and develops the file with its exposure anchor, measuring and remembering it the
-    /// first time; the anchor is measured as shot, so a white balance change reuses it.
+    /// Reads and develops the file with its exposure anchor; the anchor is measured as shot, so
+    /// a white balance change reuses it.
     private func develop(_ url: URL, maxDimension: CGFloat?, whiteBalance: CameraWhiteBalance?) throws -> Negative {
+        let known = knownExposureAnchor(url)
         let developed = try engine().developer.develop(
-            Self.contents(of: url), maxDimension: maxDimension, whiteBalance: whiteBalance,
-            exposureAnchorStops: exposureAnchors[url])
+            Self.contents(of: url), maxDimension: maxDimension, whiteBalance: whiteBalance, exposureAnchorStops: known)
         fileReadCount += 1
-        exposureAnchors[url] = developed.exposureAnchorStops
+        // Only RAW has an anchor (non-RAW develops report no as-shot white balance).
+        if known == nil, developed.asShotWhiteBalance != nil { remember(developed.exposureAnchorStops, for: url) }
         return developed
     }
 
@@ -202,18 +212,38 @@ public actor RenderService {
         if let kept = openDecoder, kept.url != open || (kept.url == url && kept.maxDimension < maxDimension) { openDecoder = nil }
         guard open == url else { return nil }
         if let kept = openDecoder { return kept.decoder }
-        let decoder = try engine().developer.rawDecoder(
-            Self.contents(of: url), maxDimension: maxDimension, exposureAnchorStops: exposureAnchors[url])
+        let known = knownExposureAnchor(url)
+        let decoder = try engine().developer.rawDecoder(Self.contents(of: url), maxDimension: maxDimension, exposureAnchorStops: known)
         fileReadCount += 1
         openDecoder = (url, decoder == nil ? .infinity : maxDimension, decoder)
-        if let decoder { exposureAnchors[url] = decoder.exposureAnchorStops }
+        if let decoder, known == nil { remember(decoder.exposureAnchorStops, for: url) }
         return decoder
+    }
+
+    /// The anchor known for the file as it is now (restored or measured), or nil to measure it.
+    private func knownExposureAnchor(_ url: URL) -> Double? {
+        let source = StoredExposureAnchor.Source(url)
+        return exposureAnchors.withLock { $0[url] }.flatMap { $0.source == source ? $0.stops : nil }
+    }
+
+    /// Remembers a measured anchor and reports it for the photo store to save (MOV-141).
+    private func remember(_ stops: Double, for url: URL) {
+        guard let source = StoredExposureAnchor.Source(url) else { return }
+        exposureAnchorMeasurements += 1
+        let anchor = StoredExposureAnchor(stops: stops, source: source)
+        exposureAnchors.withLock { $0[url] = anchor }
+        measuredExposureAnchor.yield((url, anchor))
     }
 
     /// The file's bytes, mapped where that's safe: a kept decoder holds them for as long as the
     /// editor is open, and mapped pages can be dropped and read back instead of staying in memory.
     private static func contents(of url: URL) throws -> Data {
         try Data(contentsOf: url, options: .mappedIfSafe)
+    }
+
+    /// Develops `url` with a saved anchor instead of measuring it, while the file still matches.
+    nonisolated func restoreExposureAnchor(_ anchor: StoredExposureAnchor, for url: URL) {
+        exposureAnchors.withLock { $0[url] = anchor }
     }
 
     /// Marks the photo open in the editor: its RAW decoder is kept from its next develop, so
@@ -243,7 +273,7 @@ public actor RenderService {
     /// Drops every cached preview, the exposure anchor and a kept decoder of a photo (after it's
     /// deleted or its source changes).
     public func forget(_ url: URL) {
-        exposureAnchors[url] = nil
+        exposureAnchors.withLock { $0[url] = nil }
         if openDecoder?.url == url { openDecoder = nil }
         let prefix = url.absoluteString + "@"
         for key in previews.keys where key.hasPrefix(prefix) { previews[key] = nil }
@@ -260,6 +290,8 @@ public actor RenderService {
     private(set) var fileReadCount = 0
     /// The photo whose RAW decoder is kept; for tests.
     var keptDecoderURL: URL? { openDecoder?.decoder == nil ? nil : openDecoder?.url }
+    /// RAW develops that had no anchor to reuse and measured one; for tests.
+    private(set) var exposureAnchorMeasurements = 0
     /// The file's remembered exposure anchor; for tests.
-    func exposureAnchor(_ url: URL) -> Double? { exposureAnchors[url] }
+    nonisolated func exposureAnchor(_ url: URL) -> Double? { exposureAnchors.withLock { $0[url]?.stops } }
 }

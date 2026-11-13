@@ -112,9 +112,9 @@ extension RenderServiceTests {
         let service = library.renderService
         let fresh = { TestLibrary().renderService }
 
-        #expect(await service.exposureAnchor(url) == nil)
+        #expect(service.exposureAnchor(url) == nil)
         _ = try await service.image(url, .init(), maxDimension: 256)
-        let anchor = try #require(await service.exposureAnchor(url))
+        let anchor = try #require(service.exposureAnchor(url))
         #expect(anchor != 0)
 
         let reused = try await service.image(url, .init(), maxDimension: 512)
@@ -123,10 +123,10 @@ extension RenderServiceTests {
         let exported = try await service.export(url, .init(), format: .jpeg)
         let exportedFresh = try await fresh().export(url, .init(), format: .jpeg)
         #expect(TestPixels.rgba(try Self.decoded(exported)) == TestPixels.rgba(try Self.decoded(exportedFresh)))
-        #expect(await service.exposureAnchor(url) == anchor)
+        #expect(service.exposureAnchor(url) == anchor)
 
         await service.forget(url)
-        #expect(await service.exposureAnchor(url) == nil)
+        #expect(service.exposureAnchor(url) == nil)
     }
 
     private static func decoded(_ data: Data) throws -> CGImage {
@@ -201,11 +201,11 @@ extension RenderServiceTests {
         let service = library.renderService
 
         _ = try await service.image(url, .neutral, maxDimension: 512)
-        let anchor = try #require(await service.exposureAnchor(url))
+        let anchor = try #require(service.exposureAnchor(url))
         #expect(anchor != 0)
         let reused = try await service.image(url, Self.tungstenWhiteBalance, maxDimension: 512)
         #expect(await service.developCount == 2, "the white balance developed again")
-        #expect(await service.exposureAnchor(url) == anchor)
+        #expect(service.exposureAnchor(url) == anchor)
         let measured = try await TestLibrary().renderService.image(url, Self.tungstenWhiteBalance, maxDimension: 512)
         #expect(TestPixels.rgba(reused) == TestPixels.rgba(measured))
     }
@@ -266,10 +266,11 @@ extension RenderServiceTests {
         service.open(url)
 
         _ = try await service.image(url, .neutral, maxDimension: 512)
-        let anchor = try #require(await service.exposureAnchor(url))
+        let anchor = try #require(service.exposureAnchor(url))
         #expect(anchor != 0)
         _ = try await service.image(url, Self.tungstenWhiteBalance, maxDimension: 512)
-        #expect(await service.exposureAnchor(url) == anchor)
+        #expect(service.exposureAnchor(url) == anchor)
+        #expect(await service.exposureAnchorMeasurements == 1, "measured once and reported for the record (MOV-141)")
 
         let exported = try await service.export(url, Self.tungstenWhiteBalance, format: .jpeg)
         let exportedFresh = try await TestLibrary().renderService.export(url, Self.tungstenWhiteBalance, format: .jpeg)
