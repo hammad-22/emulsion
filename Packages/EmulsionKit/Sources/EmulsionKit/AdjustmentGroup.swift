@@ -34,7 +34,7 @@ public enum AdjustmentGroup: String, CaseIterable, Identifiable, Sendable {
     /// The one control whose value differs between two edits, or nil when none or several
     /// do (Reset Edits): a ruler move changes exactly one.
     public static func changedControl(
-        from old: Adjustments, to new: Adjustments, whiteBalanceAsShot asShot: CameraWhiteBalance? = nil
+        from old: Adjustments, to new: Adjustments, whiteBalanceAsShot asShot: CameraWhiteBalance?
     ) -> (group: AdjustmentGroup, control: AdjustmentControl.ID)? {
         let changed = allCases.flatMap { group in
             group.controls(whiteBalanceAsShot: asShot)
@@ -44,7 +44,7 @@ public enum AdjustmentGroup: String, CaseIterable, Identifiable, Sendable {
     }
 
     /// The group's controls. White balance has none without the photo's as-shot white balance.
-    public func controls(whiteBalanceAsShot asShot: CameraWhiteBalance? = nil) -> [AdjustmentControl] {
+    public func controls(whiteBalanceAsShot asShot: CameraWhiteBalance?) -> [AdjustmentControl] {
         switch self {
         case .whiteBalance:
             guard let asShot = asShot?.clamped() else { return [] }
@@ -112,6 +112,9 @@ public struct AdjustmentControl: Identifiable {
         }
     }
 
+    private static let signedInteger = FloatingPointFormatStyle<Double>.number.precision(.fractionLength(0))
+        .sign(strategy: .always(includingZero: false))
+
     /// Kelvin readouts are rounded to this: finer digits would suggest a precision the as-shot
     /// estimate doesn't have.
     private static let kelvinRounding = 10.0
@@ -129,15 +132,14 @@ public struct AdjustmentControl: Identifiable {
 
     /// The value with a sign, e.g. "+0.7 EV" or "-35"; a temperature in kelvin, e.g. "5,600 K".
     public func formatted(_ value: Double) -> String {
-        let signed = FloatingPointFormatStyle<Double>.number.precision(.fractionLength(0)).sign(strategy: .always(includingZero: false))
         switch unit {
         case .temperature:
             return String(localized: "\(roundedKelvin(value)) K", bundle: .module, comment: "Colour temperature in kelvin, e.g. 5,600 K")
-        case .whiteBalanceTint: return value.formatted(signed)
+        case .whiteBalanceTint: return value.formatted(Self.signedInteger)
         case .stops:
             let stops = value.formatted(.number.precision(.fractionLength(1)).sign(strategy: .always(includingZero: false)))
             return String(localized: "\(stops) EV", bundle: .module, comment: "Exposure in stops, e.g. +0.7 EV")
-        case .amount: return (value * 100).formatted(signed)
+        case .amount: return (value * 100).formatted(Self.signedInteger)
         }
     }
 }

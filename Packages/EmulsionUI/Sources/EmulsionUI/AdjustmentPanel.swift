@@ -25,24 +25,23 @@ public struct AdjustmentPanel: View {
     /// The selected group, or Light while this photo doesn't have it (White Balance on a photo
     /// that isn't RAW, or whose as-shot white balance is still being read).
     private var group: AdjustmentGroup { groups.contains(selectedGroup) ? selectedGroup : .light }
-    private var controls: [AdjustmentControl] { group.controls(whiteBalanceAsShot: whiteBalanceAsShot) }
-
-    private var selectedControl: AdjustmentControl {
-        controls.first { $0.id == selectedControls[group] } ?? controls[0]
-    }
 
     public var body: some View {
+        // Built once per update: this body runs on every ruler step.
+        let group = group
+        let controls = group.controls(whiteBalanceAsShot: whiteBalanceAsShot)
+        let selectedControl = controls.first { $0.id == selectedControls[group] } ?? controls[0]
         VStack(spacing: FilmLabLayout.compact) {
-            header
+            header(group, selectedControl)
             AdjustmentRuler(control: selectedControl, adjustments: $adjustments)
-            controlPicker
+            controlPicker(group, controls, selectedControl)
         }
         .padding(FilmLabLayout.inset)
         .glassEffect(.regular, in: .rect(cornerRadius: FilmLabLayout.panelCorner))
         .sensoryFeedback(.selection, trigger: selectedControl.id)
     }
 
-    private var header: some View {
+    private func header(_ group: AdjustmentGroup, _ selectedControl: AdjustmentControl) -> some View {
         HStack {
             Menu {
                 Picker("Adjustments", selection: $selectedGroup) {
@@ -69,7 +68,9 @@ public struct AdjustmentPanel: View {
         }
     }
 
-    private var controlPicker: some View {
+    private func controlPicker(_ group: AdjustmentGroup, _ controls: [AdjustmentControl], _ selectedControl: AdjustmentControl)
+        -> some View
+    {
         ScrollView(.horizontal) {
             HStack(spacing: FilmLabLayout.compact) {
                 ForEach(controls) { control in

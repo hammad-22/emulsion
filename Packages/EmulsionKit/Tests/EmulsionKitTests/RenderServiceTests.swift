@@ -137,9 +137,11 @@ extension RenderServiceTests {
 // MARK: RAW white balance (MOV-10)
 
 extension RenderServiceTests {
-    static var tungstenWhiteBalance: Adjustments {
+    static var tungstenWhiteBalance: Adjustments { whiteBalance(SyntheticDNG.illuminantAKelvin) }
+
+    static func whiteBalance(_ kelvin: Double, tint: Double = 0) -> Adjustments {
         var adjustments = Adjustments.neutral
-        adjustments.whiteBalance = CameraWhiteBalance(temperature: SyntheticDNG.illuminantAKelvin, tint: 0)
+        adjustments.whiteBalance = CameraWhiteBalance(temperature: kelvin, tint: tint)
         return adjustments
     }
 
@@ -229,12 +231,6 @@ extension RenderServiceTests {
 // MARK: Interactive RAW white balance (MOV-137)
 
 extension RenderServiceTests {
-    private static func whiteBalance(_ kelvin: Double, tint: Double = 0) -> Adjustments {
-        var adjustments = Adjustments.neutral
-        adjustments.whiteBalance = CameraWhiteBalance(temperature: kelvin, tint: tint)
-        return adjustments
-    }
-
     /// Each step of a white balance drag on the open photo matches a develop from the file
     /// (a service that hasn't opened it), without reading the file again.
     @Test func theOpenPhotoChangesWhiteBalanceWithoutReadingTheFileAgain() async throws {
@@ -358,7 +354,7 @@ extension RenderServiceTests {
         let service = library.renderService
 
         let asShot = try #require(await service.asShotWhiteBalance(raw))
-        #expect(abs(asShot.temperature - 6504) < 15, "tagged D65; Apple reads 6502 K (MOV-10)")
+        #expect(abs(asShot.temperature - TestRAW.taggedKelvin) < TestRAW.asShotTemperatureTolerance)
         #expect(await service.asShotWhiteBalance(jpeg) == nil)
         #expect(await service.asShotWhiteBalance(library.folder.appending(path: "missing.dng")) == nil)
         #expect(await service.fileReadCount == 0, "reading it doesn't develop the photo")

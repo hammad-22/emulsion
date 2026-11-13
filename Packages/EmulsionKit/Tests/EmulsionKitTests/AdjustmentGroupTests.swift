@@ -8,7 +8,7 @@ struct AdjustmentGroupTests {
         // Every Double the engine reads except the seed should have a slider; a new one
         // added to Adjustments fails here until it gets one.
         let editable = Mirror(reflecting: Adjustments()).children.filter { $0.value is Double && $0.label != "seed" }
-        let controls = AdjustmentGroup.allCases.flatMap { $0.controls() }
+        let controls = AdjustmentGroup.allCases.flatMap { $0.controls(whiteBalanceAsShot: nil) }
         #expect(controls.count == editable.count)
         #expect(Set(controls.map(\.keyPath)).count == controls.count)
         var probe = Adjustments()
@@ -19,13 +19,13 @@ struct AdjustmentGroupTests {
 
     @Test func defaultsSitInsideTheirRanges() {
         let defaults = Adjustments()
-        for control in AdjustmentGroup.allCases.flatMap({ $0.controls() }) {
+        for control in AdjustmentGroup.allCases.flatMap({ $0.controls(whiteBalanceAsShot: nil) }) {
             #expect(control.range.contains(defaults[keyPath: control.keyPath]), "\(control.title)")
         }
     }
 
     @Test func rangesMatchWhatTheEngineClampsTo() {
-        for control in AdjustmentGroup.allCases.flatMap({ $0.controls() }) {
+        for control in AdjustmentGroup.allCases.flatMap({ $0.controls(whiteBalanceAsShot: nil) }) {
             var low = Adjustments()
             low[keyPath: control.keyPath] = -100
             var high = Adjustments()
@@ -36,10 +36,10 @@ struct AdjustmentGroupTests {
     }
 
     @Test func valuesShowWithSignAndUnit() {
-        let exposure = AdjustmentGroup.light.controls()[0]
+        let exposure = AdjustmentGroup.light.controls(whiteBalanceAsShot: nil)[0]
         #expect(exposure.formatted(0.7) == "+0.7 EV")
         #expect(exposure.formatted(0) == "0.0 EV")
-        let warmth = AdjustmentGroup.color.controls()[0]
+        let warmth = AdjustmentGroup.color.controls(whiteBalanceAsShot: nil)[0]
         #expect(warmth.formatted(-0.35) == "-35")
     }
 
@@ -58,8 +58,8 @@ struct AdjustmentGroupTests {
         var edited = Adjustments()
         edited.exposure = 1
         edited.grain = 0.9
-        #expect(AdjustmentGroup.changedControl(from: edited, to: Adjustments()) == nil, "a reset changes several")
-        #expect(AdjustmentGroup.changedControl(from: edited, to: edited) == nil)
+        #expect(AdjustmentGroup.changedControl(from: edited, to: Adjustments(), whiteBalanceAsShot: nil) == nil, "a reset changes several")
+        #expect(AdjustmentGroup.changedControl(from: edited, to: edited, whiteBalanceAsShot: nil) == nil)
     }
 }
 
@@ -77,7 +77,7 @@ extension AdjustmentGroupTests {
     @Test func onlyAPhotoWithAnAsShotWhiteBalanceHasTheGroup() {
         #expect(AdjustmentGroup.available(whiteBalanceAsShot: nil) == [.light, .color, .texture])
         #expect(AdjustmentGroup.available(whiteBalanceAsShot: Self.asShot) == [.light, .whiteBalance, .color, .texture])
-        #expect(AdjustmentGroup.whiteBalance.controls().isEmpty)
+        #expect(AdjustmentGroup.whiteBalance.controls(whiteBalanceAsShot: nil).isEmpty)
     }
 
     @Test func whiteBalanceRulersRestAtAsShot() throws {

@@ -65,14 +65,9 @@ public actor RenderService {
             return cached.negative
         }
         let renderer = try engine()
-        let open = openPhoto.withLock { $0 }
-        // Only the open photo's decoder is held, and it's released before a file is read for
-        // another: never two files' decodes at once.
-        if let kept = openDecoder, kept.url != open || (kept.url == url && kept.maxDimension < maxDimension) { openDecoder = nil }
-        let kept = open == url ? openDecoder?.decoder : nil
         let developed =
-            try kept?.negative(whiteBalance: whiteBalance)
-            ?? develop(url, maxDimension: maxDimension, whiteBalance: whiteBalance, keepsDecoder: open == url)
+            try openDecoder(for: url, maxDimension: maxDimension)?.negative(whiteBalance: whiteBalance)
+            ?? develop(url, maxDimension: maxDimension, whiteBalance: whiteBalance)
         developCount += 1
         // Draft RAW decode may come back larger than asked; fit it exactly. Then render it
         // once into a half-float buffer, so slider moves don't redo the RAW develop or the
@@ -186,25 +181,38 @@ public actor RenderService {
 
     /// Reads and develops the file with its exposure anchor, measuring and remembering it the
     /// first time; the anchor is measured as shot, so a white balance change reuses it.
-    /// `keepsDecoder` keeps a RAW file's decoder as the open photo's, for its later white balances.
-    private func develop(
-        _ url: URL, maxDimension: CGFloat?, whiteBalance: CameraWhiteBalance?, keepsDecoder: Bool = false
-    ) throws -> Negative {
-        let developer = try engine().developer
-        let data = try Data(contentsOf: url)
+    private func develop(_ url: URL, maxDimension: CGFloat?, whiteBalance: CameraWhiteBalance?) throws -> Negative {
+        let developed = try engine().developer.develop(
+            Self.contents(of: url), maxDimension: maxDimension, whiteBalance: whiteBalance,
+            exposureAnchorStops: exposureAnchors[url])
         fileReadCount += 1
-        let developed: Negative
-        if keepsDecoder, let maxDimension,
-            let decoder = developer.rawDecoder(data, maxDimension: maxDimension, exposureAnchorStops: exposureAnchors[url])
-        {
-            openDecoder = (url, maxDimension, decoder)
-            developed = try decoder.negative(whiteBalance: whiteBalance)
-        } else {
-            developed = try developer.develop(
-                data, maxDimension: maxDimension, whiteBalance: whiteBalance, exposureAnchorStops: exposureAnchors[url])
-        }
         exposureAnchors[url] = developed.exposureAnchorStops
         return developed
+    }
+
+    /// The open photo's decoder, large enough for `maxDimension`: the kept one, or a new one made
+    /// by reading the file. Nil when `url` isn't the open photo or isn't RAW. A kept decoder that
+    /// is too small or no longer the open photo's is released first, so two files' decodes are
+    /// never held at once.
+    private func openDecoder(for url: URL, maxDimension: CGFloat) throws -> RAWDecoder? {
+        let open = openPhoto.withLock { $0 }
+        if let kept = openDecoder, kept.url != open || (kept.url == url && kept.maxDimension < maxDimension) { openDecoder = nil }
+        guard open == url else { return nil }
+        if let kept = openDecoder { return kept.decoder }
+        guard
+            let decoder = try engine().developer.rawDecoder(
+                Self.contents(of: url), maxDimension: maxDimension, exposureAnchorStops: exposureAnchors[url])
+        else { return nil }
+        fileReadCount += 1
+        exposureAnchors[url] = decoder.exposureAnchorStops
+        openDecoder = (url, maxDimension, decoder)
+        return decoder
+    }
+
+    /// The file's bytes, mapped where that's safe: a kept decoder holds them for as long as the
+    /// editor is open, and mapped pages can be dropped and read back instead of staying in memory.
+    private static func contents(of url: URL) throws -> Data {
+        try Data(contentsOf: url, options: .mappedIfSafe)
     }
 
     /// Marks the photo open in the editor: its RAW decoder is kept from its next develop, so
@@ -228,7 +236,7 @@ public actor RenderService {
     /// The white balance a RAW photo was shot at, read from the file without developing it; nil
     /// when it isn't RAW or can't be read. Runs off this actor, so it never waits behind a render.
     @concurrent public nonisolated func asShotWhiteBalance(_ url: URL) async -> CameraWhiteBalance? {
-        (try? Data(contentsOf: url, options: .mappedIfSafe)).flatMap(Developer.asShotWhiteBalance(of:))
+        (try? Self.contents(of: url)).flatMap(Developer.asShotWhiteBalance(of:))
     }
 
     /// Drops every cached preview, the exposure anchor and a kept decoder of a photo (after it's
@@ -247,7 +255,7 @@ public actor RenderService {
     var cachedPreviewKeys: [String] { lruKeys }
     /// Previews developed so far, cache misses; for tests.
     private(set) var developCount = 0
-    /// Times a file was read and decoded to develop a preview or an export; for tests.
+    /// Times a file was read to develop a preview or an export, or to make a decoder; for tests.
     private(set) var fileReadCount = 0
     /// The photo whose RAW decoder is kept; for tests.
     var keptDecoderURL: URL? { openDecoder?.url }

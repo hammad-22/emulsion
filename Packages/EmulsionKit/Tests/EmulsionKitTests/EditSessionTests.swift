@@ -79,8 +79,7 @@ struct EditSessionTests {
         await jpeg.readAsShotWhiteBalance()
 
         let asShot = try #require(raw.asShotWhiteBalance)
-        // The file is tagged D65 (6504 K); Apple reads 6502 K (MOV-10).
-        #expect(abs(asShot.temperature - 6504) < 15)
+        #expect(abs(asShot.temperature - TestRAW.taggedKelvin) < TestRAW.asShotTemperatureTolerance)
         #expect(jpeg.asShotWhiteBalance == nil, "white balance doesn't apply to a photo that isn't RAW")
     }
 
@@ -108,12 +107,14 @@ struct EditSessionTests {
         _ = try await service.image(session.url, session.adjustments, maxDimension: 900)
         #expect(await service.keptDecoderURL == session.url)
 
+        session.save()
+        session.adjustments.exposure = 1
+        _ = try await service.image(session.url, session.adjustments, maxDimension: 900)
+        #expect(await service.keptDecoderURL == session.url, "saving (the Mac window going inactive) keeps it")
+
         session.close()
         await service.close(session.url).value
         #expect(await service.keptDecoderURL == nil)
-
-        session.adjustments.exposure = 1
-        _ = try await service.image(session.url, session.adjustments, maxDimension: 1200)
-        #expect(await service.keptDecoderURL == session.url, "an editor that closed to save and carried on is open again")
+        #expect(library.store.photo(photo.id)?.adjustments.exposure == 1)
     }
 }

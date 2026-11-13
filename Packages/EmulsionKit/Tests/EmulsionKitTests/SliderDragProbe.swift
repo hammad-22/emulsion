@@ -18,7 +18,7 @@ struct SliderDragProbe {
     func updatesPerSecond(mosaic: SyntheticDNG.Mosaic) async throws {
         let library = TestLibrary()
         // 12 MP (4032 × 3024), with a gain table so the develop measures an exposure anchor.
-        let chart = PatchChart(RAWDevelopChart.scene, cell: 504)
+        let chart = RAWDevelopChart.chart(cell: 504)
         let raw = RAWDevelopChart.dng(mosaic, chart: chart, profile: SyntheticDNG.Profile(gainTableGain: 4))
         let photo = try await library.store.add(raw, fileExtension: "dng")
         let url = library.store.url(for: photo)
@@ -40,7 +40,7 @@ struct SliderDragProbe {
                         _ = try await service.image(url, adjustments, maxDimension: Self.previewPixels)
                     }
                 }
-                rates.append(Double(Self.steps) / Self.seconds(duration))
+                rates.append(Double(Self.steps) / (duration / .seconds(1)))
             }
             return rates.sorted()[Self.rounds / 2]
         }
@@ -58,10 +58,6 @@ struct SliderDragProbe {
             String(
                 format:
                     "12 MP %@, %d px preview: open %.0f ms; Warmth drag %.0f updates/s; white balance drag %.0f updates/s (%d file reads)",
-                "\(mosaic)", Int(Self.previewPixels), 1000 * Self.seconds(open), printerLights, whiteBalance, await service.fileReadCount))
-    }
-
-    private static func seconds(_ duration: Duration) -> Double {
-        Double(duration.components.seconds) + Double(duration.components.attoseconds) / 1e18
+                "\(mosaic)", Int(Self.previewPixels), open / .milliseconds(1), printerLights, whiteBalance, await service.fileReadCount))
     }
 }

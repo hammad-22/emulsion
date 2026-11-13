@@ -17,7 +17,7 @@ struct RAWDecoderTests {
             taggedLight: CameraWhiteBalanceTests.d65, baselineStops: 0.5, profile: SyntheticDNG.Profile(gainTableGain: 4))
     }
 
-    static let tungsten = CameraWhiteBalance(temperature: SyntheticDNG.illuminantAKelvin, tint: 0)
+    static let tungsten = CameraWhiteBalance(temperature: CameraWhiteBalanceTests.tungstenKelvin, tint: 0)
     static let whiteBalances: [CameraWhiteBalance?] = [
         nil, tungsten, CameraWhiteBalance(temperature: 4200, tint: 25), CameraWhiteBalance(temperature: 9000, tint: -40), nil,
     ]
@@ -58,9 +58,7 @@ struct RAWDecoderTests {
     }
 
     @Test func aPhotoThatIsNotRAWHasNoDecoderOrAsShotWhiteBalance() throws {
-        let jpeg = try #require(
-            CIContext(options: [.useSoftwareRenderer: true])
-                .jpegRepresentation(of: SceneFixtures.patches(), colorSpace: CGColorSpace(name: CGColorSpace.sRGB)!))
+        let jpeg = try EmulsionTestCase.sharedRenderer.export(SceneFixtures.flat(0.18, width: 64, height: 64), format: .jpeg)
         #expect(Self.developer.rawDecoder(jpeg) == nil)
         #expect(Developer.asShotWhiteBalance(of: jpeg) == nil)
     }

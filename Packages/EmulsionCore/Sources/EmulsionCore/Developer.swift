@@ -98,13 +98,13 @@ public struct Developer {
     /// decoder, so both give the same pixels (a preview that measures its anchor: within the
     /// draft tolerance). `maxDimension` and `exposureAnchorStops` as in `develop`.
     public func rawDecoder(_ data: Data, maxDimension: CGFloat? = nil, exposureAnchorStops: Double? = nil) -> RAWDecoder? {
-        guard exposureAnchorStops == nil, maxDimension != nil else {
+        if exposureAnchorStops != nil || maxDimension == nil {
             return rawDecoder(data, maxDimension: maxDimension, anchor: Self.anchorChoice(exposureAnchorStops))
         }
-        // Measuring the anchor leaves draft mode off (switching it on decodes the file again), and
-        // every develop of the kept decoder would then render the full-size decode: 3 to 4 times
-        // slower per white balance step on a 12 MP file (Mac, MOV-137). So the anchor is measured
-        // on one decoder and a second, in draft mode, is kept.
+        // A preview decoder that measured its anchor stays out of draft mode (switching it on
+        // decodes the file again) and renders every develop from the full-size decode: 3 to 4
+        // times slower per white balance step on 12 MP (Mac, MOV-137). So one decoder measures
+        // and a second, in draft mode, is kept.
         guard let measured = rawDecoder(data, maxDimension: ExposureAnchor.thumbnailLongEdge, anchor: .measured) else { return nil }
         return rawDecoder(data, maxDimension: maxDimension, anchor: .known(stops: measured.exposureAnchorStops))
     }

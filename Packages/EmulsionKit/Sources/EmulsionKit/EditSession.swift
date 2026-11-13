@@ -9,11 +9,7 @@ import Observation
 public final class EditSession {
     public let photo: PhotoRecord
     public var adjustments: Adjustments {
-        didSet {
-            // An editor that closed to save (the Mac window going inactive) and carried on.
-            store.renderService.open(url)
-            scheduleSave()
-        }
+        didSet { scheduleSave() }
     }
     /// The white balance a RAW photo was shot at, where its Temperature and Tint rulers rest;
     /// nil until `readAsShotWhiteBalance()` has read it, and for photos that aren't RAW.
@@ -53,12 +49,17 @@ public final class EditSession {
         adjustments = recipe.applying(to: adjustments)
     }
 
-    /// Writes any pending change now and lets go of the photo's RAW decoder. Call when the
-    /// editor goes away.
-    public func close() {
+    /// Writes any pending change now. Call when the editor may not come back (its window going
+    /// inactive, the app quitting).
+    public func save() {
         pendingSave?.cancel()
         pendingSave = nil
         store.update(photo.id, adjustments: adjustments)
+    }
+
+    /// Saves and lets go of the photo's RAW decoder. Call when the editor goes away.
+    public func close() {
+        save()
         store.renderService.close(url)
     }
 

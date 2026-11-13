@@ -44,11 +44,11 @@ struct PhotoEditor: View {
         .task { await session.readAsShotWhiteBalance() }
         .onDisappear { session.close() }
         .onChange(of: scenePhase) { _, phase in
-            if phase != .active { session.close() }
+            if phase != .active { session.save() }
         }
         // Quitting doesn't change the scene phase, so a pending edit is written here.
         .onReceive(NotificationCenter.default.publisher(for: NSApplication.willTerminateNotification)) { _ in
-            session.close()
+            session.save()
         }
     }
 }

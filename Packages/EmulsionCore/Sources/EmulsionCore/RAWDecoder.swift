@@ -10,7 +10,7 @@ public final class RAWDecoder {
     /// The file's own neutral, to return to as shot exactly (a temperature and tint read back
     /// from the filter are rounded).
     private let asShotNeutral: CGPoint
-    public let asShotWhiteBalance: CameraWhiteBalance
+    let asShotWhiteBalance: CameraWhiteBalance
     /// Measured or given once, as shot, when the decoder was made; the same at every white balance.
     public let exposureAnchorStops: Double
 
