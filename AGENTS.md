@@ -20,7 +20,7 @@ iOS 26 / macOS 26 only, iPhone 17 Pro and iPhone Duo as targets. Swift 6.4 toolc
 - `Packages/EmulsionUI/`: shared SwiftUI components (rendered photo, sliders, photo import).
 - `Apps/iOS/`: the iOS app (`Emulsion.xcodeproj`, sources in `Emulsion/`, UI walkthrough in `EmulsionUITests/`). Opens on the camera; the library and editor are behind it.
 - `Apps/macOS/`: minimal native Mac shell on the same packages (`Emulsion.xcodeproj`); library, edit and compare.
-- `Tools/`: `build-kernels.sh` rebuilds the metallibs; `make-sample-photos.swift` regenerates the bundled sample photos; `color-references/` generates the colour-science test references (offline Python, never shipped).
+- `Tools/`: `build-kernels.sh` rebuilds the metallibs; `make-sample-photos.swift` regenerates the bundled sample photos; `color-references/` generates the colour-science test references (offline Python, never shipped); `review-renders.sh` renders full-resolution before/after look reviews from local CC0 samples.
 
 ## Commands
 Run these yourself to verify every change. A change isn't done until they pass.

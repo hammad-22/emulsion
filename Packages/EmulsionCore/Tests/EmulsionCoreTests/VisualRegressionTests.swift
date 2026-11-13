@@ -67,6 +67,7 @@ struct VisualRegressionTests {
     func isolatedOutliersPassThePhotoLocalToneStructuralFloor(name: String) throws {
         let golden = try #require(VisualRegression.Store.repository.golden(name)).get()
         let outliers = 16
+        // 4.2% of full scale moves these pixels by about 4 ΔE00, the size of the CI outliers.
         let lift = UInt16(0.042 * RegressionImage.maxCode)
         var pixels = golden.pixels
         for i in stride(from: pixels.count / (2 * outliers), to: pixels.count, by: pixels.count / outliers) {

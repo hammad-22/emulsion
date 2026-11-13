@@ -1,7 +1,7 @@
 #!/bin/sh
 # Full-resolution before/after renders of the local CC0 samples, for look reviews (MOV-146).
 #   Tools/review-renders.sh [base-ref] [output-folder]
-# "before" is base-ref (default origin/main), built in a temporary worktree; "after" is this
+# "before" is base-ref (default origin/main, fetched first), built in a temporary worktree; "after" is this
 # checkout as it is, uncommitted changes included. Each sample gives
 # <sample>.<neutral|default>.<before|after>.jpg in the output folder (default
 # ~/Documents/Emulsion Review/renders/<base>-vs-<head>), so Quick Look can flip between a pair.
@@ -10,9 +10,10 @@
 set -eu
 root=$(CDPATH= cd -- "$(dirname -- "$0")/.." && pwd)
 base=${1:-origin/main}
+case "$base" in origin/*) git -C "$root" fetch --quiet origin ;; esac
 base_sha=$(git -C "$root" rev-parse --short "$base^{commit}")
 head_sha=$(git -C "$root" rev-parse --short HEAD)
-if ! git -C "$root" diff --quiet HEAD; then head_sha="$head_sha-dirty"; fi
+if [ -n "$(git -C "$root" status --porcelain)" ]; then head_sha="$head_sha-dirty"; fi
 out=${2:-"$HOME/Documents/Emulsion Review/renders/$base_sha-vs-$head_sha"}
 mkdir -p "$out"
 out=$(CDPATH= cd -- "$out" && pwd)

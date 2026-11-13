@@ -3,8 +3,8 @@ import Testing
 
 @testable import EmulsionCore
 
-/// Full-resolution renders of local CC0 samples for look reviews (MOV-146): each sample (file name
-/// containing `_CC0.`) under `EMULSION_REVIEW_SAMPLES` is developed at full size and written as a
+/// Full-resolution renders of local CC0 samples for look reviews (MOV-146): each sample (name ending
+/// in `_CC0.dng`, any case) under `EMULSION_REVIEW_SAMPLES` is developed at full size and written as a
 /// Display P3 JPEG, `<sample>.<look>.<label>.jpg`, into `EMULSION_REVIEW_DIR`. `Tools/review-renders.sh`
 /// runs this on two commits so the pairs sit side by side; never review a look on the frozen
 /// test scenes, which are 240 px. Opt-in, so CI and plain `swift test` skip it.
@@ -34,7 +34,7 @@ struct ReviewRenders {
     /// Only CC0 samples: their licence lets the renders be shared in a PR.
     static func samples() throws -> [URL] {
         try FileManager.default.contentsOfDirectory(at: samplesDirectory, includingPropertiesForKeys: nil)
-            .filter { $0.lastPathComponent.contains("_CC0.") && $0.pathExtension.lowercased() == "dng" }
+            .filter { $0.lastPathComponent.lowercased().hasSuffix("_cc0.dng") }
             .sorted { $0.lastPathComponent < $1.lastPathComponent }
     }
 

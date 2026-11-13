@@ -71,8 +71,9 @@ struct GrainStatisticsTests {
         let patches: [GrainStatistics.Patch]
     }
 
-    private static func measure(_ adjustments: Adjustments) throws -> [GrainStatistics.Patch] {
-        try exposures.map { stops in
+    /// Patches at `stops` of scene exposure, before the adjustments' own exposure edit.
+    private static func measure(_ adjustments: Adjustments, at stops: [Double] = exposures) throws -> [GrainStatistics.Patch] {
+        try stops.map { stops in
             let scene = SceneFixtures.flat(Float(0.18 * pow(2, stops)), width: patchWidth, height: patchHeight)
             let rendered = try VisualRegression.renderer.render(Negative(image: scene, contract: .sceneReferred), adjustments)
             return GrainStatistics.patch(RegressionImage(rendering: rendered))
@@ -81,7 +82,7 @@ struct GrainStatisticsTests {
 
     @Test func tracksTheGrainCases() throws {
         let midGray = try #require(Self.exposures.firstIndex(of: 0))
-        let clean = try Self.measure(.neutral)
+        let clean = try Self.measure(.neutral, at: [-4, 0, 4])
         #expect(clean.allSatisfy { $0.rmsDensity < 0.001 }, "grain off: \(clean.map(\.rmsDensity))")
         var tracked: [Tracked] = []
         for name in Self.cases {
@@ -90,7 +91,11 @@ struct GrainStatisticsTests {
             #expect(patches[midGray].rmsDensity > 0.005, "\(name): grain not measurable at mid-gray")
             tracked.append(Tracked(caseName: name, grain: adjustments.grain, patches: patches))
         }
-        let byGrain = tracked.sorted { $0.grain < $1.grain }.map { $0.patches[midGray].rmsDensity }
+        let byGrain = try [0.35, 0.6, 1].map { amount in
+            var adjustments = RegressionCase.defaultLook
+            adjustments.grain = amount
+            return try Self.measure(adjustments, at: [0])[0].rmsDensity
+        }
         #expect(byGrain == byGrain.sorted(), "σ(D) at mid-gray does not rise with the grain amount: \(byGrain)")
         try Self.write(tracked, to: VisualRegression.reportDirectory)
     }
@@ -108,7 +113,8 @@ struct GrainStatisticsTests {
             .write(to: directory.appending(path: "grain-statistics.json"))
         var lines = [
             "### Grain statistics", "",
-            "Visual density D = −log10(display luminance) of flat \(patchWidth) × \(patchHeight) patches; σ(D) per pixel; "
+            "Visual density D = −log10(display luminance) of flat \(patchWidth) × \(patchHeight) patches; stops are scene "
+                + "exposure before the case's own exposure edit; σ(D) per pixel; "
                 + "high/low = noise power at 0.375–0.5 over 0.016–0.125 cycles per pixel (1 = white).", "",
             "| Case | Grain | Stops | Mean D | σ(D) | High/low |", "| --- | ---: | ---: | ---: | ---: | ---: |",
         ]
