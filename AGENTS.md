@@ -31,9 +31,11 @@ sh Tools/build-kernels.sh                                    # after any .metal 
 (cd Packages/EmulsionKit && swift test)                      # app logic; also on iOS, see its AGENTS.md
 (cd Packages/EmulsionUI && swift test)                       # shared control interaction tests
 .venv/bin/python -I Tools/color-references/generate_input_references.py    # after changing input reference samples
-.venv/bin/python -I Tools/color-references/generate_delta_e_references.py  # after changing ΔE / chart references (both: pip install -r Tools/color-references/requirements.txt)
+.venv/bin/python -I Tools/color-references/generate_delta_e_references.py  # after changing ΔE / chart references
+.venv/bin/python -I Tools/color-references/generate_ssim_references.py      # after changing SSIM references (all three: pip install -r Tools/color-references/requirements.txt)
 (cd Packages/EmulsionCore && EMULSION_PERF=1 swift test --filter PerformanceProbe)  # Mac timings
 (cd Packages/EmulsionCore && EMULSION_UPDATE_GOLDENS=1 swift test --filter VisualRegression)  # accept an intended look change (Tests/AGENTS.md)
+Tools/review-renders.sh [base-ref]                           # full-resolution before/after of the local CC0 samples for look reviews
 (cd Packages/EmulsionCore && swift run emulsion-fit dyes --stock <id> --out <dir>)  # dye set + printing density (MOV-88; local standards tables, `--standards`)
 (cd Packages/EmulsionCore && swift run emulsion-fit negative --stock kodak-vision3-250d-5207 --out /tmp/fit)  # fit a stock; also `list`, `check`
 swift format lint --recursive Packages Apps Tools            # style (config: .swift-format)

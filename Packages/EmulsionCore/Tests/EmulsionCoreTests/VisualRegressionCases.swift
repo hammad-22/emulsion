@@ -86,8 +86,12 @@ extension RegressionCase {
 
     private static let realSceneCases: [RegressionCase] = RealScene.allCases.flatMap { scene in
         [
-            RegressionCase(name: "\(scene.rawValue).default-look", scene: { try scene.image() }, adjustments: defaultLook),
-            RegressionCase(name: "\(scene.rawValue).graded", scene: { try scene.image() }, adjustments: graded),
+            RegressionCase(
+                name: "\(scene.rawValue).default-look", scene: { try scene.image() }, adjustments: defaultLook,
+                thresholds: VisualRegression.photoThresholds),
+            RegressionCase(
+                name: "\(scene.rawValue).graded", scene: { try scene.image() }, adjustments: graded,
+                thresholds: VisualRegression.photoThresholds),
             RegressionCase(
                 name: "\(scene.rawValue).localtone", scene: { try scene.image() },
                 adjustments: adjust { ($0.highlights, $0.shadows) = (0.5, 0.4) }, thresholds: VisualRegression.photoLocalToneThresholds),
