@@ -47,9 +47,13 @@ struct CameraContent: View {
 
     @ViewBuilder private func viewfinder(showingRecipes: Bool) -> some View {
         switch model.status {
-        case .unauthorized, .unavailable:
-            CameraUnavailableView(isUnauthorized: model.status == .unauthorized)
-        default:
+        case .unauthorized:
+            CameraUnavailableView(reason: .denied)
+        case .restricted:
+            CameraUnavailableView(reason: .restricted)
+        case .unavailable:
+            CameraUnavailableView(reason: .unavailable { Task { await model.start() } })
+        case .idle, .starting, .running, .interrupted:
             ViewfinderView(model: model) {
                 if showingRecipes {
                     recipeStrip

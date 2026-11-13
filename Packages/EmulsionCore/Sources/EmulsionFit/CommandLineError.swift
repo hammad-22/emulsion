@@ -13,6 +13,7 @@ enum CommandLineError: LocalizedError, Equatable {
     case noSuchDirectory(String)
     case noBundledData
     case noReferenceData(String)
+    case noStandardsDirectory(String)
 
     var errorDescription: String? {
         switch self {
@@ -32,6 +33,8 @@ enum CommandLineError: LocalizedError, Equatable {
                 the datasheet PDF with Tools/stock-digitizing/digitize.py, then pass --data <dir> or set \
                 \(DigitizedStock.referenceDataEnvironmentVariable).
                 """
+        case .noStandardsDirectory(let path):
+            return "No standards tables at \(path); pass --standards <dir> or set \(StandardsTables.environmentVariable)."
         }
     }
 }

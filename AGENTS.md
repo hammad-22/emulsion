@@ -38,6 +38,7 @@ sh Tools/build-kernels.sh                                    # after any .metal 
 .venv/bin/python -I Tools/grain-reference/boolean-model/boolean_grain_reference.py --out Tools/grain-reference/boolean-model/grain-boolean-model.json
 (cd Packages/EmulsionCore && EMULSION_PERF=1 swift test --filter PerformanceProbe)  # Mac timings
 (cd Packages/EmulsionCore && EMULSION_UPDATE_GOLDENS=1 swift test --filter VisualRegression)  # accept an intended look change (Tests/AGENTS.md)
+(cd Packages/EmulsionCore && swift run emulsion-fit dyes --stock <id> --out <dir>)  # dye set + printing density (MOV-88; local standards tables, `--standards`)
 (cd Packages/EmulsionCore && swift run emulsion-fit negative --stock kodak-vision3-250d-5207 --out /tmp/fit)  # fit a stock; also `list`, `check`
 swift format lint --recursive Packages Apps Tools            # style (config: .swift-format)
 ```

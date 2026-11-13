@@ -73,6 +73,37 @@ final class CameraUITests: XCTestCase {
         XCTAssertEqual(recipe.value as? String, "Everyday")
     }
 
+    /// The system pauses the camera (another app takes it): the frozen viewfinder says why and
+    /// the shutter and lenses stop working, without an alert (MOV-133).
+    @MainActor
+    func testInterruptionPausesTheCamera() {
+        let app = XCUIApplication()
+        app.launchArguments = ["-camera-scenario", "in-use"]
+        app.launch()
+
+        XCTAssertTrue(app.descendants(matching: .any)["camera-paused"].waitForExistence(timeout: 10))
+        XCTAssertTrue(app.staticTexts["Camera in Use"].exists, "VoiceOver can read why")
+        XCTAssertFalse(app.buttons["Take Photo"].isEnabled)
+        XCTAssertFalse(app.alerts.firstMatch.exists)
+        keepScreenshot(app, named: "Camera 6 Paused")
+    }
+
+    /// A session that fails offers to try again, and trying again brings the viewfinder back.
+    @MainActor
+    func testFailedCameraCanBeRetried() {
+        let app = XCUIApplication()
+        app.launchArguments = ["-camera-scenario", "failed"]
+        app.launch()
+
+        let retry = app.buttons["Try Again"]
+        XCTAssertTrue(retry.waitForExistence(timeout: 10))
+        keepScreenshot(app, named: "Camera 7 Failed")
+        retry.tap()
+
+        XCTAssertTrue(app.descendants(matching: .any)["viewfinder"].waitForExistence(timeout: 5))
+        XCTAssertTrue(app.buttons["Take Photo"].isEnabled)
+    }
+
     /// Opens the library to count what's already there, then returns to the camera.
     @MainActor
     private func countPhotos(_ app: XCUIApplication, library: XCUIElement, photos: XCUIElementQuery) throws -> Int {
