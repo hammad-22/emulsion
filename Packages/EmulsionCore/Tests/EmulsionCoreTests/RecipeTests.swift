@@ -19,6 +19,23 @@ struct RecipeTests {
         #expect(recipe.applying(to: settings).seed == 123)
     }
 
+    /// White balance describes the light one photo was shot under, so a recipe neither stores it
+    /// nor changes it.
+    @Test func photoKeepsItsWhiteBalance() throws {
+        var settings = Adjustments()
+        settings.warmth = 0.3
+        settings.whiteBalance = CameraWhiteBalance(temperature: 3200, tint: 5)
+        let recipe = try Recipe(name: "Tungsten", adjustments: settings)
+        #expect(recipe.adjustments.whiteBalance == nil)
+        #expect(try Recipe.decode(recipe.encoded()) == recipe)
+        var photo = Adjustments()
+        photo.whiteBalance = CameraWhiteBalance(temperature: 5600, tint: -4)
+        let applied = recipe.applying(to: photo)
+        #expect(applied.whiteBalance == photo.whiteBalance)
+        #expect(applied.warmth == 0.3)
+        #expect(recipe.matches(applied))
+    }
+
     @Test(arguments: [Double.nan, .infinity, -.infinity, 3.01, -3.01])
     func rejectsInvalidExposure(_ value: Double) {
         var settings = Adjustments()
@@ -60,6 +77,18 @@ struct RecipeTests {
             var settings = Adjustments()
             settings.seed = 817
             #expect(recipe.applying(to: settings).seed == 817)
+        }
+    }
+
+    /// MOV-92: no film brand or stock names in the product.
+    @Test func curatedLooksNameNoFilmBrandOrStock() {
+        let banned = [
+            "kodak", "fuji", "portra", "ektar", "velvia", "provia", "cinestill", "ilford", "agfa", "tri-x", "gold", "superia",
+            "vision3",
+        ]
+        for recipe in CuratedLooks.recipes {
+            let text = (recipe.name + " " + recipe.summary).lowercased()
+            #expect(!banned.contains { text.contains($0) }, "\(recipe.name)")
         }
     }
 

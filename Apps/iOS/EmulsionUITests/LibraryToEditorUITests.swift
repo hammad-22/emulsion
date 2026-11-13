@@ -91,6 +91,7 @@ final class LibraryToEditorUITests: XCTestCase {
     @MainActor
     func testSamplesEditCompareAndSave() throws {
         let app = XCUIApplication()
+        app.launchArguments = ["--library"]
         app.launch()
         XCTAssertTrue(app.navigationBars["Library"].waitForExistence(timeout: 5))
 
@@ -293,13 +294,5 @@ final class LibraryToEditorUITests: XCTestCase {
                 return false
             }
         }
-    }
-
-    @MainActor
-    private func keepScreenshot(_ app: XCUIApplication, named name: String) {
-        let attachment = XCTAttachment(screenshot: app.screenshot())
-        attachment.name = name
-        attachment.lifetime = .keepAlways
-        add(attachment)
     }
 }

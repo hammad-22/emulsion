@@ -1,0 +1,8 @@
+# Offline chart digitizing only; never shipped. NumPy: BSD-3-Clause (bundled parts 0BSD, MIT, Zlib, CC0).
+# SciPy: BSD-3-Clause. Pillow: MIT-CMU (HPND). Matplotlib (plot_curves.py only): Matplotlib License,
+# a PSF-style permissive license; its dependencies are BSD-3-Clause, MIT or Apache-2.0.
+# Also needs poppler's pdfimages and pdftotext on PATH (GPL tools, run as separate programs; nothing from them is bundled).
+numpy==2.5.4
+pillow==13.0.0
+scipy==1.18.1
+matplotlib==3.11.2

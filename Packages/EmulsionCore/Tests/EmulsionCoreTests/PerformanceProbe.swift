@@ -27,19 +27,72 @@ final class PerformanceProbe: XCTestCase {
             // A JPEG/HEIC: developed and materialized once (not timed), then rendered.
             let picture = upscaled(DisplayFixtures.displayP3) { x, y in SIMD3(Float(x) / 63, Float(y) / 47, 0.5) }
             try time(r, try r.materialize(try r.developer.sceneFromDisplay(picture)), "display-referred ", full: a, w, h)
+            // A viewfinder frame: estimated every frame, by the preview inverse or the per-pixel solve.
+            try time(r, r.developer.viewfinderNegative(from: picture), "viewfinder ", full: a, w, h)
+            let solved = try r.developer.sceneFromDisplay(picture).image
+            try time(r, Negative(image: solved, contract: .previewEstimate), "viewfinder via per-pixel solve ", full: a, w, h)
         }
     }
 
     private func time(_ r: Renderer, _ neg: Negative, _ kind: String, full a: Adjustments, _ w: Int, _ h: Int) throws {
         for (label, adj) in [("look only", Adjustments.neutral), ("full", a)] {
-            var times = [Double]()
-            for _ in 0..<5 {
-                let t = Date()
+            let times = try Self.milliseconds(runs: 5) {
                 let cg = try r.cgImage(try r.render(neg, adj))
                 _ = cg.dataProvider?.data
-                times.append(Date().timeIntervalSince(t) * 1000)
             }
             print(String(format: "%dx%d %@%@: median %.1f ms (first %.1f)", w, h, kind, label, times.dropFirst().sorted()[2], times[0]))
+        }
+    }
+
+    /// RAW develop without the exposure anchor (before), measuring it (after), given the anchor an
+    /// earlier develop reported (known anchor, MOV-134), and at a white balance (MOV-10),
+    /// developed and materialized, for the first DNG of each native size in EMULSION_RAW_SAMPLES.
+    /// Opt-in: EMULSION_PERF=1.
+    func testRAWDevelopTimings() throws {
+        try XCTSkipUnless(ProcessInfo.processInfo.environment["EMULSION_PERF"] != nil, "set EMULSION_PERF=1 to run")
+        try XCTSkipUnless(RAWDevelopSupport.samplesFolders != nil, "set EMULSION_RAW_SAMPLES to run")
+        let r = try Renderer()
+        var seenSizes = Set<String>()
+        var files: [(url: URL, data: Data, size: CGSize)] = []
+        for url in try RAWDevelopSupport.sampleURLs() {
+            let data = try Data(contentsOf: url)
+            let size = try RAWDevelopSupport.filter(data).nativeSize
+            if seenSizes.insert("\(size)").inserted { files.append((url, data, size)) }
+        }
+        let tungsten = CameraWhiteBalance(temperature: 3200, tint: 0)
+        print("| File | Native size | Long edge | Variant | Median ms | First ms | Anchor |")
+        print("| --- | --- | ---: | --- | ---: | ---: | ---: |")
+        for (url, data, size) in files {
+            let measured = try r.developer.develop(data, maxDimension: ExposureAnchor.thumbnailLongEdge).exposureAnchorStops
+            let variants: [(name: String, anchor: ExposureAnchor.Choice, whiteBalance: CameraWhiteBalance?)] = [
+                ("before", .none, nil), ("after", .measured, nil), ("known anchor", .known(stops: measured), nil),
+                ("after, 3200 K", .measured, tungsten), ("known anchor, 3200 K", .known(stops: measured), tungsten),
+            ]
+            for edge in [CGFloat(1024), 1600, nil] {
+                for variant in variants {
+                    var anchor = 0.0
+                    let times = try Self.milliseconds(runs: 4) {
+                        let negative = try r.developer.develop(
+                            data, maxDimension: edge, whiteBalance: variant.whiteBalance, anchor: variant.anchor)
+                        _ = try r.materialize(negative)
+                        anchor = negative.exposureAnchorStops
+                    }
+                    let median = times.dropFirst().sorted()[1]
+                    print(
+                        "| \(url.lastPathComponent) | \(Int(size.width))×\(Int(size.height)) | \(edge.map { "\(Int($0))" } ?? "full")"
+                            + " | \(variant.name) | \(String(format: "%.0f", median))"
+                            + " | \(String(format: "%.0f", times[0])) | \(String(format: "%+.3f", anchor)) |")
+                }
+            }
+        }
+    }
+
+    /// Wall-clock milliseconds of each of `runs` calls of `body`.
+    private static func milliseconds(runs: Int, _ body: () throws -> Void) rethrows -> [Double] {
+        try (0..<runs).map { _ in
+            let start = ContinuousClock.now
+            try body()
+            return (ContinuousClock.now - start).milliseconds
         }
     }
 }

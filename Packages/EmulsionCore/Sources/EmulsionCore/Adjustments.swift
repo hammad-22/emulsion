@@ -17,6 +17,9 @@ public struct Adjustments: Codable, Equatable, Sendable {
     public var halation: Double = 0.35
     /// Grain pattern seed, fixed per photo so re-renders and exports match.
     public var seed: Double = 0
+    /// RAW white balance, applied when the photo is developed (nil: as shot); the printer lights
+    /// above act at print.
+    public var whiteBalance: CameraWhiteBalance?
 
     public init() {}
     public static let neutral: Adjustments = {
@@ -32,6 +35,7 @@ public struct Adjustments: Codable, Equatable, Sendable {
         for k in [\Adjustments.warmth, \.tint, \.color, \.highlights, \.shadows] { a[keyPath: k] = min(1, max(-1, a[keyPath: k])) }
         a.grain = min(1, max(0, grain))
         a.halation = min(1, max(0, halation))
+        a.whiteBalance = whiteBalance?.clamped()
         return a
     }
 }
@@ -43,8 +47,8 @@ extension Adjustments {
     public init(from decoder: any Decoder) throws {
         self.init()
         let saved = try decoder.container(keyedBy: CodingKeys.self)
-        func decode(_ key: CodingKeys, into value: inout Double) throws {
-            value = try saved.decodeIfPresent(Double.self, forKey: key) ?? value
+        func decode<Value: Decodable>(_ key: CodingKeys, into value: inout Value) throws {
+            value = try saved.decodeIfPresent(Value.self, forKey: key) ?? value
         }
         try decode(.exposure, into: &exposure)
         try decode(.warmth, into: &warmth)
@@ -55,6 +59,7 @@ extension Adjustments {
         try decode(.grain, into: &grain)
         try decode(.halation, into: &halation)
         try decode(.seed, into: &seed)
+        try decode(.whiteBalance, into: &whiteBalance)
     }
 }
 

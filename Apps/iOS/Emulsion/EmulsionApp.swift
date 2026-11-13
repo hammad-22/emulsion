@@ -11,7 +11,6 @@ struct EmulsionApp: App {
     var body: some Scene {
         WindowGroup {
             content
-                .libraryErrorAlert(store)
                 .environment(store)
                 .environment(recipes)
                 .environment(settings)
@@ -22,11 +21,13 @@ struct EmulsionApp: App {
         #if DEBUG
             if ProcessInfo.processInfo.arguments.contains("--component-gallery") {
                 ComponentGallery()
+            } else if ProcessInfo.processInfo.arguments.contains("--library") {
+                LibraryScreen().libraryErrorAlert(store)
             } else {
-                LibraryScreen()
+                CameraScreen()
             }
         #else
-            LibraryScreen()
+            CameraScreen()
         #endif
     }
 }
