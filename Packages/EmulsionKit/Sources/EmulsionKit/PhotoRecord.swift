@@ -8,6 +8,8 @@ public struct PhotoRecord: Identifiable, Codable, Equatable, Sendable {
     public let fileName: String
     public let isRAW: Bool
     public var adjustments: Adjustments
+    /// RAW only, saved after the first develop; nil until then and for other photos.
+    var exposureAnchor: StoredExposureAnchor?
 
     /// True once the edit differs from the default look the photo was imported with.
     public var isEdited: Bool { adjustments != .defaults(for: id) }
@@ -23,5 +25,7 @@ extension PhotoRecord {
         created = try saved.decodeIfPresent(Date.self, forKey: .created) ?? .distantPast
         isRAW = try saved.decodeIfPresent(Bool.self, forKey: .isRAW) ?? false
         adjustments = try saved.decodeIfPresent(Adjustments.self, forKey: .adjustments) ?? .defaults(for: id)
+        // A cache: one that doesn't decode is measured again rather than failing the record.
+        exposureAnchor = try? saved.decodeIfPresent(StoredExposureAnchor.self, forKey: .exposureAnchor)
     }
 }

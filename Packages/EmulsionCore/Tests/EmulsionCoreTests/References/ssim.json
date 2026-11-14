@@ -1,0 +1,27 @@
+{
+ "source": "scikit-image 0.26.0 structural_similarity (Wang et al. 2004 settings), 48x40 planes defined in generate_ssim_references.py",
+ "width": 48,
+ "height": 40,
+ "cases": [
+  {
+   "name": "identical",
+   "ssim": 1.0
+  },
+  {
+   "name": "contrast and offset",
+   "ssim": 0.9948958635037232
+  },
+  {
+   "name": "added pattern",
+   "ssim": 0.7420465608514314
+  },
+  {
+   "name": "flattened",
+   "ssim": 0.17764876641260782
+  },
+  {
+   "name": "texture removed",
+   "ssim": 0.8967693421575706
+  }
+ ]
+}

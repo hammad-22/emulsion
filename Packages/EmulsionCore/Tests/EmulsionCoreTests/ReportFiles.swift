@@ -55,6 +55,7 @@ struct ReportFiles {
         let header = [
             "### Visual regression: \(report.title)", "",
             "Thresholds (ΔE00): mean ≤ \(t.mean), p95 ≤ \(t.p95), max ≤ \(t.max); cases marked * use p99.9 ≤ \(t.max). "
+                + "SSIM is checked on the photo cases (`VisualRegression.photoThresholds`). "
                 + "Host \(report.host), GPU \(report.gpu), \(report.os). "
                 + String(format: "%d cases in %.1f s.", report.cases.count, report.seconds),
         ]
@@ -74,8 +75,11 @@ struct ReportFiles {
     }
 
     private static func table(_ outcomes: [VisualRegression.Outcome]) -> [String] {
-        ["", "| Case | Mean | p95 | p99.9 | Max | Status |", "| --- | ---: | ---: | ---: | ---: | --- |"]
-            + outcomes.map { "| \($0.name)\($0.allowsIsolatedOutliers ? " *" : "") | \(columns($0.summary)) | \($0.status.rawValue) |" }
+        ["", "| Case | Mean | p95 | p99.9 | Max | SSIM | Status |", "| --- | ---: | ---: | ---: | ---: | ---: | --- |"]
+            + outcomes.map {
+                let ssim = $0.structuralSimilarity.map { String(format: "%.5f", $0) } ?? "–"
+                return "| \($0.name)\($0.allowsIsolatedOutliers ? " *" : "") | \(columns($0.summary)) | \(ssim) | \($0.status.rawValue) |"
+            }
     }
 
     private static func columns(_ summary: ColorDifference.Summary?) -> String {
