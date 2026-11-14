@@ -11,6 +11,9 @@ public final class EditSession {
     public var adjustments: Adjustments {
         didSet { scheduleSave() }
     }
+    /// The white balance a RAW photo was shot at, where its Temperature and Tint rulers rest;
+    /// nil until `editorAppeared()` has read it, and for photos that aren't RAW.
+    public private(set) var asShotWhiteBalance: CameraWhiteBalance?
 
     private let store: PhotoStore
     @ObservationIgnored private(set) var pendingSave: Task<Void, Never>?
@@ -21,6 +24,20 @@ public final class EditSession {
         self.photo = photo
         self.store = store
         adjustments = photo.adjustments
+        store.renderService.open(store.url(for: photo))
+    }
+
+    /// Call from the editor's `.task`. Marks the photo open again (an editor that disappeared
+    /// under another screen closed it) and reads a RAW photo's as-shot white balance, which gives
+    /// the editor its White Balance rulers. The file is read off the main actor, whatever the
+    /// record says: records saved before `isRAW` existed have it false.
+    public func editorAppeared() async {
+        // A `.task` cancelled before it ran (the editor left at once) still runs: it mustn't
+        // mark a photo open after its editor closed it.
+        guard !Task.isCancelled else { return }
+        store.renderService.open(url)
+        guard asShotWhiteBalance == nil else { return }
+        asShotWhiteBalance = await store.renderService.asShotWhiteBalance(url)
     }
 
     public var url: URL { store.url(for: photo) }
@@ -38,11 +55,18 @@ public final class EditSession {
         adjustments = recipe.applying(to: adjustments)
     }
 
-    /// Writes any pending change now. Call when the editor goes away.
-    public func close() {
+    /// Writes any pending change now. Call when the editor may not come back (its window going
+    /// inactive, the app quitting).
+    public func save() {
         pendingSave?.cancel()
         pendingSave = nil
         store.update(photo.id, adjustments: adjustments)
+    }
+
+    /// Saves and lets go of the photo's RAW decoder. Call when the editor goes away.
+    public func close() {
+        save()
+        store.renderService.close(url)
     }
 
     /// Develops at full resolution with the current edit and adds the result to Photos.

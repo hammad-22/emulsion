@@ -95,6 +95,10 @@ enum TestRAW {
     static let tungstenTaggedAsDaylight = RAWDevelopChart.dng(
         .linearRGB, chart: chart, light: SyntheticDNG.planckianChromaticity(kelvin: SyntheticDNG.illuminantAKelvin),
         taggedLight: SyntheticDNG.d65Chromaticity)
+    /// The tagged light, D65, at its CCT (CIE 15:2004), and how far from it Apple reads the
+    /// file's as-shot temperature: 6502 K measured, tolerance as in `CameraWhiteBalanceTests`.
+    static let taggedKelvin = 6504.0
+    static let asShotTemperatureTolerance = 15.0
 
     /// How far the gray patch's centre is from neutral: the largest difference between its
     /// channels, in 8-bit codes of a Display P3 image (as the renderer and its exports make them).

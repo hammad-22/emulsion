@@ -4,7 +4,7 @@ import Foundation
 /// camera's colour space by Apple's RAW decoder when the file is developed, before the film
 /// process. Separate from the printer-light Warmth and Tint, which act at print. Photos that
 /// aren't RAW ignore it.
-public struct CameraWhiteBalance: Codable, Equatable, Sendable {
+public struct CameraWhiteBalance: Codable, Hashable, Sendable {
     /// Colour temperature, in kelvin, of the light that develops neutral: a higher setting
     /// renders warmer.
     public var temperature: Double

@@ -18,10 +18,14 @@ enum ColorDifference {
     /// Display P3 encoded (sRGB transfer) → CIELAB. The Lab white is the display's own D65 and no
     /// chromatic adaptation is applied: both images compared share that white.
     static func lab(fromDisplayP3 encoded: SIMD3<Double>) -> SIMD3<Double> {
-        let linear = SIMD3(decode(encoded.x), decode(encoded.y), decode(encoded.z))
-        let xyz = p3ToXYZ * linear / white
+        let xyz = xyz(fromDisplayP3: encoded) / white
         let f = SIMD3(labCompand(xyz.x), labCompand(xyz.y), labCompand(xyz.z))
         return SIMD3(116 * f.y - 16, 500 * (f.x - f.y), 200 * (f.y - f.z))
+    }
+
+    /// Display P3 encoded (sRGB transfer) → XYZ, white Y = 1.
+    static func xyz(fromDisplayP3 encoded: SIMD3<Double>) -> SIMD3<Double> {
+        p3ToXYZ * SIMD3(decode(encoded.x), decode(encoded.y), decode(encoded.z))
     }
 
     /// CIEDE2000 between two Display P3 encoded colours.

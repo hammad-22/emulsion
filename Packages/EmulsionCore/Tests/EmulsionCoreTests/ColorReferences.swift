@@ -126,7 +126,8 @@ enum ColorReferences {
         }
     }
 
-    private static func reference(_ name: String) throws -> Data {
+    /// A JSON file in `References/`.
+    static func reference(_ name: String) throws -> Data {
         guard let url = Bundle.module.url(forResource: name, withExtension: "json", subdirectory: "References") else {
             throw CocoaError(.fileNoSuchFile)
         }
