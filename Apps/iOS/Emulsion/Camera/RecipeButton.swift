@@ -9,10 +9,12 @@ struct RecipeButton: View {
     let isShowingRecipes: Bool
     let toggle: (() -> Void)?
 
+    @Environment(\.dynamicTypeSize) private var dynamicTypeSize
     /// Matches the glass button style's own horizontal padding.
     private static let labelPadding: CGFloat = 12
     /// With the glass button's vertical padding, about the library button's height.
     private static let labelHeight: CGFloat = 44
+    private static let symbol = "camera.filters"
 
     var body: some View {
         if let toggle {
@@ -21,7 +23,7 @@ struct RecipeButton: View {
                 .accessibilityLabel("Recipe")
                 .accessibilityValue(recipe.name)
                 .accessibilityHint(isShowingRecipes ? "Hides the recipes" : "Shows the recipes")
-                .accessibilityShowsLargeContentViewer { label }
+                .accessibilityShowsLargeContentViewer { Label(recipe.name, systemImage: Self.symbol) }
         } else {
             label
                 .padding(.horizontal, Self.labelPadding)
@@ -34,13 +36,16 @@ struct RecipeButton: View {
 
     private var label: some View {
         VStack(spacing: 2) {
-            Image(systemName: "camera.filters")
+            Image(systemName: Self.symbol)
                 .font(.body.weight(.semibold))
                 .symbolVariant(isShowingRecipes ? .fill : .none)
-            Text(recipe.name)
-                .font(.caption2.weight(.semibold))
-                .lineLimit(1)
-                .minimumScaleFactor(0.7)
+            // Doesn't fit the fixed width at accessibility sizes; the large content viewer shows it.
+            if !dynamicTypeSize.isAccessibilitySize {
+                Text(recipe.name)
+                    .font(.caption2.weight(.semibold))
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.7)
+            }
         }
         // A fixed width, so switching recipes never moves the button.
         .frame(width: LibraryButton.size, height: Self.labelHeight)

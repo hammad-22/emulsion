@@ -151,7 +151,7 @@ public actor RenderService {
     ) async throws -> CGImage {
         let renderer = try await preparedViewfinderRenderer()
         let negative = renderer.developer.viewfinderNegative(from: Self.fitted(frame.uprightImage, maxDimension: maxDimension))
-        return try renderer.cgImage(renderer.render(negative, adjustments))
+        return try renderer.viewfinderImage(negative, adjustments)
     }
 
     /// Loads the renderer and samples the viewfinder's preview inverse, so the first frame

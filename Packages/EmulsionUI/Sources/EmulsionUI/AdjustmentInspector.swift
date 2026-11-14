@@ -29,8 +29,10 @@ public struct AdjustmentInspector: View {
                 ForEach(AdjustmentGroup.available(whiteBalanceAsShot: whiteBalanceAsShot)) { section in
                     VStack(alignment: .leading, spacing: FilmLabLayout.gap) {
                         Text(section.title)
+                            // Set apart by case, not a dimmer style: secondary measured 3.2:1 on
+                            // dark glass, under the 4.5:1 minimum for small text (MOV-140).
                             .font(.footnote.weight(.semibold))
-                            .foregroundStyle(.secondary)
+                            .textCase(.uppercase)
                             .accessibilityAddTraits(.isHeader)
                         ForEach(section.controls(whiteBalanceAsShot: whiteBalanceAsShot)) { control in
                             AdjustmentRuler(control: control, adjustments: $adjustments, isCompact: true)

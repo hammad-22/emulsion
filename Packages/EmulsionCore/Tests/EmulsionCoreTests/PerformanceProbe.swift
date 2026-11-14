@@ -37,7 +37,8 @@ final class PerformanceProbe: XCTestCase {
     private func time(_ r: Renderer, _ neg: Negative, _ kind: String, full a: Adjustments, _ w: Int, _ h: Int) throws {
         for (label, adj) in [("look only", Adjustments.neutral), ("full", a)] {
             let times = try Self.milliseconds(runs: 5) {
-                let cg = try r.cgImage(try r.render(neg, adj))
+                // Viewfinder frames go through the viewfinder's own render, as in the app.
+                let cg = neg.contract == .previewEstimate ? try r.viewfinderImage(neg, adj) : try r.cgImage(try r.render(neg, adj))
                 _ = cg.dataProvider?.data
             }
             print(String(format: "%dx%d %@%@: median %.1f ms (first %.1f)", w, h, kind, label, times.dropFirst().sorted()[2], times[0]))

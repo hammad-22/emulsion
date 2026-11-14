@@ -10,8 +10,8 @@ import UniformTypeIdentifiers
 /// exports run the same graph, with spatial effects sized relative to the image so they agree
 /// across resolutions.
 ///
-/// `@unchecked Sendable`: every stored property is a `let`. The `CIContext`s are thread-safe
-/// (Apple: CIContext.h), and the loaded `CIColorKernel`s are only read.
+/// `@unchecked Sendable`: every stored property is a `let`. `CIContext` is thread-safe (Apple:
+/// CIContext.h), and the loaded `CIColorKernel`s are only read.
 public final class Renderer: @unchecked Sendable {
     public static let outputSpace = CGColorSpace(name: CGColorSpace.displayP3)!
     /// Core Image working space: extended linear sRGB, half float.
@@ -19,26 +19,27 @@ public final class Renderer: @unchecked Sendable {
     let kernels: Kernels
     let digicamKernels: DigicamKernels
     public let developer: Developer
-    private let interactiveContext: CIContext
-    /// For graphs that may hold a RAW decode (`materialize`, `export`, the exposure anchor): a
-    /// full-size decode comes back with corrupted tiles without intermediate caching (MOV-147,
-    /// docs/ENGINE.md).
-    private let developContext: CIContext
+    /// For every render but viewfinder frames, and the developer's: any of these graphs may hold a
+    /// RAW decode, and a full-size one comes back with corrupted tiles from a context that doesn't
+    /// cache intermediates (MOV-147, docs/ENGINE.md). Each render clears the caches after itself.
+    private let context: CIContext
+    /// Viewfinder frames only (`viewfinderImage`), which hold no RAW decode, so they skip the
+    /// caching context's per-frame cache write and clear (+0.8 ms per 1600 px frame, Mac).
+    private let viewfinderContext: CIContext
+    static var contextOptions: [CIContextOption: Any] {
+        [
+            .workingColorSpace: workingSpace, .workingFormat: CIFormat.RGBAh, .outputColorSpace: outputSpace,
+            .cacheIntermediates: true,
+        ]
+    }
 
     public init() throws {
         let library = try Kernels.library()
         kernels = try Kernels(library: library)
         digicamKernels = try DigicamKernels(library: library)
-        interactiveContext = Self.context(cachesIntermediates: false)
-        developContext = Self.context(cachesIntermediates: true)
-        developer = Developer(kernels: kernels, context: developContext)
-    }
-
-    private static func context(cachesIntermediates: Bool) -> CIContext {
-        CIContext(options: [
-            .workingColorSpace: workingSpace, .workingFormat: CIFormat.RGBAh,
-            .outputColorSpace: outputSpace, .cacheIntermediates: cachesIntermediates,
-        ])
+        context = CIContext(options: Self.contextOptions)
+        viewfinderContext = CIContext(options: Self.contextOptions.merging([.cacheIntermediates: false]) { $1 })
+        developer = Developer(kernels: kernels, context: context)
     }
 
     /// Scene light → display light (in the working space), look applied. Display-referred
@@ -116,8 +117,8 @@ public final class Renderer: @unchecked Sendable {
         guard CVPixelBufferCreate(nil, w, h, kCVPixelFormatType_64RGBAHalf, attributes, &buffer) == kCVReturnSuccess, let buffer else {
             throw EmulsionError.renderFailed
         }
-        defer { developContext.clearCaches() }
-        developContext.render(negative.image, to: buffer, bounds: negative.image.extent, colorSpace: Self.workingSpace)
+        defer { context.clearCaches() }
+        context.render(negative.image, to: buffer, bounds: negative.image.extent, colorSpace: Self.workingSpace)
         let image = CIImage(cvPixelBuffer: buffer, options: [.colorSpace: Self.workingSpace])
         return Negative(
             image: image, contract: negative.contract, exposureAnchorStops: negative.exposureAnchorStops,
@@ -134,12 +135,21 @@ public final class Renderer: @unchecked Sendable {
             asShotWhiteBalance: negative.asShotWhiteBalance)
     }
 
-    /// An interactive render, without intermediate caching. Not for a full-size RAW develop: that
-    /// can come back corrupted (MOV-147), so `materialize` it first.
     public func cgImage(_ image: CIImage) throws -> CGImage {
-        guard let cg = interactiveContext.createCGImage(image, from: image.extent, format: .RGBA8, colorSpace: Self.outputSpace) else {
+        defer { context.clearCaches() }
+        guard let cg = context.createCGImage(image, from: image.extent, format: .RGBA8, colorSpace: Self.outputSpace) else {
             throw EmulsionError.renderFailed
         }
+        return cg
+    }
+
+    /// A viewfinder frame (`Developer.viewfinderNegative(from:)`) with the look. Throws for any other
+    /// negative: only a camera frame's preview estimate is known to hold no RAW decode.
+    public func viewfinderImage(_ negative: Negative, _ adjustments: Adjustments) throws -> CGImage {
+        guard negative.contract == .previewEstimate else { throw EmulsionError.renderFailed }
+        let image = try render(negative, adjustments)
+        guard let cg = viewfinderContext.createCGImage(image, from: image.extent, format: .RGBA8, colorSpace: Self.outputSpace)
+        else { throw EmulsionError.renderFailed }
         return cg
     }
 
@@ -150,9 +160,9 @@ public final class Renderer: @unchecked Sendable {
         switch format {
         case .jpeg: return try jpegData(image, colorSpace: Self.outputSpace, quality: quality)
         case .heic:
-            defer { developContext.clearCaches() }
+            defer { context.clearCaches() }
             guard
-                let data = try? developContext.heif10Representation(
+                let data = try? context.heif10Representation(
                     of: image.settingProperties([:]), colorSpace: Self.outputSpace, options: Self.options(quality: quality))
             else { throw EmulsionError.renderFailed }
             return data
@@ -162,11 +172,11 @@ public final class Renderer: @unchecked Sendable {
     /// A JPEG of `image` in `colorSpace`, with the image's properties cleared: Core Image writes them
     /// into the file, and they survive the render, so the source's metadata (GPS included) would
     /// otherwise be carried over (MOV-126).
-    /// Through the caching context, like every graph that may hold a full-size RAW decode (MOV-147).
+    /// Through the caching context, like every render that may hold a full-size RAW decode (MOV-147).
     func jpegData(_ image: CIImage, colorSpace: CGColorSpace, quality: Double) throws -> Data {
-        defer { developContext.clearCaches() }
+        defer { context.clearCaches() }
         guard
-            let data = developContext.jpegRepresentation(
+            let data = context.jpegRepresentation(
                 of: image.settingProperties([:]), colorSpace: colorSpace, options: Self.options(quality: quality))
         else { throw EmulsionError.renderFailed }
         return data
