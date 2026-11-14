@@ -24,7 +24,9 @@ class EmulsionTestCase: XCTestCase {
     }
     /// Display P3 luminance weights.
     func luma(_ c: SIMD3<Double>) -> Double { 0.2290 * c.x + 0.6917 * c.y + 0.0793 * c.z }
-    func sd(_ v: [Double]) -> Double {
+    func sd(_ v: [Double]) -> Double { Self.sd(v) }
+    /// Population standard deviation.
+    static func sd(_ v: [Double]) -> Double {
         let m = v.reduce(0, +) / Double(v.count)
         return (v.map { ($0 - m) * ($0 - m) }.reduce(0, +) / Double(v.count)).squareRoot()
     }

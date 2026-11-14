@@ -1,8 +1,9 @@
 import CoreImage
-import EmulsionCore
 import EmulsionFixtures
 import Foundation
 import Testing
+
+@testable import EmulsionCore
 
 /// One golden: a scene rendered with fixed adjustments (and a fixed grain seed). `name` is
 /// `scene.variant`, also the golden's file name.

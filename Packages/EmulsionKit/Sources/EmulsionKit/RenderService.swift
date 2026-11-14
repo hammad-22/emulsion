@@ -175,7 +175,7 @@ public actor RenderService {
     public func export(_ url: URL, _ adjustments: Adjustments, format: Renderer.ExportFormat) throws -> Data {
         let renderer = try engine()
         let full = try develop(url, maxDimension: nil, whiteBalance: adjustments.whiteBalance)
-        return try renderer.export(renderer.render(full, adjustments), format: format)
+        return try renderer.export(renderer.render(full, adjustments, intent: .export), format: format)
     }
 
     /// Develops the file with its exposure anchor, measuring, remembering and reporting it when

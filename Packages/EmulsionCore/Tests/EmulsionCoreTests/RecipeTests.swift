@@ -101,7 +101,7 @@ struct RecipeTests {
             #expect(throws: EmulsionError.recipeVersionUnsupported) { try JSONDecoder().decode(Recipe.self, from: changed) }
         }
         #expect(throws: EmulsionError.recipeModelUnsupported) {
-            try Recipe.decode(Data(json.replacingOccurrences(of: Recipe.engineModel(for: .film), with: "future-model").utf8))
+            try Recipe.decode(Data(json.replacingOccurrences(of: RenderProcess.film.engineModel, with: "future-model").utf8))
         }
         for invalid in [
             "{}", "[]", "not json", json.replacingOccurrences(of: "\"grain\" : 0.35,", with: ""),

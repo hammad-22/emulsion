@@ -44,18 +44,16 @@ final class PerformanceProbe: XCTestCase {
         }
     }
 
-    /// The digicam process (MOV-149): a 1600 px preview, and a 12 MP source to its 5 MP export with
-    /// and without the JPEG round trip (processing on and off). Opt-in: EMULSION_PERF=1.
+    /// The digicam process (MOV-149) at its default look: a 1600 px preview, and a 12 MP source to its
+    /// 5 MP frame as an export (with the JPEG round trip) and as a preview (without). Opt-in: EMULSION_PERF=1.
     func testDigicamTimings() throws {
         try XCTSkipUnless(ProcessInfo.processInfo.environment["EMULSION_PERF"] != nil, "set EMULSION_PERF=1 to run")
         let r = try Renderer()
         var look = Adjustments()
         (look.process, look.grain, look.halation, look.seed) = (.digicam, DigicamLook.defaultNoise, DigicamLook.defaultProcessing, 2)
-        var noJPEG = look
-        noJPEG.halation = 0
-        for (w, h, label, a) in [
-            (1600, 1200, "preview", look), (4032, 3024, "12 MP → 5 MP export with JPEG", look),
-            (4032, 3024, "12 MP → 5 MP export without JPEG (processing 0)", noJPEG),
+        for (w, h, label, intent) in [
+            (1600, 1200, "preview", RenderIntent.preview), (4032, 3024, "12 MP → 5 MP export (JPEG)", .export),
+            (4032, 3024, "12 MP → 5 MP as a preview (no JPEG)", .preview),
         ] {
             let scene = Fixtures.image(width: 64, height: 48, space: SceneFixtures.linear) { x, y in
                 SIMD3(Float(x) / 16, Float(y) / 24, 0.18)
@@ -64,7 +62,7 @@ final class PerformanceProbe: XCTestCase {
             .cropped(to: CGRect(x: 0, y: 0, width: w, height: h))
             let negative = try r.materialize(Negative(image: scene, contract: .sceneReferred))
             let times = try Self.milliseconds(runs: 5) {
-                let cg = try r.cgImage(try r.render(negative, a))
+                let cg = try r.cgImage(try r.render(negative, look, intent: intent))
                 _ = cg.dataProvider?.data
             }
             print(String(format: "digicam %dx%d %@: median %.1f ms (first %.1f)", w, h, label, times.dropFirst().sorted()[2], times[0]))

@@ -10,7 +10,8 @@ import Testing
 /// test scenes, which are 240 px. Opt-in, so CI and plain `swift test` skip it.
 ///
 /// `EMULSION_REVIEW_INCLUDE_LOCAL=1` also renders the samples that aren't CC0, into a `local-only/`
-/// subfolder: for the owner's own review, never shared or posted.
+/// subfolder: for the owner's own review, never shared or posted. `EMULSION_REVIEW_LOOK=<name>` renders
+/// one look only, so each look can get its own process (MOV-147 corrupts later full-size renders in a process).
 ///
 /// Kept free of other test-target helpers: the script copies this file into an older checkout
 /// when that checkout does not have it (one older than the digicam process, MOV-149, can't build it).
@@ -41,8 +42,12 @@ struct ReviewRenders {
     static let looks: [(name: String, adjustments: Adjustments)] = [
         ("neutral", .neutral), ("default", defaultLook),
         ("digicam", digicam(noise: DigicamLook.defaultNoise, processing: DigicamLook.defaultProcessing)),
-        ("digicam-strong", digicam(noise: 0.7, processing: 1)),
+        ("digicam-strong", digicam(noise: 1, processing: 1)),
     ]
+    /// The looks to render: all of them, or the one `EMULSION_REVIEW_LOOK` names.
+    static var selectedLooks: [(name: String, adjustments: Adjustments)] {
+        environment["EMULSION_REVIEW_LOOK"].map { name in looks.filter { $0.name == name } } ?? looks
+    }
     static var includesLocalSamples: Bool { environment["EMULSION_REVIEW_INCLUDE_LOCAL"] == "1" }
 
     static func isCC0(_ url: URL) -> Bool { url.lastPathComponent.lowercased().hasSuffix("_cc0.dng") }
@@ -60,15 +65,15 @@ struct ReviewRenders {
         let localOnly = shared.appending(path: "local-only", directoryHint: .isDirectory)
         try FileManager.default.createDirectory(at: shared, withIntermediateDirectories: true)
         let samples = try Self.samples()
-        try #require(samples.contains(where: Self.isCC0), "no *_CC0.dng samples in \(Self.samplesDirectory.path)")
+        try #require(!samples.isEmpty, "no samples to render in \(Self.samplesDirectory.path)")
         let renderer = try Renderer()
         for url in samples {
             let output = Self.isCC0(url) ? shared : localOnly
             try FileManager.default.createDirectory(at: output, withIntermediateDirectories: true)
             let name = url.deletingPathExtension().lastPathComponent
             let negative = try renderer.developer.develop(Data(contentsOf: url))
-            for look in Self.looks {
-                let rendered = try renderer.render(negative, look.adjustments)
+            for look in Self.selectedLooks {
+                let rendered = try renderer.render(negative, look.adjustments, intent: .export)
                 let file = output.appending(path: "\(name).\(look.name).\(Self.label).jpg")
                 try renderer.export(rendered, format: .jpeg, quality: 0.95).write(to: file)
                 print("\(file.lastPathComponent): \(Int(rendered.extent.width))×\(Int(rendered.extent.height))")

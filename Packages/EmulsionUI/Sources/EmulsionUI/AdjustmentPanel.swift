@@ -15,8 +15,7 @@ public struct AdjustmentPanel: View {
     }
 
     private var selectedControl: AdjustmentControl {
-        let controls = group.controls(for: adjustments.process)
-        return controls.first { $0.id == selectedControls[group] } ?? controls[0]
+        group.controls.first { $0.id == selectedControls[group] } ?? group.controls[0]
     }
 
     public var body: some View {
@@ -56,11 +55,11 @@ public struct AdjustmentPanel: View {
     private var controlPicker: some View {
         ScrollView(.horizontal) {
             HStack(spacing: FilmLabLayout.compact) {
-                ForEach(group.controls(for: adjustments.process)) { control in
+                ForEach(group.controls) { control in
                     Button {
                         selectedControls[group] = control.id
                     } label: {
-                        Text(control.title)
+                        Text(control.title(for: adjustments.process))
                             .font(.caption.weight(.medium))
                             .padding(.horizontal, FilmLabLayout.gap)
                             .frame(minHeight: FilmLabLayout.minimumControlHeight)

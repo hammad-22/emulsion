@@ -4,32 +4,47 @@ using namespace metal;
 // The digicam process (Renderer+Digicam.swift): a mid-2000s compact CCD camera's in-camera JPEG.
 // Not a film process. Pointwise math mirrors DigicamModel.swift; constants arrive as arguments
 // from DigicamLook.swift. Working space: extended linear sRGB (D65).
+//
+// Copied from Emulsion.ci.metal so the film kernels' open PRs merge cleanly: digicamLuma709
+// (lumaSRGB), digicamHash (the grain `hash`) and the value-noise lattice (valueNoise).
+// Follow-up: share them through a header.
 
 float digicamLuma709(float3 rgb) { return dot(rgb,float3(.2126,.7152,.0722)); }
 float3 digicamEncode(float3 x) { return select(1.055*pow(max(x,0.0),1.0/2.4)-0.055, 12.92*x, x<=0.0031308); }
 float3 digicamDecode(float3 v) { return select(pow((max(v,0.0)+0.055)/1.055,2.4), v/12.92, v<=0.04045); }
 
-// Mirrors `hash` in Emulsion.ci.metal (film grain). Kept separate so open PRs on the film kernels
-// merge cleanly; follow-up: share a header.
+// The seed enters through irrational multiples, so whole-number seeds stay independent.
 float digicamHash(float2 p, float seed) {
     float3 q=fract(float3(p.xyx)*float3(.1031,.1030,.0973)+fract(seed*float3(.6180339887,.7548776662,.5698402910)));
     q+=dot(q,q.yzx+33.33);
     return fract((q.x+q.y)*q.z)*2.0-1.0;
 }
-float digicamValueNoise(float2 p, float seed) {
+// Three independent values per lattice point (same mixing, three outputs), in −1…1.
+float3 digicamHash3(float2 p, float seed) {
+    float3 q=fract(float3(p.xyx)*float3(.1031,.1030,.0973)+fract(seed*float3(.6180339887,.7548776662,.5698402910)));
+    q+=dot(q,q.yxz+33.33);
+    return fract((q.xxy+q.yzz)*q.zyx)*2.0-1.0;
+}
+// Smooth value noise, one lattice for all three channels.
+float3 digicamValueNoise3(float2 p, float seed) {
     float2 i=floor(p), f=fract(p);
     float2 u=f*f*(3.0-2.0*f);
-    float a=digicamHash(i,seed), b=digicamHash(i+float2(1,0),seed), c=digicamHash(i+float2(0,1),seed), d=digicamHash(i+float2(1,1),seed);
+    float3 a=digicamHash3(i,seed), b=digicamHash3(i+float2(1,0),seed), c=digicamHash3(i+float2(0,1),seed),
+           d=digicamHash3(i+float2(1,1),seed);
     return mix(mix(a,b,u.x),mix(c,d,u.x),u.y);
 }
 
 // JPEG tone curve on x = light / clip (0…1, black offset already removed): sRGB encode, a power
-// that puts mid-gray on its code (pivot), then an S curve pivoting there that still reaches 1 with
-// slope 1 − contrast: a hard clip, no shoulder.
-float digicamToneCurve(float x, float gammaPower, float contrast, float pivot, float power) {
+// that puts mid-gray on the pivot, an S curve (a square on each side) pivoting there whose slope
+// at 1 is 1 − contrast (a hard clip, no shoulder), then lifted to the black floor.
+// curve = (pivot, black floor code, -, -).
+float digicamToneCurve(float x, float gammaPower, float contrast, float4 curve) {
+    float p=curve.x;
     float t=pow(digicamEncode(float3(clamp(x,0.0,1.0))).x,gammaPower);
-    float s=t<pivot ? pivot*pow(t/pivot,power) : 1.0-(1.0-pivot)*pow((1.0-t)/(1.0-pivot),power);
-    return digicamDecode(float3(mix(t,s,contrast))).x;
+    float lo=t/p, hi=(1.0-t)/(1.0-p);
+    float s=t<p ? p*lo*lo : 1.0-(1.0-p)*hi*hi;
+    float v=mix(t,s,contrast);
+    return digicamDecode(float3(curve.y+(1.0-curve.y)*v)).x;
 }
 
 // Scene light (working space, premultiplied) → near-clip mask (0…1, opaque). `fringe` = (scene
@@ -40,14 +55,19 @@ extern "C" float4 digicamFringeSource(coreimage::sample_t s, float2 fringe) {
     return float4(m,m,m,1.0);
 }
 
-// Scene light (working space, premultiplied) plus its corner-softness blur, near-clip mask and
-// blurred mask → display light (display-linear sRGB in 0…1, working space, premultiplied).
+// Scene light (working space, premultiplied), its near-clip mask and the blurred mask → scene light
+// with purple fringing (premultiplied): the blur's spill outside the mask, × `fringe` (colour × strength).
+extern "C" float4 digicamFringe(coreimage::sample_t s, coreimage::sample_t mask, coreimage::sample_t maskBlur, float4 fringe) {
+    return float4(s.rgb+fringe.rgb*max(maskBlur.r-mask.r,0.0)*s.a,s.a);
+}
+
+// Scene light (working space, premultiplied, already softened by the lens) and its corner blur → display light
+// (display-linear sRGB in 0…1, working space, premultiplied).
 // lens = (centre x, centre y, 1 / half-diagonal², vignette stops at the corner).
-// fringe = purple fringe colour × strength (scene light). gains = (white balance × 2^exposure, clip).
-// noise = (amount, luminance cell px, chroma cell px, seed); noiseShape = (shot, read floor, chroma
-// share, -). tone = (saturation, gamma power, contrast, black offset); curve = (pivot, power, -, -).
-extern "C" float4 digicamCapture(coreimage::sample_t s, coreimage::sample_t soft, coreimage::sample_t mask,
-                                 coreimage::sample_t maskBlur, float4 lens, float4 fringe, float4 gains,
+// gains = (white balance × 2^exposure, clip). noise = (amount, luminance cell px, chroma cell px,
+// seed); noiseShape = (shot, read floor, chroma share, blue noise gain). tone = (saturation, gamma power,
+// contrast, black offset); curve as digicamToneCurve.
+extern "C" float4 digicamCapture(coreimage::sample_t s, coreimage::sample_t soft, float4 lens, float4 gains,
                                  float4 noise, float4 noiseShape, float4 tone, float4 curve,
                                  coreimage::destination dest) {
     float a=s.a;
@@ -56,7 +76,6 @@ extern "C" float4 digicamCapture(coreimage::sample_t s, coreimage::sample_t soft
     float2 d=c-lens.xy;
     float r2=dot(d,d)*lens.z;
     rgb=mix(rgb,soft.rgb/max(soft.a,1e-6),clamp(r2,0.0,1.0));
-    rgb+=fringe.rgb*max(maskBlur.r-mask.r,0.0);
     rgb*=exp2(-lens.w*r2)*gains.rgb;
     float clip=gains.w;
     if(noise.x>0.0) {
@@ -64,16 +83,14 @@ extern "C" float4 digicamCapture(coreimage::sample_t s, coreimage::sample_t soft
         float sigma=noise.x*clip*(noiseShape.x*sqrt(Y/clip)+noiseShape.y);
         float lumaCell=max(noise.y,1.0), chromaCell=max(noise.z,1.0);
         float n=digicamHash(floor(c/lumaCell),noise.w)*min(noise.y,1.0);
-        float2 p=c/chromaCell;
-        float3 chroma=float3(digicamValueNoise(p,noise.w+3.1),digicamValueNoise(p+41.0,noise.w+3.1),
-                             digicamValueNoise(p+83.0,noise.w+3.1))*noiseShape.z*min(noise.z,1.0);
-        rgb+=sigma*(n+chroma);
+        float3 chroma=digicamValueNoise3(c/chromaCell,noise.w+3.1)*noiseShape.z*min(noise.z,1.0);
+        rgb+=sigma*(n+chroma)*float3(1.0,1.0,noiseShape.w);
     }
     float3 x=max(min(rgb,float3(clip))/clip-tone.w,0.0)/(1.0-tone.w);
     float Yx=digicamLuma709(x);
     x=clamp(Yx+(x-Yx)*tone.x,0.0,1.0);
-    float3 o=float3(digicamToneCurve(x.r,tone.y,tone.z,curve.x,curve.y),digicamToneCurve(x.g,tone.y,tone.z,curve.x,curve.y),
-                    digicamToneCurve(x.b,tone.y,tone.z,curve.x,curve.y));
+    float3 o=float3(digicamToneCurve(x.r,tone.y,tone.z,curve),digicamToneCurve(x.g,tone.y,tone.z,curve),
+                    digicamToneCurve(x.b,tone.y,tone.z,curve));
     return float4(o*a,a);
 }
 

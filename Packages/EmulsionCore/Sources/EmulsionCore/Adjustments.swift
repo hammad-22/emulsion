@@ -5,7 +5,8 @@ import Foundation
 /// The controls are shared by both processes. In the digicam process exposure is set before the
 /// sensor clip, Warmth and Tint shift the camera's white balance (channel gains, not printer
 /// lights), Color is saturation, Grain is sensor noise and Halation is the in-camera processing
-/// (sharpening halos, purple fringing and JPEG compression; 0 is clean).
+/// (purple fringing, corner softness, vignette, sharpening halos and, in exports, JPEG
+/// compression; 0 is clean).
 public struct Adjustments: Codable, Equatable, Sendable {
     /// Scene exposure in stops (−3…3).
     public var exposure: Double = 0

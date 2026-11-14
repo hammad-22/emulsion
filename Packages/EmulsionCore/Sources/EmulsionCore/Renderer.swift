@@ -35,12 +35,13 @@ public final class Renderer: @unchecked Sendable {
 
     /// Scene light → display light (in the working space), look applied. Display-referred
     /// negatives are printed relative to the photo they were developed from. The digicam process
-    /// crops to 4:3 and caps the size at its sensor's (`renderDigicam`).
-    public func render(_ negative: Negative, _ adjustments: Adjustments) throws -> CIImage {
+    /// crops to 4:3, caps the size at its sensor's and compresses exports (`renderDigicam`); the film
+    /// process renders previews and exports alike.
+    public func render(_ negative: Negative, _ adjustments: Adjustments, intent: RenderIntent = .preview) throws -> CIImage {
         let a = adjustments.clamped()
         switch a.process {
         case .film: return try renderFilm(negative, a)
-        case .digicam: return try renderDigicam(negative, a)
+        case .digicam: return try renderDigicam(negative, a, intent: intent)
         }
     }
 
@@ -135,16 +136,30 @@ public final class Renderer: @unchecked Sendable {
 
     /// Display P3 file with the look baked in; source metadata (GPS etc.) is not carried over.
     public func export(_ image: CIImage, format: ExportFormat, quality: Double = 0.95) throws -> Data {
-        let options = [CIImageRepresentationOption(rawValue: kCGImageDestinationLossyCompressionQuality as String): quality]
-        // Core Image writes an image's properties into the file, and they survive the film
-        // render, so the source's metadata (GPS included) is cleared first (MOV-126).
-        let image = image.settingProperties([:])
-        let data: Data?
         switch format {
-        case .jpeg: data = context.jpegRepresentation(of: image, colorSpace: Self.outputSpace, options: options)
-        case .heic: data = try? context.heif10Representation(of: image, colorSpace: Self.outputSpace, options: options)
+        case .jpeg: return try jpegData(image, colorSpace: Self.outputSpace, quality: quality)
+        case .heic:
+            let image = image.settingProperties([:])
+            guard
+                let data = try? context.heif10Representation(
+                    of: image, colorSpace: Self.outputSpace, options: Self.options(quality: quality))
+            else { throw EmulsionError.renderFailed }
+            return data
         }
-        guard let data else { throw EmulsionError.renderFailed }
+    }
+
+    /// A JPEG of `image` in `colorSpace`, with the image's properties cleared: Core Image writes them
+    /// into the file, and they survive the render, so the source's metadata (GPS included) would
+    /// otherwise be carried over (MOV-126).
+    func jpegData(_ image: CIImage, colorSpace: CGColorSpace, quality: Double) throws -> Data {
+        guard
+            let data = context.jpegRepresentation(
+                of: image.settingProperties([:]), colorSpace: colorSpace, options: Self.options(quality: quality))
+        else { throw EmulsionError.renderFailed }
         return data
+    }
+
+    private static func options(quality: Double) -> [CIImageRepresentationOption: Any] {
+        [CIImageRepresentationOption(rawValue: kCGImageDestinationLossyCompressionQuality as String): quality]
     }
 }

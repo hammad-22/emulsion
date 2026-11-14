@@ -3,7 +3,7 @@ import EmulsionCore
 /// The editor's controls, grouped the way the film process is: exposure and local tone,
 /// printer lights and color density, then texture. Shared so iOS and Mac show the same
 /// controls with the same ranges; the iPhone panel shows one group at a time. The digicam
-/// process uses the same controls, two of them under its own names (`controls(for:)`).
+/// process uses the same controls, two of them under its own names (`AdjustmentControl.title(for:)`).
 public enum AdjustmentGroup: String, CaseIterable, Identifiable, Sendable {
     case light, color, texture
 
@@ -28,16 +28,12 @@ public enum AdjustmentGroup: String, CaseIterable, Identifiable, Sendable {
         group: AdjustmentGroup, control: AdjustmentControl.ID
     )? {
         let changed = allCases.flatMap { group in
-            group.controls(for: .film).filter { old[keyPath: $0.keyPath] != new[keyPath: $0.keyPath] }.map {
-                (group: group, control: $0.id)
-            }
+            group.controls.filter { old[keyPath: $0.keyPath] != new[keyPath: $0.keyPath] }.map { (group: group, control: $0.id) }
         }
         return changed.count == 1 ? changed[0] : nil
     }
 
-    /// The group's controls, titled for `process`: in the digicam process Grain is sensor noise and
-    /// Halation the in-camera processing (sharpening, fringing, JPEG).
-    public func controls(for process: RenderProcess) -> [AdjustmentControl] {
+    public var controls: [AdjustmentControl] {
         switch self {
         case .light:
             [
@@ -56,21 +52,15 @@ public enum AdjustmentGroup: String, CaseIterable, Identifiable, Sendable {
                 .init(id: "color", title: String(localized: "Color", bundle: .module), keyPath: \.color, range: Self.balanceRange),
             ]
         case .texture:
-            switch process {
-            case .film:
-                [
-                    .init(id: "grain", title: String(localized: "Grain", bundle: .module), keyPath: \.grain, range: Self.amountRange),
-                    .init(
-                        id: "halation", title: String(localized: "Halation", bundle: .module), keyPath: \.halation, range: Self.amountRange),
-                ]
-            case .digicam:
-                [
-                    .init(id: "grain", title: String(localized: "Noise", bundle: .module), keyPath: \.grain, range: Self.amountRange),
-                    .init(
-                        id: "halation", title: String(localized: "Processing", bundle: .module), keyPath: \.halation,
-                        range: Self.amountRange),
-                ]
-            }
+            [
+                .init(
+                    id: "grain", title: String(localized: "Grain", bundle: .module),
+                    digicamTitle: String(localized: "Noise", bundle: .module),
+                    keyPath: \.grain, range: Self.amountRange),
+                .init(
+                    id: "halation", title: String(localized: "Halation", bundle: .module),
+                    digicamTitle: String(localized: "Processing", bundle: .module), keyPath: \.halation, range: Self.amountRange),
+            ]
         }
     }
 }
@@ -81,17 +71,32 @@ public struct AdjustmentControl: Identifiable {
 
     /// Stable across processes and languages, unlike the title.
     public let id: String
-    public let title: String
+    private let filmTitle: String
+    /// The title in the digicam process when it differs (Grain is sensor noise, Halation the
+    /// in-camera processing: sharpening, fringing, lens and JPEG).
+    private let digicamTitle: String?
     public let keyPath: WritableKeyPath<Adjustments, Double>
     public let range: ClosedRange<Double>
     let unit: Unit
 
-    init(id: String, title: String, keyPath: WritableKeyPath<Adjustments, Double>, range: ClosedRange<Double>, unit: Unit = .amount) {
+    init(
+        id: String, title: String, digicamTitle: String? = nil, keyPath: WritableKeyPath<Adjustments, Double>, range: ClosedRange<Double>,
+        unit: Unit = .amount
+    ) {
         self.id = id
-        self.title = title
+        self.filmTitle = title
+        self.digicamTitle = digicamTitle
         self.keyPath = keyPath
         self.range = range
         self.unit = unit
+    }
+
+    /// What the control is called in `process`.
+    public func title(for process: RenderProcess) -> String {
+        switch process {
+        case .film: filmTitle
+        case .digicam: digicamTitle ?? filmTitle
+        }
     }
 
     /// A visible ruler tick and an accessible adjustment step.
