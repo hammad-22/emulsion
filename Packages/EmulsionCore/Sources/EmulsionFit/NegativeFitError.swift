@@ -5,8 +5,10 @@ enum NegativeFitError: LocalizedError, Equatable {
     case notACameraNegative(String)
     case missingCameraStops(String)
     case missingLayers(String)
+    case dyeSet(DyeSetError)
     case invalidBaseStock(path: String, reason: String)
     case fittedStockRejected(String)
+    case notTheDefaultSource(String, expected: String)
     case encodingFailed(String)
     case writeFailed(path: String, reason: String)
 
@@ -18,10 +20,14 @@ enum NegativeFitError: LocalizedError, Equatable {
             return "\(id): the characteristic chart has no camera-stop axis to anchor mid-gray; pass --mid-gray-log-exposure."
         case .missingLayers(let id):
             return "\(id): the characteristic chart needs red, green and blue curves."
+        case .dyeSet(let error):
+            return "The dye set needed for the fit failed: \(error.errorDescription ?? "")"
         case .invalidBaseStock(let path, let reason):
             return "Base stock \(path) can't be used: \(reason)"
         case .fittedStockRejected(let reason):
             return "The fitted stock fails the engine's validation: \(reason)"
+        case .notTheDefaultSource(let id, let expected):
+            return "--bundled-default is made from \(expected) only, not \(id)."
         case .encodingFailed(let reason):
             return "Couldn't encode the fit report: \(reason)"
         case .writeFailed(let path, let reason):

@@ -1,5 +1,9 @@
 # Decisions
 
+## 12 November 2026: fitted default negative (delegated, pending owner review)
+
+The default stock's negative is fitted to the H-1-5207 (VISION3 250D) datasheet: a toe-and-shoulder curve per layer in dye amount, and an APD printing-density matrix from the reconstructed dye set (MOV-25, MOV-88). The print contrast is rebalanced per channel so print × printing-density gamma is 1.33 on every channel, the old default's overall level; that level stays artistic (MOV-5). Made under the owner's delegated continuation, pending owner review of the look: blacks lift slightly (≈500:1 instead of ≈900:1), system gamma at mid-gray rises from 1.24 to 1.27, and saturated colors print a little less saturated through the matrix's cross terms. Measured against the previous goldens (CIEDE2000, neutral edits): gray wedge mean 0.55 / max 1.8, 24-patch chart mean 2.5 / max 6.3, skin-like patches 1.4, the two frozen photos 1.4–1.7 mean, and P3 primaries mean 3.9 / max 9.7, the largest change; the visual regression goldens were regenerated with it. The shipped default file names no film brand (MOV-92): its provenance says only that the negative is fitted to a published daylight-balanced ECN-2 camera-negative datasheet and points, by `sourceSHA256`, to the committed (unshipped) fit in `EmulsionFit/Resources/StockData/`, which keeps the datasheet's publisher, title, revision and URL. `emulsion-fit negative --bundled-default` writes it.
+
 ## 12 November 2026: traced datasheet curves stay local (owner)
 
 12 Nov 2026: publish fitted stock parameters and tools; keep traced datasheet curves local until MOV-94 counsel review; then reconsider publishing them with attribution.

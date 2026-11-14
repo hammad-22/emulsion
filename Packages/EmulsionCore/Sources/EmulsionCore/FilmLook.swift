@@ -32,7 +32,9 @@ public enum FilmLook {
     /// measurements: the film prints neither pure white nor pure black, so a finite estimate
     /// is picked that keeps edits smooth (see `FilmModel.SoftEnds`).
     static let displayCeilingStops = 4.0
-    static let displayFloorStops = -9.0
+    /// The deepest exposure at which the fitted negative's toe still gives the print a usable
+    /// slope; chosen by the near-black banding sweep (docs/ENGINE.md), not measured.
+    static let displayFloorStops = -6.0
     /// The scene-estimate bisection searches this far beyond the floor and ceiling.
     static let displaySearchMarginStops = 0.5
     /// Display-linear values between these knees pass to the neutral-response inversion

@@ -3,7 +3,8 @@ import simd
 
 /// Emulsion's look as a photochemical system rather than a curve or LUT:
 ///
-///   scene light ─▶ negative layers (sensitivity crosstalk) ─▶ H&D curves → dye density
+///   scene light ─▶ negative layers (sensitivity crosstalk) ─▶ characteristic curves → dye amounts
+///               ─▶ printing density (dye amounts through the printing-density matrix)
 ///               ─▶ print exposure through the negative (printer lights)
 ///               ─▶ print H&D curves → print dye density (unwanted absorptions)
 ///               ─▶ viewing: light = 10^−(density − paper white)
@@ -18,12 +19,20 @@ public struct FilmModel: Sendable, Equatable {
     /// Strongly saturated light can drive a layer's exposure negative, which is clamped.
     public let sensitivity: simd_double3x3
 
-    /// Negative characteristic curves (per layer R, G, B): density = range·logistic.
-    /// `negativeGamma` is the slope (density per log10 exposure) at the curve center,
-    /// `negativeOffset` log10 exposure above mid-gray.
+    /// Negative characteristic curves, per layer (red-, green-, blue-sensitive), as dye amount above
+    /// minimum density against log10 exposure x relative to mid-gray (`negativeDyeAmount`): zero far
+    /// below the toe, a straight line of slope `negativeGamma` between toe and shoulder, flat far above
+    /// the shoulder. A toe-and-shoulder form fitted to datasheet dye amounts (Approximated; see
+    /// docs/ENGINE.md, "Fitting stocks", for how closely it follows them).
     public let negativeGamma: SIMD3<Double>
-    public let negativeRange: Double
-    public let negativeOffset: SIMD3<Double>
+    public let negativeToeExposure: SIMD3<Double>
+    public let negativeToeWidth: SIMD3<Double>
+    public let negativeShoulderExposure: SIMD3<Double>
+    public let negativeShoulderWidth: SIMD3<Double>
+    /// Printing density per unit dye: rows printing density R, G, B; columns the cyan, magenta and
+    /// yellow amounts of the red-, green- and blue-sensitive layers. Its cross terms are the dyes'
+    /// unwanted absorptions net of the masking couplers, as the print stock sees them.
+    public let printingDensity: simd_double3x3
 
     /// Print stock: high contrast, deep blacks, paper white at dmin.
     public let printGamma: SIMD3<Double>
@@ -57,8 +66,11 @@ public struct FilmModel: Sendable, Equatable {
         try Self.validate(stock)
         sensitivity = stock.negative.sensitivity
         negativeGamma = stock.negative.gamma
-        negativeRange = stock.negative.densityRange
-        negativeOffset = stock.negative.exposureOffset
+        negativeToeExposure = stock.negative.toeExposure
+        negativeToeWidth = stock.negative.toeWidth
+        negativeShoulderExposure = stock.negative.shoulderExposure
+        negativeShoulderWidth = stock.negative.shoulderWidth
+        printingDensity = stock.negative.printingDensity
         printGamma = stock.print.gamma
         printDmin = stock.print.minimumDensity
         printRange = stock.print.densityRange
@@ -74,19 +86,32 @@ public struct FilmModel: Sendable, Equatable {
 
     static func logistic(_ x: Double) -> Double { 1 / (1 + exp(-x)) }
 
-    /// One layer's characteristic curve: log10 exposure (relative to mid-gray) → negative density.
-    package static func negativeDensity(logExposure: Double, gamma: Double, densityRange: Double, exposureOffset: Double) -> Double {
-        densityRange * logistic(4 * gamma / densityRange * (logExposure - exposureOffset))
+    /// log(1 + eˣ) in a form that doesn't overflow far above zero. Far below zero it returns exactly 0 once e⁻|ˣ| is
+    /// under machine epsilon (x below about −36.7 here, −16.6 in the Float kernel).
+    static func softplus(_ x: Double) -> Double { max(x, 0) + log(1 + exp(-abs(x))) }
+
+    /// One layer's characteristic curve: log10 exposure (relative to mid-gray) → dye amount above minimum density.
+    package static func negativeDyeAmount(
+        logExposure: Double, gamma: Double, toeExposure: Double, toeWidth: Double, shoulderExposure: Double, shoulderWidth: Double
+    ) -> Double {
+        gamma
+            * (toeWidth * softplus((logExposure - toeExposure) / toeWidth)
+                - shoulderWidth * softplus((logExposure - shoulderExposure) / shoulderWidth))
     }
 
-    /// log10 scene exposure (per layer, relative to mid-gray) → negative density.
-    public func negativeDensity(_ logE: SIMD3<Double>) -> SIMD3<Double> {
+    /// log10 scene exposure (per layer, relative to mid-gray) → dye amounts (cyan, magenta, yellow).
+    public func negativeDyeAmount(_ logE: SIMD3<Double>) -> SIMD3<Double> {
         SIMD3(
             (0..<3).map {
-                Self.negativeDensity(
-                    logExposure: logE[$0], gamma: negativeGamma[$0], densityRange: negativeRange, exposureOffset: negativeOffset[$0])
+                Self.negativeDyeAmount(
+                    logExposure: logE[$0], gamma: negativeGamma[$0], toeExposure: negativeToeExposure[$0],
+                    toeWidth: negativeToeWidth[$0], shoulderExposure: negativeShoulderExposure[$0],
+                    shoulderWidth: negativeShoulderWidth[$0])
             })
     }
+
+    /// log10 scene exposure (per layer, relative to mid-gray) → printing density above minimum density.
+    public func negativePrintingDensity(_ logE: SIMD3<Double>) -> SIMD3<Double> { printingDensity * negativeDyeAmount(logE) }
 
     /// log10 print exposure → print density (before dye cross-absorption).
     public func printDensity(_ logP: SIMD3<Double>) -> SIMD3<Double> {
@@ -112,11 +137,20 @@ public struct FilmModel: Sendable, Equatable {
         return t * t * (3 - 2 * t)
     }
 
+    /// The smallest layer exposure (scene-linear) the chain uses: black and the exposures the sensitivity crosstalk drives
+    /// negative are clamped to it, so log10 stays finite. The kernel clamps to the same 1e-7 (`filmRender`, `filmSystemRelative`).
+    static let layerExposureFloor = 1e-7
+    /// The lowest log10 exposure relative to mid-gray a layer can see: `layerExposureFloor` (about −20.8 stops).
+    static let minimumLogExposure = log10(layerExposureFloor / 0.18)
+    /// The highest log10 exposure relative to mid-gray a stock must stay well behaved to: +6 (about +20 stops), beyond any
+    /// exposure the pipeline produces (scene values above mid-gray plus the largest exposure edit).
+    static let maximumLogExposure = 6.0
+
     /// The photochemical chain itself.
     func system(_ s: SIMD3<Double>, lights: SIMD3<Double>) -> SIMD3<Double> {
-        let exposure = simd_max(sensitivity * s, SIMD3(repeating: 1e-7))
+        let exposure = simd_max(sensitivity * s, SIMD3(repeating: Self.layerExposureFloor))
         let logE = SIMD3((0..<3).map { log10(exposure[$0] / 0.18) })
-        let dNeg = negativeDensity(logE)
+        let dNeg = negativePrintingDensity(logE)
         // More negative density → less light reaches the print.
         let logP = printerLights + lights - dNeg
         let dPrint = printDyes * printDensity(logP)
@@ -163,16 +197,29 @@ extension FilmModel {
         let print = stock.print
         let rendering = stock.rendering
         let numbers =
-            (negative.sensitivity.rows + print.dyes.rows + [negative.gamma, negative.exposureOffset, print.gamma])
-            .flatMap { [$0.x, $0.y, $0.z] }
+            (negative.sensitivity.rows + negative.printingDensity.rows + print.dyes.rows
             + [
-                negative.densityRange, print.minimumDensity, print.densityRange, print.shape,
-                rendering.highlightChromaRetention, rendering.middleGrayOut,
-            ]
+                negative.gamma, negative.toeExposure, negative.toeWidth, negative.shoulderExposure, negative.shoulderWidth,
+                print.gamma,
+            ])
+            .flatMap { [$0.x, $0.y, $0.z] }
+            + [print.minimumDensity, print.densityRange, print.shape, rendering.highlightChromaRetention, rendering.middleGrayOut]
         try require(numbers.allSatisfy(\.isFinite), "every parameter must be a finite number.")
         try require(negative.gamma.min() > 0, "negative gamma must be above 0.")
+        try require(negative.toeWidth.min() > 0, "negative toe width must be above 0.")
+        try require(negative.shoulderWidth.min() > 0, "negative shoulder width must be above 0.")
+        try require(
+            all(negative.shoulderExposure .> negative.toeExposure), "each negative shoulder exposure must be above its toe exposure.")
+        let printingDensity = negative.printingDensity
+        try require(
+            (0..<3).allSatisfy { printingDensity[$0, $0] > 0 }, "the printing-density matrix must have a positive diagonal.")
+        try require(printingDensity.determinant != 0, "the printing-density matrix must be invertible (non-zero determinant).")
+        try require(
+            negative.printingDensityGamma.min() > 0,
+            "each channel's printing density must rise with neutral exposure (printingDensity · gamma is "
+                + "\(negative.printingDensityGamma)).")
+        try requireRisingNegativeCurves(negative)
         try require(print.gamma.min() > 0, "print gamma must be above 0.")
-        try require(negative.densityRange > 0, "negative density range must be above 0.")
         try require(print.densityRange > 0, "print density range must be above 0.")
         try require(print.shape > 0, "print shape must be above 0.")
         try require(print.minimumDensity >= 0, "print minimum density can't be negative.")
@@ -181,6 +228,24 @@ extension FilmModel {
             (0...1).contains(rendering.highlightChromaRetention), "highlight chroma retention must be between 0 and 1.")
         try requireRowsSumToOne(negative.sensitivity, "sensitivity")
         try requireRowsSumToOne(print.dyes, "print dye")
+    }
+
+    /// Each layer's dye amount must not fall as exposure rises, over every exposure the engine reaches. The curve's slope
+    /// is gamma·[σ(z_t) − σ(z_s)], z_t = (x − toeExposure)/toeWidth and z_s = (x − shoulderExposure)/shoulderWidth, so it
+    /// is non-negative exactly where z_t ≥ z_s. z_t − z_s is linear in x: checking both ends of the range covers it all.
+    private static func requireRisingNegativeCurves(_ negative: FilmStock.Negative) throws(EmulsionError) {
+        for (layer, name) in ["red", "green", "blue"].enumerated() {
+            let rises = [minimumLogExposure, maximumLogExposure].allSatisfy { x in
+                (x - negative.toeExposure[layer]) / negative.toeWidth[layer]
+                    >= (x - negative.shoulderExposure[layer]) / negative.shoulderWidth[layer]
+            }
+            try require(
+                rises,
+                "the \(name) layer's negative curve must not fall between log10 exposure "
+                    + String(format: "%.2f and %+.2f", minimumLogExposure, maximumLogExposure)
+                    + " from mid-gray, the range the engine reaches: its shoulder bends down before its toe has risen "
+                    + "(toe width \(negative.toeWidth[layer]), shoulder width \(negative.shoulderWidth[layer])).")
+        }
     }
 
     /// Rows summing to 1 is what keeps neutral light neutral through the matrix.

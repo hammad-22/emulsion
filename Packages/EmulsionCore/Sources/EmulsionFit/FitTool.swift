@@ -1,7 +1,8 @@
 import EmulsionCore
 import Foundation
 
-/// `emulsion-fit`: lists and checks the digitized datasheet data and fits the engine's negative curve to it.
+/// `emulsion-fit`: lists and checks the digitized datasheet data, reconstructs negative dye sets and fits the engine's
+/// negative to them.
 public enum FitTool {
     /// Written into fitted stock files and reports as `tool`.
     static let version = "0.1.0"
@@ -48,16 +49,23 @@ public enum FitTool {
             guard let referenceData else { throw .noReferenceData(resolved.path) }
             return referenceData
         }
+        /// After the reference data, so a missing tracing is reported first.
+        let requiredStandards = { (flag: URL?) throws(CommandLineError) -> (referenceData: URL, standards: URL) in
+            let referenceData = try requiredReferenceData()
+            let standards = StandardsTables.directory(flag: flag, environment: standardsEnvironment, referenceData: resolved)
+            guard standards.isExistingDirectory else { throw .noStandardsDirectory(standards.path) }
+            return (referenceData, standards)
+        }
         switch command {
         case .help: return (FitCommand.usage + "\n", true)
         case .list: return list(try manifests(), referenceData: referenceData, tried: resolved)
         case .check: return check(try manifests(), referenceData: try requiredReferenceData())
-        case .negative(let options): return (try negative(options, in: manifests(), referenceData: requiredReferenceData()), true)
+        case .negative(let options):
+            let local = try requiredStandards(options.shared.standards)
+            return (try negative(options, in: manifests(), referenceData: local.referenceData, standards: local.standards), true)
         case .dyes(let options):
-            let referenceData = try requiredReferenceData()
-            let standards = StandardsTables.directory(flag: options.standards, environment: standardsEnvironment, referenceData: resolved)
-            guard standards.isExistingDirectory else { throw CommandLineError.noStandardsDirectory(standards.path) }
-            return (try dyes(options, in: manifests(), referenceData: referenceData, standards: standards), true)
+            let local = try requiredStandards(options.standards)
+            return (try dyes(options, in: manifests(), referenceData: local.referenceData, standards: local.standards), true)
         }
     }
 
@@ -178,21 +186,30 @@ public enum FitTool {
             + verdict
     }
 
-    private static func negative(_ options: FitCommand.NegativeOptions, in directory: URL, referenceData: URL) throws -> String {
-        let stock = try DigitizedStock.load(id: options.stock, from: directory, referenceData: referenceData)
-        let report = try NegativeFitReport.fitting(stock, midGrayLogExposure: options.midGrayLogExposure, tool: toolName)
+    private static func negative(_ options: FitCommand.NegativeOptions, in directory: URL, referenceData: URL, standards: URL) throws
+        -> String
+    {
+        let standards = try StandardsTables.load(from: standards)
+        let stock = try DigitizedStock.load(id: options.shared.stock, from: directory, referenceData: referenceData)
+        let report = try NegativeFitReport.fitting(
+            stock, standards: standards, midGrayLogExposure: options.midGrayLogExposure, tool: toolName)
         let fitted = try FittedStock.make(base: baseStock(options.base), report: report, fitDate: options.fitDate, name: options.name)
 
-        try createDirectory(options.out)
-        try write(fitted.encoded(), to: options.out.appending(path: "\(stock.id).stock.json"))
-        try write(report.reportJSON(), to: options.out.appending(path: "\(stock.id).negative-fit.json"))
-        try write(Data(report.plotTable().utf8), to: options.out.appending(path: "\(stock.id).negative-fit.csv"))
-        return NegativeFitSummary.text(report)
-            + "\nWrote \(stock.id).stock.json, .negative-fit.json, .negative-fit.csv to \(options.out.path)\n"
+        let out = options.shared.out
+        try createDirectory(out)
+        try write(fitted.encoded(), to: out.appending(path: "\(stock.id).stock.json"))
+        try write(report.reportJSON(), to: out.appending(path: "\(stock.id).negative-fit.json"))
+        try write(Data(report.plotTable().utf8), to: out.appending(path: "\(stock.id).negative-fit.csv"))
+        var wrote = "\nWrote \(stock.id).stock.json, .negative-fit.json, .negative-fit.csv to \(out.path)\n"
+        if let bundledDefault = options.bundledDefault {
+            try write(FittedStock.bundledDefault(from: fitted).encoded(), to: bundledDefault)
+            wrote += "Wrote the bundled default to \(bundledDefault.path)\n"
+        }
+        return NegativeFitSummary.text(report) + wrote
             + "The report and plot table contain traced samples: keep them out of the repository.\n"
     }
 
-    private static func dyes(_ options: FitCommand.DyesOptions, in directory: URL, referenceData: URL, standards: URL) throws -> String {
+    private static func dyes(_ options: FitCommand.StockOptions, in directory: URL, referenceData: URL, standards: URL) throws -> String {
         let standards = try StandardsTables.load(from: standards)
         let stock = try DigitizedStock.load(id: options.stock, from: directory, referenceData: referenceData)
         let report = try NegativeDyeSetReport.making(stock, standards: standards, tool: toolName)

@@ -152,8 +152,8 @@ struct DyeSetTests {
     }
 
     @Test func dyesNeedsTheReferenceDataThenTheStandardsTables() throws {
-        let options = FitCommand.DyesOptions(
-            stock: "kodak-vision3-250d-5207", out: URL(filePath: "/tmp/unused", directoryHint: .isDirectory))
+        let options = FitCommand.StockOptions(
+            stock: NegativeFitReport.targetStock, out: URL(filePath: "/tmp/unused", directoryHint: .isDirectory))
         let home = FitCommandTests.home
         #expect(throws: CommandLineError.noReferenceData(FitCommandTests.missingData)) {
             try FitTool.perform(.dyes(options), environment: FitCommandTests.missingData, standardsEnvironment: nil, home: home)

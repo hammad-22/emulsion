@@ -6,17 +6,21 @@ import Testing
 struct FitCommandTests {
     @Test func negativeParsesEveryOption() throws {
         let command = try FitCommand(arguments: [
-            "negative", "--stock", "s", "--out", "/tmp/o", "--data", "/tmp/d", "--manifests", "/tmp/m", "--base", "/tmp/b.json",
-            "--mid-gray-log-exposure", "-1.25", "--fit-date", "2026-11-10", "--name", "Warm test",
+            "negative", "--stock", "s", "--out", "/tmp/o", "--data", "/tmp/d", "--manifests", "/tmp/m", "--standards", "/tmp/st",
+            "--base", "/tmp/b.json", "--mid-gray-log-exposure", "-1.25", "--fit-date", "2026-11-10", "--name", "Warm test",
+            "--bundled-default", "/tmp/default.json",
         ])
         #expect(
             command
                 == .negative(
                     .init(
-                        stock: "s", out: URL(filePath: "/tmp/o", directoryHint: .isDirectory),
-                        manifests: URL(filePath: "/tmp/m", directoryHint: .isDirectory),
-                        data: URL(filePath: "/tmp/d", directoryHint: .isDirectory), base: URL(filePath: "/tmp/b.json"),
-                        midGrayLogExposure: -1.25, fitDate: "2026-11-10", name: "Warm test")))
+                        shared: .init(
+                            stock: "s", out: URL(filePath: "/tmp/o", directoryHint: .isDirectory),
+                            manifests: URL(filePath: "/tmp/m", directoryHint: .isDirectory),
+                            data: URL(filePath: "/tmp/d", directoryHint: .isDirectory),
+                            standards: URL(filePath: "/tmp/st", directoryHint: .isDirectory)),
+                        base: URL(filePath: "/tmp/b.json"), midGrayLogExposure: -1.25, fitDate: "2026-11-10", name: "Warm test",
+                        bundledDefault: URL(filePath: "/tmp/default.json"))))
     }
 
     @Test func dyesParsesEveryOption() throws {
@@ -90,7 +94,8 @@ struct FitCommandTests {
 
     @Test(arguments: [
         FitCommand.check(manifests: nil, data: nil),
-        .negative(.init(stock: "kodak-vision3-250d-5207", out: URL(filePath: "/tmp/unused", directoryHint: .isDirectory))),
+        .negative(
+            .init(shared: .init(stock: NegativeFitReport.targetStock, out: URL(filePath: "/tmp/unused", directoryHint: .isDirectory)))),
     ])
     func dataCommandsNeedTheReferenceData(_ command: FitCommand) {
         #expect(throws: CommandLineError.noReferenceData(Self.missingData)) {
@@ -136,13 +141,13 @@ struct FitCommandTests {
         #expect(FitTool.main(arguments: ["fit"]) == FitTool.usageExitCode)
     }
 
-    @Test(.enabled(if: StockDataTests.referenceDataAvailable && StockDataTests.presentStocks.contains("kodak-vision3-250d-5207")))
+    @Test(.enabled(if: DyeSetDataTests.available))
     func negativeWritesByteIdenticalFilesOnEveryRun() throws {
-        let id = "kodak-vision3-250d-5207"
+        let id = DyeSetDataTests.stock
         let runs = try (0..<2).map { _ in
             let out = FileManager.default.temporaryDirectory.appending(path: "emulsion-fit-\(UUID().uuidString)")
             defer { try? FileManager.default.removeItem(at: out) }
-            let options = FitCommand.NegativeOptions(stock: id, out: out)
+            let options = FitCommand.NegativeOptions(shared: .init(stock: id, out: out, standards: DyeSetDataTests.standardsDirectory))
             _ = try FitTool.perform(.negative(options))
             return try ["stock.json", "negative-fit.json", "negative-fit.csv"].map {
                 try Data(contentsOf: out.appending(path: "\(id).\($0)"))

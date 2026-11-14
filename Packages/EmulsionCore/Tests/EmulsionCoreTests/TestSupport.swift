@@ -32,7 +32,8 @@ class EmulsionTestCase: XCTestCase {
     func pixel(x: Int, y: Int, width: Int) -> Int { Self.pixel(x: x, y: y, width: width) }
     static func pixel(x: Int, y: Int, width: Int) -> Int { y * width + x }
     /// Linear Display P3 → OKLab.
-    func p3ToLab(_ p: SIMD3<Double>) -> SIMD3<Double> {
+    func p3ToLab(_ p: SIMD3<Double>) -> SIMD3<Double> { Self.p3ToLab(p) }
+    static func p3ToLab(_ p: SIMD3<Double>) -> SIMD3<Double> {
         let m = simd_double3x3(rows: [
             SIMD3(1.2249401763, -0.2249401763, 0), SIMD3(-0.0420569547, 1.0420569547, 0),
             SIMD3(-0.0196375546, -0.0786360456, 1.0982736001),
