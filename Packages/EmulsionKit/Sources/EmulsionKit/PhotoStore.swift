@@ -20,6 +20,10 @@ public final class PhotoStore {
     /// Set once a failed save is reported and cleared when one succeeds, so a full disk is
     /// reported once rather than on every slider rest.
     private var hasReportedSaveFailure = false
+    /// Measured anchors waiting for the save `exposureAnchorSave` holds back, by photo.
+    private var unsavedExposureAnchors: [UUID: StoredExposureAnchor] = [:]
+    private var exposureAnchorSave: Task<Void, Never>?
+    static let exposureAnchorSaveDelay = Duration.seconds(1)
 
     public convenience init() {
         self.init(folder: URL.applicationSupportDirectory.appending(path: "Emulsion", directoryHint: .isDirectory), renderService: .shared)
@@ -30,6 +34,14 @@ public final class PhotoStore {
         self.folder = folder
         self.renderService = renderService
         try? FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
+        loadIndex()
+        restoreExposureAnchors()
+        Task { [weak self, anchors = renderService.measuredExposureAnchors] in
+            for await (file, anchor) in anchors { self?.keepExposureAnchor(anchor, for: file) }
+        }
+    }
+
+    private func loadIndex() {
         let saved: Data
         do {
             saved = try Data(contentsOf: indexURL)
@@ -138,6 +150,42 @@ public final class PhotoStore {
         }
         hasReportedSaveFailure = false
         photos = updated
+    }
+
+    /// Gives the render service every saved anchor; it measures again for an original that changed.
+    private func restoreExposureAnchors() {
+        for photo in photos {
+            if let anchor = photo.exposureAnchor { renderService.restoreExposureAnchor(anchor, for: url(for: photo)) }
+        }
+    }
+
+    /// Saves a newly measured anchor with its photo's record: at once, then with any others measured
+    /// within `exposureAnchorSaveDelay`, so opening a library of unmeasured RAWs writes the index
+    /// about once a second, not once per photo.
+    private func keepExposureAnchor(_ anchor: StoredExposureAnchor, for file: URL) {
+        guard let photo = photos.first(where: { $0.fileName == file.lastPathComponent }) else { return }
+        unsavedExposureAnchors[photo.id] = anchor
+        guard exposureAnchorSave == nil else { return }
+        saveExposureAnchors()
+        exposureAnchorSave = Task {
+            try? await Task.sleep(for: Self.exposureAnchorSaveDelay)
+            exposureAnchorSave = nil
+            if !unsavedExposureAnchors.isEmpty { saveExposureAnchors() }
+        }
+    }
+
+    private func saveExposureAnchors() {
+        let anchors = unsavedExposureAnchors
+        unsavedExposureAnchors = [:]
+        do {
+            try commit { photos in
+                for i in photos.indices {
+                    if let anchor = anchors[photos[i].id] { photos[i].exposureAnchor = anchor }
+                }
+            }
+        } catch {
+            report(error)
+        }
     }
 
     private func report(_ error: EmulsionError) {
