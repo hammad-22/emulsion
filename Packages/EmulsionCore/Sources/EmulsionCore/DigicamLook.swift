@@ -33,9 +33,9 @@ enum DigicamLook {
     static let minimumBlurSigma = 0.5
     /// Purple fringing around near-clip highlights: the mask starts at this fraction of the clip,
     /// spreads by this sigma (sensor px), and is added in this colour (linear sRGB) at this
-    /// strength × the processing amount, relative to the clip level. The low onset lets bright sky
-    /// (not only clipped light) fringe onto dark edges. Artistic, owner direction (MOV-149 review); unmeasured.
-    static let fringeOnset = 0.45
+    /// strength × the processing amount, relative to the clip level. The onset keeps it to near-clipped
+    /// light: at 0.45 every bright grass blade turned violet. Artistic, owner direction (MOV-149 review); unmeasured.
+    static let fringeOnset = 0.85
     static let fringeRadius = 3.5
     static let fringeColor = SIMD3(0.55, 0.2, 1.0)
     static let fringeStrength = 1.0
