@@ -35,8 +35,8 @@ public struct Negative: @unchecked Sendable {
 /// film curve: the camera's rendering can't be undone.
 public struct Developer {
     private let kernels: Kernels
-    /// Caches intermediates; shared with `Renderer.materialize` and `export` (MOV-147) and used by
-    /// `ExposureAnchor.stops(of:context:)`.
+    /// The renderer's caching context, shared with its renders but viewfinder frames (MOV-147);
+    /// used here by `ExposureAnchor.stops(of:context:)`.
     private let context: CIContext
 
     init(kernels: Kernels, context: CIContext) {

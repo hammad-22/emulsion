@@ -43,7 +43,7 @@ struct FullSizeRenderTests {
     static func pixels(_ image: CGImage) -> Data? { image.dataProvider?.data as Data? }
 }
 
-/// The renderer has one context, for every render and the developer's, and it caches
+/// Every render but viewfinder frames, and the developer's, goes through a context that caches
 /// intermediates: without that, a full-size RAW decode comes back with corrupted tiles (MOV-147).
 /// Real ProRAW is needed to trigger it, so on CI this checks the setting itself.
 @Test func everyRenderCachesIntermediates() {
