@@ -12,8 +12,8 @@ iOS 26 / macOS 26 only, iPhone 17 Pro and iPhone Duo as targets. Swift 6.4 toolc
 
 ## Layout
 - `Packages/EmulsionCore/`: the engine package. Every look decision lives here.
-  - `Sources/EmulsionCore/`: film math (`FilmModel`), input transforms (`ColorSpaces`), develop (`Developer`; `RAWDecoder` keeps one RAW file's decoder alive for white balance changes), render graph and export (`Renderer`), stock files (`Resources/Stocks/*.json`, loaded through `FilmStock`; the default is `FilmLook.stock`), texture constants (`FilmLook`), kernel argument packing (`FilmModel+Kernel`).
-  - `Kernels/Emulsion.ci.metal`: GPU kernels; must match the Swift mirror. Compiled `.metallib`s are checked in under `Resources/Kernels/`.
+  - `Sources/EmulsionCore/`: film math (`FilmModel`), input transforms (`ColorSpaces`), develop (`Developer`; `RAWDecoder` keeps one RAW file's decoder alive for white balance changes), render graph and export (`Renderer`), stock files (`Resources/Stocks/*.json`, loaded through `FilmStock`; the default is `FilmLook.stock`), texture constants (`FilmLook`), kernel argument packing (`FilmModel+Kernel`). The non-film digicam process (`Adjustments.process`, docs/ENGINE.md "Non-film looks"): `Renderer+Digicam`, `DigicamModel` (Swift mirror), `DigicamLook` (constants).
+  - `Kernels/`: GPU kernels, `Emulsion.ci.metal` (film) and `Digicam.ci.metal` (digicam), linked into one metallib; must match the Swift mirrors. Compiled `.metallib`s are checked in under `Resources/Kernels/`.
   - `Sources/EmulsionFixtures/`: synthetic test images. `Tests/`: the test suite, with visual regression goldens in `Tests/EmulsionCoreTests/Goldens/` and frozen CC0 photos in `Scenes/`.
   - `Sources/EmulsionFit/` + `Sources/emulsion-fit/`: offline stock fitting (`emulsion-fit` CLI: manifest and reference-data loader and checks, bounded least squares, negative-curve fit). `Sources/EmulsionFit/Resources/StockData/<stock>/` holds the provenance manifests and the fitted stock files (`negative-fit.stock.json`; parameters and provenance only, not loaded by the engine until MOV-25). The traced curve CSVs are not in the repo (`docs/DECISIONS.md`, 12 Nov 2026): they are local reference data, pinned by SHA-256 in the manifests; never commit them. Not a library product, so no app can link it. The tracing tools are in `Tools/stock-digitizing/`.
 - `Packages/EmulsionKit/`: shared app logic for iOS and Mac (library, `RenderService`, camera capture, editor controls, settings, export, sample photos). No UI.
@@ -26,7 +26,7 @@ iOS 26 / macOS 26 only, iPhone 17 Pro and iPhone Duo as targets. Swift 6.4 toolc
 Run these yourself to verify every change. A change isn't done until they pass.
 ```bash
 export DEVELOPER_DIR=/Applications/Xcode.app/Contents/Developer
-sh Tools/build-kernels.sh                                    # after any .metal change
+sh Tools/build-kernels.sh                                    # after any .metal change (both sources, one metallib)
 (cd Packages/EmulsionCore && swift test)                     # must stay green
 (cd Packages/EmulsionKit && swift test)                      # app logic; also on iOS, see its AGENTS.md
 (cd Packages/EmulsionUI && swift test)                       # shared control interaction tests

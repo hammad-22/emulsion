@@ -51,12 +51,15 @@ struct FullSizeRenderTests {
 }
 
 /// The viewfinder's context skips caching, so it takes only a camera frame's preview estimate:
-/// a RAW develop, or anything else, is refused (MOV-147).
-@Test func viewfinderRendersOnlyCameraFrames() throws {
+/// a RAW develop, or anything else, is refused (MOV-147), in either render process (the digicam
+/// process renders a viewfinder frame as a preview, so its export-only JPEG step never runs there).
+@Test(arguments: RenderProcess.allCases) func viewfinderRendersOnlyCameraFrames(_ process: RenderProcess) throws {
     let renderer = EmulsionTestCase.sharedRenderer
+    var look = Adjustments.neutral
+    look.process = process
     let frame = SceneFixtures.flat(0.18, width: 16, height: 16)
-    #expect(throws: Never.self) { try renderer.viewfinderImage(renderer.developer.viewfinderNegative(from: frame), .neutral) }
+    #expect(throws: Never.self) { try renderer.viewfinderImage(renderer.developer.viewfinderNegative(from: frame), look) }
     let dng = RAWDevelopChart.dng(.linearRGB, chart: RAWDevelopTests.chart, baselineStops: 0)
     let raw = try renderer.developer.develop(dng)
-    #expect(throws: EmulsionError.renderFailed) { try renderer.viewfinderImage(raw, .neutral) }
+    #expect(throws: EmulsionError.renderFailed) { try renderer.viewfinderImage(raw, look) }
 }

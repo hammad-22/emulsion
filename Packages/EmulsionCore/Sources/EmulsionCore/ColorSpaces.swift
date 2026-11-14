@@ -177,6 +177,36 @@ enum ColorMath {
             return v
         }
     }
+    /// The sRGB transfer function (IEC 61966-2-1), linear → encoded: the inverse of `decode(_:curve: 10)`.
+    static func encodeSRGB(_ linear: Double) -> Double {
+        linear <= 0.0031308 ? 12.92 * linear : 1.055 * pow(linear, 1 / 2.4) - 0.055
+    }
+
+    /// CIE 1931 xy of a Planckian radiator, from the cubic-spline approximation of Kim et al. 2002
+    /// (valid 1667–25000 K; clamped to it). EmulsionFixtures keeps its own copy (`SyntheticDNG`) as
+    /// an independent reference for the tests.
+    static func planckianChromaticity(kelvin: Double) -> SIMD2<Double> {
+        let t = min(max(kelvin, 1667), 25000)
+        let (t1, t2, t3) = (1e3 / t, 1e6 / (t * t), 1e9 / (t * t * t))
+        let x =
+            t <= 4000
+            ? -0.2661239 * t3 - 0.2343589 * t2 + 0.8776956 * t1 + 0.179910
+            : -3.0258469 * t3 + 2.1070379 * t2 + 0.2226347 * t1 + 0.240390
+        let y: Double =
+            switch t {
+            case ...2222: -1.1063814 * x * x * x - 1.34811020 * x * x + 2.18555832 * x - 0.20219683
+            case ...4000: -0.9549476 * x * x * x - 1.37418593 * x * x + 2.09137015 * x - 0.16748867
+            default: 3.0817580 * x * x * x - 5.87338670 * x * x + 3.75112997 * x - 0.37001483
+            }
+        return SIMD2(x, y)
+    }
+
+    /// CIE XYZ → linear sRGB, the working space (Rec. 709 primaries, D65).
+    static let xyzToLinearSRGB: simd_double3x3 = {
+        let p = InputColorSpace.rec709.primaries
+        return rgbToXYZ(p.r, p.g, p.b, white: p.white).inverse
+    }()
+
     /// ITU-R BT.2100 HLG constants; `sceneScale` maps 38% signal to 18% gray (BT.2408).
     enum HLG { static let a = 0.17883277, b = 0.28466892, c = 0.55991073, sceneScale = 0.18 / (0.38 * 0.38 / 3) }
     /// ARRI LogC4 specification constants.

@@ -189,7 +189,7 @@ public actor RenderService {
         // makes that decoder again.
         if openDecoder?.url == url { openDecoder = nil }
         let full = try develop(url, maxDimension: nil, whiteBalance: adjustments.whiteBalance)
-        return try renderer.export(renderer.render(full, adjustments), format: format)
+        return try renderer.export(renderer.render(full, adjustments, intent: .export), format: format)
     }
 
     /// Reads and develops the file with its exposure anchor; the anchor is measured as shot, so

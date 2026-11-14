@@ -1,6 +1,6 @@
 import Foundation
 
-/// Descriptive artistic choices using the current model, not measured matches to named film stocks.
+/// Descriptive artistic choices using the built-in processes, not measured matches to named film stocks or cameras.
 public enum CuratedLooks {
     // Amounts are artistic defaults chosen to express each description, not fitted stock data.
     public static let recipes: [Recipe] = [
@@ -35,6 +35,14 @@ public enum CuratedLooks {
             $0.highlights = 0.25
             $0.halation = 0.65
             $0.grain = 0.45
+        },
+        make(
+            "00000000-0000-0000-0000-000000000005", String(localized: "Digicam 2004", bundle: .module),
+            String(localized: "Washed-out tones, blown highlights, color casts and crunchy in-camera processing.", bundle: .module)
+        ) {
+            $0.process = .digicam
+            $0.grain = DigicamLook.defaultNoise
+            $0.halation = DigicamLook.defaultProcessing
         },
     ].compactMap { $0 }
 

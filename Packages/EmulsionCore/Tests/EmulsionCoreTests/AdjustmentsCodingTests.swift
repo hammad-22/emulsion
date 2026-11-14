@@ -22,7 +22,7 @@ struct AdjustmentsCodingTests {
 
     @Test func everyFieldRoundTrips() throws {
         let edited = Adjustments.everyFieldEdited
-        #expect(Mirror(reflecting: edited).children.count == 10, "a new field needs a line in init(from:) and here")
+        #expect(Mirror(reflecting: edited).children.count == 11, "a new field needs a line in init(from:) and here")
         #expect(try JSONDecoder().decode(Adjustments.self, from: JSONEncoder().encode(edited)) == edited)
     }
 }
@@ -41,6 +41,7 @@ extension Adjustments {
         a.halation = 0.7
         a.seed = 8
         a.whiteBalance = CameraWhiteBalance(temperature: 3200, tint: 9)
+        a.process = .digicam
         return a
     }
 }

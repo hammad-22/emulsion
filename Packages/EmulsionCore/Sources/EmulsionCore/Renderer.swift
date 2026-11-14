@@ -5,9 +5,10 @@ import Foundation
 import ImageIO
 import UniformTypeIdentifiers
 
-/// Renders a Negative with the Emulsion look and the user's adjustments. One instance per
-/// render actor; previews and exports run the same graph, with spatial effects sized
-/// relative to the image so they agree across resolutions.
+/// Renders a Negative with the Emulsion look and the user's adjustments, through the film process
+/// or the digicam process (`Renderer+Digicam.swift`). One instance per render actor; previews and
+/// exports run the same graph, with spatial effects sized relative to the image so they agree
+/// across resolutions.
 ///
 /// `@unchecked Sendable`: every stored property is a `let`. `CIContext` is thread-safe (Apple:
 /// CIContext.h), and the loaded `CIColorKernel`s are only read.
@@ -15,7 +16,8 @@ public final class Renderer: @unchecked Sendable {
     public static let outputSpace = CGColorSpace(name: CGColorSpace.displayP3)!
     /// Core Image working space: extended linear sRGB, half float.
     static let workingSpace = CGColorSpace(name: CGColorSpace.extendedLinearSRGB)!
-    private let kernels: Kernels
+    let kernels: Kernels
+    let digicamKernels: DigicamKernels
     public let developer: Developer
     /// For every render but viewfinder frames, and the developer's: any of these graphs may hold a
     /// RAW decode, and a full-size one comes back with corrupted tiles from a context that doesn't
@@ -32,16 +34,27 @@ public final class Renderer: @unchecked Sendable {
     }
 
     public init() throws {
-        kernels = try Kernels()
+        let library = try Kernels.library()
+        kernels = try Kernels(library: library)
+        digicamKernels = try DigicamKernels(library: library)
         context = CIContext(options: Self.contextOptions)
         viewfinderContext = CIContext(options: Self.contextOptions.merging([.cacheIntermediates: false]) { $1 })
         developer = Developer(kernels: kernels, context: context)
     }
 
     /// Scene light → display light (in the working space), look applied. Display-referred
-    /// negatives are printed relative to the photo they were developed from.
-    public func render(_ negative: Negative, _ adjustments: Adjustments) throws -> CIImage {
+    /// negatives are printed relative to the photo they were developed from. The digicam process
+    /// crops to 4:3, caps the size at its sensor's and compresses exports (`renderDigicam`); the film
+    /// process renders previews and exports alike.
+    public func render(_ negative: Negative, _ adjustments: Adjustments, intent: RenderIntent = .preview) throws -> CIImage {
         let a = adjustments.clamped()
+        switch a.process {
+        case .film: return try renderFilm(negative, a)
+        case .digicam: return try renderDigicam(negative, a, intent: intent)
+        }
+    }
+
+    private func renderFilm(_ negative: Negative, _ a: Adjustments) throws -> CIImage {
         var image = negative.image
         let extent = image.extent
         let longEdge = max(extent.width, extent.height)
@@ -144,17 +157,32 @@ public final class Renderer: @unchecked Sendable {
 
     /// Display P3 file with the look baked in; source metadata (GPS etc.) is not carried over.
     public func export(_ image: CIImage, format: ExportFormat, quality: Double = 0.95) throws -> Data {
-        let options = [CIImageRepresentationOption(rawValue: kCGImageDestinationLossyCompressionQuality as String): quality]
-        // Core Image writes an image's properties into the file, and they survive the film
-        // render, so the source's metadata (GPS included) is cleared first (MOV-126).
-        let image = image.settingProperties([:])
-        let data: Data?
-        defer { context.clearCaches() }
         switch format {
-        case .jpeg: data = context.jpegRepresentation(of: image, colorSpace: Self.outputSpace, options: options)
-        case .heic: data = try? context.heif10Representation(of: image, colorSpace: Self.outputSpace, options: options)
+        case .jpeg: return try jpegData(image, colorSpace: Self.outputSpace, quality: quality)
+        case .heic:
+            defer { context.clearCaches() }
+            guard
+                let data = try? context.heif10Representation(
+                    of: image.settingProperties([:]), colorSpace: Self.outputSpace, options: Self.options(quality: quality))
+            else { throw EmulsionError.renderFailed }
+            return data
         }
-        guard let data else { throw EmulsionError.renderFailed }
+    }
+
+    /// A JPEG of `image` in `colorSpace`, with the image's properties cleared: Core Image writes them
+    /// into the file, and they survive the render, so the source's metadata (GPS included) would
+    /// otherwise be carried over (MOV-126).
+    /// Through the caching context, like every render that may hold a full-size RAW decode (MOV-147).
+    func jpegData(_ image: CIImage, colorSpace: CGColorSpace, quality: Double) throws -> Data {
+        defer { context.clearCaches() }
+        guard
+            let data = context.jpegRepresentation(
+                of: image.settingProperties([:]), colorSpace: colorSpace, options: Self.options(quality: quality))
+        else { throw EmulsionError.renderFailed }
         return data
+    }
+
+    private static func options(quality: Double) -> [CIImageRepresentationOption: Any] {
+        [CIImageRepresentationOption(rawValue: kCGImageDestinationLossyCompressionQuality as String): quality]
     }
 }

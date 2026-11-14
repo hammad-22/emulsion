@@ -80,7 +80,7 @@ public struct AdjustmentPanel: View {
             Button {
                 selectedControls[group] = control.id
             } label: {
-                Text(control.title)
+                Text(control.title(for: adjustments.process))
                     .font(.caption.weight(.medium))
                     .padding(.horizontal, FilmLabLayout.gap)
                     .frame(minHeight: FilmLabLayout.minimumControlHeight)
@@ -88,7 +88,7 @@ public struct AdjustmentPanel: View {
                     .contentShape(.capsule)
             }
             .buttonStyle(.plain)
-            .accessibilityLabel(control.accessibilityLabel)
+            .accessibilityLabel(control.accessibilityLabel(for: adjustments.process))
             .accessibilityAddTraits(control.id == selectedControl.id ? .isSelected : [])
         }
         if dynamicTypeSize.isAccessibilitySize {

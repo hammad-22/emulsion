@@ -1,6 +1,12 @@
 import Foundation
 
 /// The complete, deliberately small edit model, persisted per photo in the library index.
+///
+/// The controls are shared by both processes. In the digicam process exposure is set before the
+/// sensor clip, Warmth and Tint shift the camera's white balance (channel gains, not printer
+/// lights), Color is saturation, Grain is sensor noise and Halation is the in-camera processing
+/// (purple fringing, corner softness, vignette, sharpening halos and, in exports, JPEG
+/// compression; 0 is clean).
 public struct Adjustments: Codable, Equatable, Sendable {
     /// Scene exposure in stops (−3…3).
     public var exposure: Double = 0
@@ -15,6 +21,7 @@ public struct Adjustments: Codable, Equatable, Sendable {
     /// Texture (0 … 1).
     public var grain: Double = 0.35
     public var halation: Double = 0.35
+    public var process: RenderProcess = .film
     /// Grain pattern seed, fixed per photo so re-renders and exports match.
     public var seed: Double = 0
     /// RAW white balance, applied when the photo is developed (nil: as shot); the printer lights
@@ -60,6 +67,9 @@ extension Adjustments {
         try decode(.halation, into: &halation)
         try decode(.seed, into: &seed)
         try decode(.whiteBalance, into: &whiteBalance)
+        // A process this version doesn't know (saved by a newer app) renders as film rather than
+        // making the whole library index unreadable.
+        process = (try? saved.decodeIfPresent(RenderProcess.self, forKey: .process)) ?? .film
     }
 }
 
