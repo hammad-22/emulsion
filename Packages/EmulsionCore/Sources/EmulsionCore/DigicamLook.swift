@@ -7,8 +7,9 @@ import Foundation
 /// Spatial sizes are in sensor pixels of a `sensorLongEdge` output.
 enum DigicamLook {
     /// Default amounts of the Grain (sensor noise) and Halation (in-camera processing) controls.
-    /// Artistic, owner direction (MOV-149 review).
-    static let defaultNoise = 0.6
+    /// Artistic, owner direction (MOV-149 review). The noise default renders exactly as 0.6 did
+    /// before the Noise control was rescaled (see `shotNoise`).
+    static let defaultNoise = 0.75
     static let defaultProcessing = 0.7
 
     // MARK: Geometry
@@ -80,9 +81,11 @@ enum DigicamLook {
     /// it adds luma noise as well as colour. The blue channel's noise is `blueNoiseGain` × the others
     /// (period files measured σ R/G/B ≈ 2.2/2.1/2.4). Artistic, owner direction (MOV-149 review): at
     /// the default a flat patch two stops under mid-gray has a luma σ of 5.0 codes as exported
-    /// (`DigicamTests`), beyond the ≈ 2 codes of our rough reading of period JPEGs (n = 4).
-    static let shotNoise = 0.025
-    static let readNoise = 0.0075
+    /// (`DigicamTests`), beyond the ≈ 2 codes of our rough reading of period JPEGs (n = 4). The second
+    /// review found Noise 1 too noisy, so amount 1 is 0.8 × the earlier 0.025 / 0.0075: the slider's top
+    /// end sits between the old default and the old maximum, which it can no longer reach.
+    static let shotNoise = 0.02
+    static let readNoise = 0.006
     static let chromaNoiseShare = 2.0
     static let chromaNoiseCell = 6.0
     static let blueNoiseGain = 1.25

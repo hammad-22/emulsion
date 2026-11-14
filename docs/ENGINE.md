@@ -207,14 +207,14 @@ A curated look ("Digicam 2004", MOV-149) that renders a photo like the in-camera
 8. *Sharpening:* unsharp mask on gamma-encoded luma (σ 1.8 px, amount 1.85 × processing), clipped to 0…1, so edges carry thick bright and dark halos.
 9. *JPEG:* exports only (`RenderIntent.export`), when processing is on, at whatever size the output is: a real Core Image JPEG encode and decode in sRGB at quality 0.9 − 0.4 × processing, through the same encoder path as `Renderer.export` (metadata cleared, MOV-126). Previews skip it: at their size the 8 × 8 blocks would be sub-pixel. A digicam export is therefore encoded twice: the camera's JPEG round trip here, then the export's own format (JPEG at 0.95, or 10-bit HEIC), so the file format stays the app's choice. The second encode is a known, small generation loss on top of the simulated one.
 
-**Controls in the digicam process.** Exposure is set before the sensor clip. Warmth and Tint shift the camera's white balance (60 mired and 12 % green gain per unit), not printer lights. Color scales the saturation. Highlights/Shadows are the same local tone, after the tone curve. Grain is the sensor noise ("Noise" in the editor). Halation is the in-camera processing ("Processing": fringing, corner softness, vignette, sharpening and JPEG strength scale with it; 0 is clean apart from the lens's overall softness). Defaults: noise 0.6, processing 0.7; the review renders' "digicam-strong" is noise 1, processing 1.
+**Controls in the digicam process.** Exposure is set before the sensor clip. Warmth and Tint shift the camera's white balance (60 mired and 12 % green gain per unit), not printer lights. Color scales the saturation. Highlights/Shadows are the same local tone, after the tone curve. Grain is the sensor noise ("Noise" in the editor). Halation is the in-camera processing ("Processing": fringing, corner softness, vignette, sharpening and JPEG strength scale with it; 0 is clean apart from the lens's overall softness). Defaults: noise 0.75, processing 0.7; the review renders' "digicam-strong" is noise 1, processing 1.
 
 **Constants** (`DigicamLook`). Measured values are from period files we read, or published lab tests of period compacts; artistic ones are choices; "owner" marks an artistic owner direction from the MOV-149 review.
 
 | Constant | Value | Status |
 | --- | --- | --- |
 | `sensorLongEdge`, `aspectRatio` | 2592 px, 4:3 (5.0 MP) | Measured: period file headers |
-| `defaultNoise`, `defaultProcessing` | 0.6, 0.7 | Artistic, owner |
+| `defaultNoise`, `defaultProcessing` | 0.75, 0.7 | Artistic, owner (0.75 renders as 0.6 did before the noise rescale below) |
 | `clipStops` | +2 stops over mid-gray | Artistic, owner; below ISO 12232's ≈ 2.5 stops and the +2.7…2.8 measured on period DSLR JPEGs |
 | `blackStops` | −4.5 stops (to the floor) | Artistic; period DSLR JPEGs measured −4.6…−4.7 |
 | `blackFloorCode` | 22 / 255 | Artistic, owner (lifted, greyish black) |
@@ -224,7 +224,7 @@ A curated look ("Digicam 2004", MOV-149) that renders a photo like the in-camera
 | `whiteBalanceCorrection`, `whiteBalanceReference` | 0.6, 5500 K | Earlier fitted to the red shift of period compacts under tungsten (R +9.5…11.6 %, B −9.9…−17 %); now artistic, owner, beyond that range: a 2850 K RAW renders mid-gray R +17.0 %, B −30.5 % in code values |
 | `biasMireds`, `biasMagenta` | +12 mired (cooler), green −0.8 % | Artistic, owner; magenta kept small so daylight skies read cyan-blue, not lavender |
 | `warmthMireds`, `tintGreen` | 60 mired, 12 % per unit | Artistic |
-| `shotNoise`, `readNoise`, `chromaNoiseShare`, `chromaNoiseCell`, `blueNoiseGain` | 0.025, 0.0075 (of the clip), 2.0, 6 px, 1.25 | Artistic, owner: a flat patch 2 stops under mid-gray has luma σ 5.0 codes at the default as exported, beyond the ≈ 2 codes of our rough reading of period JPEGs (n = 4). The blue gain follows period files' σ R/G/B ≈ 2.2/2.1/2.4 |
+| `shotNoise`, `readNoise`, `chromaNoiseShare`, `chromaNoiseCell`, `blueNoiseGain` | 0.02, 0.006 (of the clip), 2.0, 6 px, 1.25 | Artistic, owner: rescaled to 0.8 × after the second review found Noise 1 too noisy, so the slider's top end lies between the old default and the old maximum. A flat patch 2 stops under mid-gray has luma σ 5.0 codes at the default as exported, beyond the ≈ 2 codes of our rough reading of period JPEGs (n = 4). The blue gain follows period files' σ R/G/B ≈ 2.2/2.1/2.4 |
 | `sharpenRadius`, `sharpenAmount` | σ 1.8 px, 1.85 | Artistic, owner: a step edge at sensor size overshoots 30.3 % at processing 1 and 20.7 % at the default; informed by period compacts' published oversharpening (−3…22 %, an MTF-based figure, not a step-edge overshoot) |
 | `jpegQualityClean`, `jpegQualityLoss` | 0.9 − 0.4 × processing (0.62 default, 0.5 strong) | Artistic, owner; heavier than period files (IJG quality 93–98, 4:2:2 chroma). Core Image at 0.85 is about IJG 95 with 4:2:0 chroma; its subsampling is not controlled here |
 | `lensSoftnessSigma`, `cornerSoftnessSigma`, `vignetteStops` | σ 0.8 px; σ 3 px and 1 stop × processing | Artistic, owner and review; unmeasured |
