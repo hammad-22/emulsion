@@ -70,8 +70,13 @@ What it is: an estimate that places the tones the file's own profile renders at 
 - `insertingIntermediate(cache: true)` didn't help, and `clearCaches()` alone was unreliable.
 - Synthetic DNGs (12 and 48 MP, linear and Bayer) never triggered it.
 
-So `Renderer` has one `CIContext`, which caches intermediates, for every render (`cgImage`, `materialize`, `export`) and for the developer (the exposure anchor). Each render clears its caches afterwards. No render path can reach a non-caching context, and `everyRenderCachesIntermediates` checks the setting on CI. Code that renders a develop through a context of its own (a test harness, a tool) must cache intermediates too.
-- History: the first fix (#59) guarded only `materialize` and `export`, which left `cgImage` of an unmaterialized full-size develop exposed. The real-file test, with a full-size `cgImage` check added, failed on that code in 2 of 3 runs (9 mismatches each) and passes with one context.
+So every render (`cgImage`, `materialize`, `export`) and the developer's exposure anchor share one `CIContext` that caches intermediates; each render clears its caches afterwards. The one exception is viewfinder frames:
+- `Renderer.viewfinderImage` renders through a context without caching, and it accepts only a camera frame's preview estimate (`.previewEstimate`, made only by `Developer.viewfinderNegative`). It throws for anything else, so a RAW develop can't reach that context.
+- The exception keeps the 30 fps path as fast as before: on the caching context a 1600 px frame took about 0.8 ms more (Mac).
+- CI checks both rules: `everyRenderCachesIntermediates` and `viewfinderRendersOnlyCameraFrames`.
+
+Code that renders a develop through a context of its own, such as a test harness or a tool, must cache intermediates too.
+- History: the first fix (#59) guarded only `materialize` and `export`, which left `cgImage` of an unmaterialized full-size develop exposed (the app always materializes first, but tools and new paths may not). The real-file test, with a full-size `cgImage` check added, failed on that code in 2 of 3 runs (9 mismatches each) and passes with one context.
 - Repeatability: now repeatable on four real files (`FullSizeRenderTests`, opt-in): exports, materialized negatives and full-size `cgImage`, 8 repeats each.
 - Output: within one 8-bit code of the old path's uncorrupted render (half-float rounding).
 - Cost (Mac):
@@ -80,7 +85,10 @@ So `Renderer` has one `CIContext`, which caches intermediates, for every render 
     - Through the engine, a full-size develop + render + JPEG export peaks at 2.2–2.3 GB (48 MP), 3.1–3.3 GB (50 MP Bayer) and 1.7 GB (12 MP), at 1.0–1.2 s, 0.19–0.23 s and 0.13–0.16 s.
   - Rejected alternative: buffering every RAW develop in `Developer` would keep a lazy decode out of every negative. But a float buffer raised the 48 MP export peak to 5.6–5.9 GB (50 MP: 6.8–7.4 GB). A half-float buffer cost only +0.2 GB, but changed 0.009 % of output values by up to 14 codes against today's render.
   - 1024 px preview develop + materialize (median of 12, three alternations): 12 MP 115–151 → 141–145 ms, 50 MP Bayer 160–194 → 175–229 ms, 48 MP unchanged (1187–1382 → 1215–1236 ms). That's once per photo, size or white balance, not per slider move.
-  - Slider drags with `cgImage` on the caching context too (`SliderDragProbe`, synthetic 12 MP, 1600 px; ranges over 2 runs before and 3 after; noisy): Warmth drag, Bayer 219–362 → 181–246 and linear 351–366 → 317–530 updates/s; white balance drag, Bayer 72–77 → 66–75 and linear 151–156 → 124–153 updates/s.
+  - Editor previews on the caching context:
+    - `PerformanceProbe`, 1600 px: full look 3.8–4.3 → 6.1–7.6 ms; look only unchanged at 3.0–3.7 ms.
+    - Slider drags (`SliderDragProbe`, synthetic 12 MP, 1600 px; ranges over 2 runs before and 3 after; noisy): Warmth drag, Bayer 219–362 → 181–246 and linear 351–366 → 317–530 updates/s; white balance drag, Bayer 72–77 → 66–75 and linear 151–156 → 124–153 updates/s.
+  - Viewfinder frames: unchanged (1600 px 2.7–2.9 → 2.6–3.0 ms; 12 MP 7.0–8.6 → 6.7–6.9 ms).
 - Concurrency: a thread clearing the caches every 2 ms during ten 48 MP exports left all of them identical (two runs), so a `clearCaches()` doesn't disturb a render already in flight.
 - Unmeasured on device, including peak memory.
 

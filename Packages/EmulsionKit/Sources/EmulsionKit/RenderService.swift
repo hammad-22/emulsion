@@ -13,7 +13,7 @@ public actor RenderService {
     public static let shared = RenderService()
     private var renderer: Renderer?
     /// The same renderer once `prepareViewfinder` has run, for frames rendered off the actor.
-    /// `Renderer` is immutable apart from its `CIContext`, which is thread-safe.
+    /// `Renderer` is immutable apart from its `CIContext`s, which are thread-safe.
     private nonisolated let viewfinderRenderer = Mutex<Renderer?>(nil)
     /// One develop per photo and size, with the RAW white balance it was developed at: another
     /// white balance replaces it, so dragging the temperature doesn't fill the cache. A photo that
@@ -151,7 +151,7 @@ public actor RenderService {
     ) async throws -> CGImage {
         let renderer = try await preparedViewfinderRenderer()
         let negative = renderer.developer.viewfinderNegative(from: Self.fitted(frame.uprightImage, maxDimension: maxDimension))
-        return try renderer.cgImage(renderer.render(negative, adjustments))
+        return try renderer.viewfinderImage(negative, adjustments)
     }
 
     /// Loads the renderer and samples the viewfinder's preview inverse, so the first frame

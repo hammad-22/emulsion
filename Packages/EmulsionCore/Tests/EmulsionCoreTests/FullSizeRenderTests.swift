@@ -1,12 +1,14 @@
 import CoreGraphics
 import CoreImage
+import EmulsionFixtures
 import Foundation
 import Testing
 
 @testable import EmulsionCore
 
 /// Full-size exports, materialized negatives and display renders of real DNGs from
-/// EMULSION_RAW_SAMPLES (never checked in) repeat bit for bit (MOV-147, docs/ENGINE.md). Only real ProRAW triggers the corruption, so this can't run on CI.
+/// EMULSION_RAW_SAMPLES (never checked in) repeat bit for bit (MOV-147, docs/ENGINE.md). Only
+/// real ProRAW triggers the corruption, so this can't run on CI.
 @Suite(.enabled(if: RAWDevelopSupport.samplesFolders != nil), .serialized)
 struct FullSizeRenderTests {
     /// The corruption is intermittent: before the fix, 4 repeats caught it on two 48 MP iPhone 15
@@ -46,4 +48,15 @@ struct FullSizeRenderTests {
 /// Real ProRAW is needed to trigger it, so on CI this checks the setting itself.
 @Test func everyRenderCachesIntermediates() {
     #expect(Renderer.contextOptions[.cacheIntermediates] as? Bool == true)
+}
+
+/// The viewfinder's context skips caching, so it takes only a camera frame's preview estimate:
+/// a RAW develop, or anything else, is refused (MOV-147).
+@Test func viewfinderRendersOnlyCameraFrames() throws {
+    let renderer = EmulsionTestCase.sharedRenderer
+    let frame = SceneFixtures.flat(0.18, width: 16, height: 16)
+    #expect(throws: Never.self) { try renderer.viewfinderImage(renderer.developer.viewfinderNegative(from: frame), .neutral) }
+    let dng = RAWDevelopChart.dng(.linearRGB, chart: RAWDevelopTests.chart, baselineStops: 0)
+    let raw = try renderer.developer.develop(dng)
+    #expect(throws: EmulsionError.renderFailed) { try renderer.viewfinderImage(raw, .neutral) }
 }

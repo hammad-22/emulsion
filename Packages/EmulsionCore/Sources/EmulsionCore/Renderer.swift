@@ -17,10 +17,13 @@ public final class Renderer: @unchecked Sendable {
     static let workingSpace = CGColorSpace(name: CGColorSpace.extendedLinearSRGB)!
     private let kernels: Kernels
     public let developer: Developer
-    /// The only context, for every render here and the developer's: any graph may hold a RAW
-    /// decode, and a full-size one comes back with corrupted tiles from a context that doesn't
+    /// For every render but viewfinder frames, and the developer's: any of these graphs may hold a
+    /// RAW decode, and a full-size one comes back with corrupted tiles from a context that doesn't
     /// cache intermediates (MOV-147, docs/ENGINE.md). Each render clears the caches after itself.
     private let context: CIContext
+    /// Viewfinder frames only (`viewfinderImage`), which hold no RAW decode, so they skip the
+    /// caching context's per-frame cache write and clear (+0.8 ms per 1600 px frame, Mac).
+    private let viewfinderContext: CIContext
     static var contextOptions: [CIContextOption: Any] {
         [
             .workingColorSpace: workingSpace, .workingFormat: CIFormat.RGBAh, .outputColorSpace: outputSpace,
@@ -31,6 +34,7 @@ public final class Renderer: @unchecked Sendable {
     public init() throws {
         kernels = try Kernels()
         context = CIContext(options: Self.contextOptions)
+        viewfinderContext = CIContext(options: Self.contextOptions.merging([.cacheIntermediates: false]) { $1 })
         developer = Developer(kernels: kernels, context: context)
     }
 
@@ -123,6 +127,16 @@ public final class Renderer: @unchecked Sendable {
         guard let cg = context.createCGImage(image, from: image.extent, format: .RGBA8, colorSpace: Self.outputSpace) else {
             throw EmulsionError.renderFailed
         }
+        return cg
+    }
+
+    /// A viewfinder frame (`Developer.viewfinderNegative(from:)`) with the look. Throws for any other
+    /// negative: only a camera frame's preview estimate is known to hold no RAW decode.
+    public func viewfinderImage(_ negative: Negative, _ adjustments: Adjustments) throws -> CGImage {
+        guard negative.contract == .previewEstimate else { throw EmulsionError.renderFailed }
+        let image = try render(negative, adjustments)
+        guard let cg = viewfinderContext.createCGImage(image, from: image.extent, format: .RGBA8, colorSpace: Self.outputSpace)
+        else { throw EmulsionError.renderFailed }
         return cg
     }
 
