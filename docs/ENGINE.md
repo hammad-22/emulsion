@@ -61,6 +61,19 @@ What it is: an estimate that places the tones the file's own profile renders at 
 
 **RAW decoder 9 is not used.** `CIRAWFilter.decoderVersion` stays at the file's default, which is "8.dng"/"8" on all 25 real DNGs and on the synthetic ones: decoder 9 is opt-in (WWDC26 session 305, "What's new in Core Image RAW"; the SDK header's "newest available" does not match what the filter reports). On the same files decoder 9 changes the image a lot: the iPhone 14 Pro 48 MP file's mean RGB goes from (0.1485, 0.1724, 0.1883) to (0.0248, 0.0202, 0.0118), medians move both ways from file to file, and synthetic Bayer neutrals develop with a warm tint (R/G 1.04–1.22). Apple DTS forum thread 843445 reports colour problems with it too. Until it develops neutrals neutral and keeps the exposure, the develop stays on the default decoder (measured on macOS 27.2, MOV-10).
 
+**Full-size RAW renders go through a caching context (MOV-147).** Apple's RAW decode at full size with `contrastAmount` 0 (which the develop sets) returns corrupted tiles, such as magenta/red blocks or shifted copies of the image, on some renders and not others. It happens when the rendering `CIContext` doesn't cache intermediates, and more often after another context has decoded the same file. It was reproduced with `CIRAWFilter` alone, without Emulsion's kernels (macOS 27.2, M4 Max):
+- On a 48 MP iPhone 15 Pro Max file, 7 of 8 renders were corrupted, even on one context and one thread.
+- On a 12 MP file, the first render after another context had decoded the same file was corrupted.
+- Every other bypass setting on its own, contrast at 0.01, 0.1 (Apple's default) or 0.5, a half-scale decode, and a context that caches intermediates all rendered the same every time.
+- Apple's software renderer, `clearCaches()` and `insertingIntermediate(cache: true)` didn't help.
+- Synthetic DNGs never triggered it.
+
+So `Renderer.materialize` and `Renderer.export`, the only renders whose graph holds a full-size RAW decode, use the developer's caching context and clear its caches afterwards. Interactive renders (`cgImage`: materialized previews, viewfinder frames) stay on the non-caching context, so don't pass `cgImage` a full-size RAW develop: materialize it first.
+- Repeatability: now repeatable on four real files (`FullSizeRenderTests`, opt-in).
+- Output: within one 8-bit code of the old path's uncorrupted render (half-float rounding).
+- Cost (48 MP export, Mac): peak resident memory about 0.2–0.5 GB higher (one half-float full-size intermediate is 390 MB), with no change in time.
+- Unmeasured on device.
+
 **Sub-black policy.** Decoding keeps sub-black signals (legal-range footroom, compression undershoot) as negative light; clipping is the film model's job. Where a specification defines values below its range, the engine follows it: Apple Log holds at R₀, and the log curves' toes and sRGB's linear segment extend linearly. Where it doesn't (BT.2100 HLG, BT.1886 gamma 2.4), the curve is extended oddly (mirrored), so every decode stays monotonic through black. colour-science mirrors HLG the same way; for BT.1886, which colour-science clamps, the reference generator applies the engine's convention.
 
 ## Stock files

@@ -13,7 +13,7 @@ public actor RenderService {
     public static let shared = RenderService()
     private var renderer: Renderer?
     /// The same renderer once `prepareViewfinder` has run, for frames rendered off the actor.
-    /// `Renderer` is immutable apart from its `CIContext`, which is thread-safe.
+    /// `Renderer` is immutable apart from its `CIContext`s, which are thread-safe.
     private nonisolated let viewfinderRenderer = Mutex<Renderer?>(nil)
     /// One develop per photo and size, with the RAW white balance it was developed at: another
     /// white balance replaces it, so dragging the temperature doesn't fill the cache. A photo that
