@@ -27,8 +27,11 @@ extension XCUIApplication {
     @MainActor
     static func launchEmptyLibrary(_ presentation: [String] = []) throws -> XCUIApplication {
         let app = launchLibrary(presentation)
+        XCTAssertTrue(app.navigationBars["Library"].waitForExistence(timeout: 5), "--library opens the library")
         let samples = app.buttons["Try Sample Photos"]
         guard samples.waitForExistence(timeout: 5) else {
+            // Skip only for a library that already has photos; a missing action is a failure.
+            XCTAssertTrue(app.photos.firstMatch.exists, "An empty library offers Try Sample Photos")
             throw XCTSkip("Needs an empty library; uninstall the isolated proof app first.")
         }
         for _ in 0..<3 where !samples.isHittable { app.swipeUp() }
@@ -61,9 +64,9 @@ extension XCUIApplication {
     /// A native accessibility audit (the engine behind Accessibility Inspector) whose failures
     /// name the element, so a finding can be traced without opening the result bundle.
     ///
-    /// On a folded iPhone Duo the contrast audit reads the switched-off inner screen: it failed
-    /// text measured at about 20:1, or threw "Invalid target app" (MOV-140). Unfolded, with the
-    /// outer screen off, it works. Contrast is left out when folded, and a contrast-only audit
+    /// On a folded iPhone Duo the contrast audit is unreliable: it failed text whose pixels
+    /// measure about 20:1, or threw "Invalid target app" (MOV-140). Unfolded it works. Contrast
+    /// is left out when folded, so folded contrast stays unverified, and a contrast-only audit
     /// skips the test.
     @MainActor
     func audit(_ types: XCUIAccessibilityAuditType, file: StaticString = #filePath, line: UInt = #line) throws {
