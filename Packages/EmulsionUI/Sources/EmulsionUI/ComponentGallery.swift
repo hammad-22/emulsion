@@ -10,6 +10,8 @@
         @State private var isComparing = false
         @State private var group = AdjustmentGroup.light
         @State private var selection: [AdjustmentGroup: String] = [:]
+        /// A stand-in as-shot white balance, so the gallery shows a RAW photo's White Balance group.
+        private let whiteBalanceAsShot = CameraWhiteBalance(temperature: 5200, tint: 8)
         /// Room for a few rulers, so the inspector's own scrolling shows inside the gallery.
         private let inspectorHeight: CGFloat = 480
 
@@ -32,9 +34,12 @@
                             SelectionBadge(isSelected: true)
                         }
                         .background(.gray, in: .rect)
-                        AdjustmentPanel(adjustments: $adjustments, group: $group, selection: $selection)
-                        AdjustmentInspector(adjustments: $adjustments, group: $group, selection: $selection)
-                            .frame(height: inspectorHeight)
+                        AdjustmentPanel(
+                            adjustments: $adjustments, group: $group, selection: $selection, whiteBalanceAsShot: whiteBalanceAsShot)
+                        AdjustmentInspector(
+                            adjustments: $adjustments, group: $group, selection: $selection, whiteBalanceAsShot: whiteBalanceAsShot
+                        )
+                        .frame(height: inspectorHeight)
                     }
                     .padding(FilmLabLayout.inset)
                 }

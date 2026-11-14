@@ -251,6 +251,26 @@ struct DigicamTests {
         #expect(ratio.z >= 0.67 && ratio.z <= 0.72, "B \(ratio.z)")
     }
 
+    /// A white balance set at develop is applied on top of the camera's cast: the negative still
+    /// reports the as-shot light, so the residual cast follows the light the photo was shot under.
+    @Test func developWhiteBalanceKeepsTheAsShotCast() throws {
+        let chart = PatchChart(Array(repeating: SIMD3(repeating: 0.18), count: 12), cell: 48, columns: 4)
+        let light = SyntheticDNG.planckianChromaticity(kelvin: 2850)
+        let data = RAWDevelopChart.dng(.linearRGB, chart: chart, light: light, taggedLight: light)
+        let developed = try Self.renderer.developer.develop(data, whiteBalance: CameraWhiteBalance(temperature: 4500, tint: 0))
+        let asShot = try #require(developed.asShotWhiteBalance)
+        #expect(abs(asShot.temperature - 2850) < 20, "the as-shot light, not the develop's")
+        func centre(_ n: Negative) throws -> SIMD3<Double> {
+            let image = try Self.renderer.render(n, Self.clean)
+            let (w, h) = (Int(image.extent.width), Int(image.extent.height))
+            let pixels = Self.centre(Self.codes(image), width: w, height: h, size: 16)
+            return pixels.reduce(.zero, +) / Double(pixels.count)
+        }
+        let withCast = try centre(developed)
+        let withoutCast = try centre(Negative(image: developed.image, contract: developed.contract))
+        #expect(withCast.x / withCast.z > 1.3 * withoutCast.x / withoutCast.z, "cast \(withCast), none \(withoutCast)")
+    }
+
     @Test func shadeRendersSlightlyCoolAndDaylightIsTheReference() throws {
         let gray = Self.flat(0.18, width: 40, height: 30)
         func centre(_ asShot: Double?) throws -> SIMD3<Double> {

@@ -40,8 +40,8 @@ struct AdjustmentRuler: View {
             scale
         }
         .accessibilityElement(children: .ignore)
-        .accessibilityLabel(control.title(for: adjustments.process))
-        .accessibilityValue(control.formatted(value))
+        .accessibilityLabel(control.accessibilityLabel(for: adjustments.process))
+        .accessibilityValue(control.accessibilityValue(value))
         .accessibilityIdentifier("adjustment-ruler")
         .accessibilityAdjustableAction { direction in
             switch direction {
