@@ -4,12 +4,12 @@ extension XCTestCase {
     /// Keeps a screenshot in the result bundle, named for the PR's Proof section.
     @MainActor
     func keepScreenshot(_ app: XCUIApplication, named name: String) {
-        // iPhone Duo has two screens, and the app's own screenshot is blank on the inner one.
-        let screens = XCUIScreen.screens
-        let isDuo = screens.count > 1
-        for (index, screen) in screens.enumerated() {
-            let attachment = XCTAttachment(screenshot: isDuo ? screen.screenshot() : app.screenshot())
-            attachment.name = isDuo ? "\(name) screen \(index + 1)" : name
+        // iPhone Duo has two screens, one of them off, and the app's own screenshot can be the
+        // blank one; keep whichever screen is lit.
+        let shots = XCUIScreen.screens.count > 1 ? XCUIScreen.screens.map { $0.screenshot() } : [app.screenshot()]
+        for shot in shots where !shot.isBlank || shots.count == 1 {
+            let attachment = XCTAttachment(screenshot: shot)
+            attachment.name = name
             attachment.lifetime = .keepAlways
             add(attachment)
         }

@@ -54,7 +54,7 @@ extension XCUIApplication {
         let count = photos.count
         for index in 0..<count { photos.element(boundBy: index).tap() }
         buttons["Delete"].tap()
-        buttons["Delete \(count) Photos"].tap()
+        buttons[count == 1 ? "Delete 1 Photo" : "Delete \(count) Photos"].tap()
         XCTAssertTrue(buttons["Try Sample Photos"].waitForExistence(timeout: 5))
     }
 
@@ -62,12 +62,13 @@ extension XCUIApplication {
     /// name the element, so a finding can be traced without opening the result bundle.
     ///
     /// On a folded iPhone Duo the contrast audit reads the switched-off inner screen: it failed
-    /// text measured at about 20:1, or threw "Invalid target app" (MOV-140). Contrast is left
-    /// out there, and a contrast-only audit skips the test.
+    /// text measured at about 20:1, or threw "Invalid target app" (MOV-140). Unfolded, with the
+    /// outer screen off, it works. Contrast is left out when folded, and a contrast-only audit
+    /// skips the test.
     @MainActor
     func audit(_ types: XCUIAccessibilityAuditType, file: StaticString = #filePath, line: UInt = #line) throws {
         var types = types
-        if types.contains(.contrast), Self.hasDarkScreen {
+        if types.contains(.contrast), Self.isFoldedDuo {
             types.remove(.contrast)
             if types.isEmpty { throw XCTSkip("The contrast audit can't read a folded iPhone Duo.") }
         }
@@ -78,15 +79,16 @@ extension XCUIApplication {
         }
     }
 
+    /// The outer screen comes first; folded, the inner one is off.
     @MainActor
-    private static var hasDarkScreen: Bool {
-        XCUIScreen.screens.count > 1 && XCUIScreen.screens.contains { $0.screenshot().isBlank }
+    private static var isFoldedDuo: Bool {
+        XCUIScreen.screens.dropFirst().contains { $0.screenshot().isBlank }
     }
 }
 
 extension XCUIScreenshot {
     /// Every pixel black, judged on an 8×8 reduction.
-    fileprivate var isBlank: Bool {
+    var isBlank: Bool {
         let side = 8
         var pixels = [UInt8](repeating: 0, count: side * side * 4)
         guard let image = image.cgImage,

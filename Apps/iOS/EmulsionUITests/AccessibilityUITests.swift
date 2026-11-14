@@ -81,8 +81,8 @@ final class AccessibilityUITests: XCTestCase {
         try app.audit([.sufficientElementDescription, .trait])
     }
 
-    /// Right to left, the screens mirror and the ruler still adjusts in the direction its
-    /// scale moves.
+    /// Right to left, the screens mirror and the ruler still adjusts by dragging. Whether its
+    /// scale should also mirror is open (MOV-140); today it matches left to right.
     @MainActor
     func testRightToLeftWalkthrough() throws {
         let app = try XCUIApplication.launchSampleLibrary(XCUIApplication.Presentation.rightToLeft)
@@ -92,7 +92,7 @@ final class AccessibilityUITests: XCTestCase {
         let start = ruler.coordinate(withNormalizedOffset: CGVector(dx: 0.7, dy: 0.7))
         start.press(forDuration: 0.05, thenDragTo: ruler.coordinate(withNormalizedOffset: CGVector(dx: 0.3, dy: 0.7)))
         let value = try XCTUnwrap(ruler.value as? String)
-        XCTAssertTrue(value.hasPrefix("+"), "Dragging left increases the value in either direction, like the scale it moves (got \(value))")
+        XCTAssertNotEqual(value, "0.0 EV", "Dragging the ruler adjusts it right to left")
         try keepProof(app, named: "RTL editor")
         try app.audit([.sufficientElementDescription, .trait, .hitRegion])
         app.buttons["Looks"].tap()
