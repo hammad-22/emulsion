@@ -8,6 +8,9 @@ import UniformTypeIdentifiers
 /// Renders a Negative with the Emulsion look and the user's adjustments. One instance per
 /// render actor; previews and exports run the same graph, with spatial effects sized
 /// relative to the image so they agree across resolutions.
+///
+/// `@unchecked Sendable`: every stored property is a `let`. The `CIContext`s are thread-safe
+/// (Apple: CIContext.h), and the loaded `CIColorKernel`s are only read.
 public final class Renderer: @unchecked Sendable {
     public static let outputSpace = CGColorSpace(name: CGColorSpace.displayP3)!
     /// Core Image working space: extended linear sRGB, half float.
