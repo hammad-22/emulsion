@@ -1,0 +1,12 @@
+Element "Emulsion"
+Text "Format: ProRAW"
+Button "Resolution", value "12 MP"
+Button "Viewfinder"
+Button "Ultra Wide, 0.5×"
+Button "Wide, 1×", selected
+Button "Telephoto, 4×"
+Button "Library"
+Button "Take Photo"
+Button "Recipe", value "Everyday"
+Image "Filters"
+Text "Everyday"

@@ -1,0 +1,22 @@
+Element "Emulsion"
+Button "Library"
+Button "Compare", value "0"
+Button "Reset Edits", dimmed
+Button "Save to Photos"
+Button "More"
+Image "Edited photo"
+Button "Adjustment group", value "Light"
+Image "Go Down"
+Text "Light"
+Button "Reset Adjustment", dimmed
+Element "Exposure", value "0.0 EV"
+Text "Exposure"
+Text "0.0 EV"
+Button "Exposure", selected
+Button "Highlights"
+Button "Shadows"
+Element "Vertical scroll bar, 1 page", value "0%"
+Element "Vertical scroll bar, 1 page", value "0%"
+Element "Toolbar"
+Button "Looks"
+Button "Hide Adjustments"
