@@ -14,19 +14,15 @@ public final class Renderer: @unchecked Sendable {
     static let workingSpace = CGColorSpace(name: CGColorSpace.extendedLinearSRGB)!
     private let kernels: Kernels
     public let developer: Developer
-    /// Interactive renders (previews of materialized negatives, viewfinder frames): no
-    /// intermediates kept between slider moves.
-    private let context: CIContext
-    /// Renders whose graph may hold a full-size RAW decode (`materialize`, `export`), shared with
-    /// the developer's exposure anchor. Without intermediate caching, Core Image's RAW decode at
-    /// full size with `contrastAmount` 0 returns corrupted tiles (magenta/red blocks, shifted
-    /// copies), varying from render to render: reproduced with CIRAWFilter alone (MOV-147).
-    /// Its caches are cleared after each render, so it holds nothing between renders.
+    private let interactiveContext: CIContext
+    /// For graphs that may hold a RAW decode (`materialize`, `export`, the exposure anchor): a
+    /// full-size decode comes back with corrupted tiles without intermediate caching (MOV-147,
+    /// docs/ENGINE.md).
     private let developContext: CIContext
 
     public init() throws {
         kernels = try Kernels()
-        context = Self.context(cachesIntermediates: false)
+        interactiveContext = Self.context(cachesIntermediates: false)
         developContext = Self.context(cachesIntermediates: true)
         developer = Developer(kernels: kernels, context: developContext)
     }
@@ -104,8 +100,8 @@ public final class Renderer: @unchecked Sendable {
         guard CVPixelBufferCreate(nil, w, h, kCVPixelFormatType_64RGBAHalf, attributes, &buffer) == kCVReturnSuccess, let buffer else {
             throw EmulsionError.renderFailed
         }
+        defer { developContext.clearCaches() }
         developContext.render(negative.image, to: buffer, bounds: negative.image.extent, colorSpace: Self.workingSpace)
-        developContext.clearCaches()
         let image = CIImage(cvPixelBuffer: buffer, options: [.colorSpace: Self.workingSpace])
         return Negative(
             image: image, contract: negative.contract, exposureAnchorStops: negative.exposureAnchorStops,
@@ -125,7 +121,7 @@ public final class Renderer: @unchecked Sendable {
     /// An interactive render, without intermediate caching. Not for a full-size RAW develop: that
     /// can come back corrupted (MOV-147), so `materialize` it first.
     public func cgImage(_ image: CIImage) throws -> CGImage {
-        guard let cg = context.createCGImage(image, from: image.extent, format: .RGBA8, colorSpace: Self.outputSpace) else {
+        guard let cg = interactiveContext.createCGImage(image, from: image.extent, format: .RGBA8, colorSpace: Self.outputSpace) else {
             throw EmulsionError.renderFailed
         }
         return cg
@@ -140,11 +136,11 @@ public final class Renderer: @unchecked Sendable {
         // render, so the source's metadata (GPS included) is cleared first (MOV-126).
         let image = image.settingProperties([:])
         let data: Data?
+        defer { developContext.clearCaches() }
         switch format {
         case .jpeg: data = developContext.jpegRepresentation(of: image, colorSpace: Self.outputSpace, options: options)
         case .heic: data = try? developContext.heif10Representation(of: image, colorSpace: Self.outputSpace, options: options)
         }
-        developContext.clearCaches()
         guard let data else { throw EmulsionError.renderFailed }
         return data
     }

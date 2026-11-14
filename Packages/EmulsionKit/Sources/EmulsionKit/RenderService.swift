@@ -61,7 +61,7 @@ public actor RenderService {
         developCount += 1
         // Draft RAW decode may come back larger than asked; fit it exactly. Then render it
         // once into a half-float buffer, so slider moves don't redo the RAW develop or the
-        // JPEG inversion (Core Image doesn't cache intermediates for us).
+        // JPEG inversion, and the RAW decode never reaches the interactive context (MOV-147).
         let fitted = try renderer.materialize(renderer.resized(developed, longestEdge: maxDimension))
         previews[key] = (fitted, whiteBalance)
         markUsed(key)
