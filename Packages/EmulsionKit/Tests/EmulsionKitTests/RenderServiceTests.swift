@@ -395,4 +395,26 @@ extension RenderServiceTests {
         #expect(await service.asShotWhiteBalance(jpeg) == nil)
         #expect(await service.asShotWhiteBalance(library.folder.appending(path: "missing.dng")) == nil)
     }
+
+    /// A digicam export goes through the camera's JPEG (`RenderIntent.export`); a preview of the same
+    /// size doesn't. A forgotten intent in the export path renders the export like a preview and fails.
+    @Test func digicamExportCarriesTheCameraJPEG() async throws {
+        let library = TestLibrary()
+        let url = library.store.url(for: try await library.store.add(TestPhoto.detailedJPEG, fileExtension: "jpg"))
+        let service = library.renderService
+        /// Export against a preview at the photo's own size, both drawn into one RGBA8 Display P3 layout.
+        func exportAgainstPreview(_ adjustments: Adjustments) async throws -> Double {
+            let preview = try await service.image(url, adjustments, maxDimension: CGFloat(TestPhoto.detailedSize.width))
+            let data = try await service.export(url, adjustments, format: .jpeg)
+            let source = try #require(CGImageSourceCreateWithData(data as CFData, nil))
+            let exported = try #require(CGImageSourceCreateImageAtIndex(source, 0, nil))
+            #expect(exported.width == preview.width && exported.height == preview.height)
+            return try TestPixels.difference(TestPixels.redrawn(exported), TestPixels.redrawn(preview)).mean
+        }
+        var digicam = Adjustments.neutral
+        (digicam.process, digicam.halation) = (.digicam, 1)
+        let digicamGap = try await exportAgainstPreview(digicam)
+        let filmGap = try await exportAgainstPreview(.neutral)
+        #expect(digicamGap > 2 * filmGap, "export vs preview, mean codes: digicam \(digicamGap), film \(filmGap)")
+    }
 }

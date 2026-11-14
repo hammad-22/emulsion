@@ -38,7 +38,7 @@ public enum CuratedLooks {
         },
         make(
             "00000000-0000-0000-0000-000000000005", String(localized: "Digicam 2004", bundle: .module),
-            String(localized: "Clipped highlights, bright color and crisp in-camera processing.", bundle: .module)
+            String(localized: "Washed-out tones, blown highlights, color casts and crunchy in-camera processing.", bundle: .module)
         ) {
             $0.process = .digicam
             $0.grain = DigicamLook.defaultNoise

@@ -196,6 +196,25 @@ struct DigicamTests {
         #expect(none < 0.01, "no halos without processing: \(none)")
     }
 
+    /// The corners are never sharper than the lens-softened centre: at low processing the corner blur
+    /// (× processing) is below the whole-frame lens blur, and used to leave the corners crisper.
+    @Test(arguments: [0, 0.2])
+    func cornersAreNoSharperThanTheCentre(processing: Double) throws {
+        let (w, h) = (2592, 1944)
+        let stripes = Fixtures.image(width: w, height: h, space: SceneFixtures.linear) { x, _ in
+            SIMD3(repeating: x.isMultiple(of: 2) ? 0.09 : 0.36)
+        }
+        let image = try Self.render(stripes, Self.adjust { $0.halation = processing })
+        /// Luma σ (codes) of a 32 × 32 window, a local contrast.
+        func contrast(x: Int, y: Int) -> Double {
+            let window = Self.codes(image.cropped(to: CGRect(x: x, y: y, width: 32, height: 32)))
+            return EmulsionTestCase.sd(window.map(DigicamModel.luma))
+        }
+        let centre = contrast(x: w / 2 - 16, y: h / 2 - 16)
+        let corner = contrast(x: 8, y: 8)
+        #expect(corner <= centre + 0.01, "corner \(corner), centre \(centre) codes")
+    }
+
     /// Only an export goes through the JPEG encoder, at any size; a preview, or no processing, doesn't.
     @Test func onlyExportsAreCompressed() throws {
         let scene = Fixtures.image(width: 640, height: 480, space: SceneFixtures.linear) { x, y in

@@ -24,7 +24,9 @@ extension Renderer {
             let fringe = DigicamLook.fringeColor * (DigicamLook.fringeStrength * processing * clipsAt)
             scene = try kernels.run(k.fringe, extent, [scene, mask, maskBlur, CIVector(x: fringe.x, y: fringe.y, z: fringe.z, w: 0)])
         }
-        let corners = Self.blurred(scene, sigma: DigicamLook.cornerSoftnessSigma * processing * pixelsPerSensorPixel)
+        // The corners are never sharper than the lens-softened centre, whatever the processing.
+        let cornerSigma = max(DigicamLook.lensSoftnessSigma, DigicamLook.cornerSoftnessSigma * processing)
+        let corners = Self.blurred(scene, sigma: cornerSigma * pixelsPerSensorPixel)
         scene = Self.blurred(scene, sigma: DigicamLook.lensSoftnessSigma * pixelsPerSensorPixel)
         let halfDiagonalSquared = (extent.width * extent.width + extent.height * extent.height) / 4
         let lens = CIVector(x: extent.midX, y: extent.midY, z: 1 / halfDiagonalSquared, w: model.vignetteStops)

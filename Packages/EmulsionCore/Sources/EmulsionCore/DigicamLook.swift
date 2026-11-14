@@ -25,8 +25,8 @@ enum DigicamLook {
     static let vignetteStops = 1.0
     /// A cheap lens is soft everywhere: the whole frame is blurred by `lensSoftnessSigma` (whatever
     /// the processing amount) and, towards the corners (weight ∝ r², full at the corner), blended
-    /// into a blur of `cornerSoftnessSigma` × the processing amount; sigmas in sensor px, each skipped
-    /// below `minimumBlurSigma`. Artistic, owner direction and independent review (MOV-149); unmeasured.
+    /// into a blur of `cornerSoftnessSigma` × the processing amount (never less than the lens blur);
+    /// sigmas in sensor px, each skipped below `minimumBlurSigma`. Artistic, owner direction and independent review (MOV-149); unmeasured.
     static let lensSoftnessSigma = 0.8
     static let cornerSoftnessSigma = 3.0
     /// Below this sigma (output px) a blur changes nothing visible, so it is skipped.

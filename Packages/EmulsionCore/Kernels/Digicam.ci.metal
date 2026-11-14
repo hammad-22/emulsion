@@ -6,7 +6,8 @@ using namespace metal;
 // from DigicamLook.swift. Working space: extended linear sRGB (D65).
 //
 // Copied from Emulsion.ci.metal so the film kernels' open PRs merge cleanly: digicamLuma709
-// (lumaSRGB), digicamHash (the grain `hash`) and the value-noise lattice (valueNoise).
+// (lumaSRGB), digicamDecode (decodeCurve's sRGB case 10) and its inverse digicamEncode, digicamHash
+// (the grain `hash`) and the value-noise lattice (valueNoise).
 // Follow-up: share them through a header.
 
 float digicamLuma709(float3 rgb) { return dot(rgb,float3(.2126,.7152,.0722)); }
@@ -19,7 +20,7 @@ float digicamHash(float2 p, float seed) {
     q+=dot(q,q.yzx+33.33);
     return fract((q.x+q.y)*q.z)*2.0-1.0;
 }
-// Three independent values per lattice point (same mixing, three outputs), in −1…1.
+// Three independent values per lattice point (digicamHash's seeding, its own mixing), in −1…1.
 float3 digicamHash3(float2 p, float seed) {
     float3 q=fract(float3(p.xyx)*float3(.1031,.1030,.0973)+fract(seed*float3(.6180339887,.7548776662,.5698402910)));
     q+=dot(q,q.yxz+33.33);

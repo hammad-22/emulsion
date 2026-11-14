@@ -4,7 +4,7 @@ import Foundation
 /// The digicam process's kernels (EmulsionCore/Kernels/Digicam.ci.metal), linked into the same
 /// metallib as the film kernels (Tools/build-kernels.sh).
 struct DigicamKernels {
-    // Named exactly like the Metal functions in Digicam.ci.metal.
+    // Named like the Metal functions in Digicam.ci.metal, without their digicam prefix.
     let fringeSource, fringe, capture, encodedLuma, sharpen: CIColorKernel
 
     init(library data: Data) throws {

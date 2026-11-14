@@ -16,7 +16,7 @@ public final class Renderer: @unchecked Sendable {
     let kernels: Kernels
     let digicamKernels: DigicamKernels
     public let developer: Developer
-    let context: CIContext
+    private let context: CIContext
 
     public init() throws {
         let library = try Kernels.library()
