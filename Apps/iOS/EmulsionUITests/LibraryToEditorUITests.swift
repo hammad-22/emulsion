@@ -13,6 +13,7 @@ final class LibraryToEditorUITests: XCTestCase {
         guard app.buttons["Try Sample Photos"].waitForExistence(timeout: 5) else {
             throw XCTSkip("Needs an empty library; uninstall the isolated proof app first.")
         }
+        if XCUIApplication.hasDarkScreen { throw XCTSkip("The contrast audit can't read a folded iPhone Duo.") }
         // The sample prints fade in as they render; the audit reads pixels.
         sleep(3)
         try app.audit(.contrast)
