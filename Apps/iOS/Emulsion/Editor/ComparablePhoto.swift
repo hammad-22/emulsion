@@ -2,8 +2,7 @@ import EmulsionCore
 import EmulsionUI
 import SwiftUI
 
-/// The photo being edited, with nothing drawn over it. Touch and hold to see the original;
-/// `isHolding` tells the editor, which names what's on screen in its title.
+/// Touch and hold to see the original.
 struct ComparablePhoto: View {
     let url: URL
     let adjustments: Adjustments
@@ -25,7 +24,6 @@ struct ComparablePhoto: View {
             .sensoryFeedback(.impact(weight: .light), trigger: isPressed) { _, isPressed in isPressed }
     }
 
-    /// True from the moment the hold is recognized until the finger lifts.
     private var hold: some Gesture {
         LongPressGesture(minimumDuration: holdDuration)
             .sequenced(before: DragGesture(minimumDistance: 0))

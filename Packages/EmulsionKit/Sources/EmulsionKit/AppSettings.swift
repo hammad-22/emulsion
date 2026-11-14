@@ -24,14 +24,12 @@ public final class AppSettings {
     public var format: Renderer.ExportFormat { didSet { defaults.set(format.rawValue, forKey: Key.format) } }
     /// The camera's capture resolution; lenses without 48 MP capture at 12 MP.
     public var resolution: Resolution { didSet { defaults.set(resolution.rawValue, forKey: Key.resolution) } }
-    /// The camera's recipe, kept as a snapshot (its encoded JSON), like a photo's edit: it
-    /// survives the recipe being deleted from the saved looks. Missing or unreadable reads as the
-    /// first curated look.
+    /// The camera's recipe, kept as a snapshot so it survives the recipe being deleted from the
+    /// saved looks. Missing or unreadable reads as the first curated look.
     public var recipe: Recipe { didSet { defaults.set(try? recipe.encoded(), forKey: Key.recipe) } }
 
     private let defaults: UserDefaults
 
-    /// `defaults` is the store (tests pass their own suite).
     public init(defaults: UserDefaults = .standard) {
         self.defaults = defaults
         autoSave = defaults.bool(forKey: Key.autoSave)

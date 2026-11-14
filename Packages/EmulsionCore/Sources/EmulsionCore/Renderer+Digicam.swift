@@ -92,6 +92,6 @@ extension Renderer {
         return decoded
     }
 
-    /// The cameras wrote sRGB.
+    /// Period cameras wrote sRGB JPEGs.
     private static let cameraSpace = CGColorSpace(name: CGColorSpace.sRGB)!
 }

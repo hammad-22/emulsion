@@ -1,15 +1,13 @@
 import XCTest
 
-/// The camera as the app opens on it, in the Simulator's stand-in camera (the sample
-/// photos as a live viewfinder): switch lens, pick a recipe, tap to focus, take a photo, find
-/// it in the library, delete it and come back. Screenshots are kept in the result bundle as PR proof.
+/// The camera walkthrough, on the Simulator's stand-in camera (the sample photos as a live viewfinder).
 final class CameraUITests: XCTestCase {
     @MainActor
     func testCaptureAppearsInLibrary() throws {
         let app = XCUIApplication()
         app.launch()
 
-        let viewfinder = app.descendants(matching: .any)["viewfinder"]
+        let viewfinder = app.descendants(matching: .any)[AccessibilityID.viewfinder]
         XCTAssertTrue(viewfinder.waitForExistence(timeout: 10))
         let library = app.buttons["Library"]
         let photos = app.photos
@@ -42,7 +40,7 @@ final class CameraUITests: XCTestCase {
         keepScreenshot(app, named: "Camera 2b Warm Light")
 
         viewfinder.coordinate(withNormalizedOffset: CGVector(dx: 0.3, dy: 0.4)).tap()
-        XCTAssertTrue(app.descendants(matching: .any)["focus-reticle"].waitForExistence(timeout: 1))
+        XCTAssertTrue(app.descendants(matching: .any)[AccessibilityID.focusReticle].waitForExistence(timeout: 1))
         keepScreenshot(app, named: "Camera 3 Focus")
 
         app.buttons["Take Photo"].tap()
@@ -56,7 +54,7 @@ final class CameraUITests: XCTestCase {
         sleep(1)
         keepScreenshot(app, named: "Camera 5 Library")
 
-        // Deletes the capture (newest first), leaving the library as it was for the next test.
+        // Newest first: deleting the capture leaves the library as it was for the next test.
         photos.firstMatch.press(forDuration: 1)
         app.buttons["Delete"].tap()
         app.buttons["Delete 1 Photo"].tap()
@@ -78,10 +76,10 @@ final class CameraUITests: XCTestCase {
     @MainActor
     func testInterruptionPausesTheCamera() {
         let app = XCUIApplication()
-        app.launchArguments = ["-camera-scenario", "in-use"]
+        app.launchArguments = LaunchArgument.cameraScenario("in-use")
         app.launch()
 
-        XCTAssertTrue(app.descendants(matching: .any)["camera-paused"].waitForExistence(timeout: 10))
+        XCTAssertTrue(app.descendants(matching: .any)[AccessibilityID.cameraPaused].waitForExistence(timeout: 10))
         XCTAssertTrue(app.staticTexts["Camera in Use"].exists, "VoiceOver can read why")
         XCTAssertFalse(app.buttons["Take Photo"].isEnabled)
         XCTAssertFalse(app.alerts.firstMatch.exists)
@@ -92,7 +90,7 @@ final class CameraUITests: XCTestCase {
     @MainActor
     func testFailedCameraCanBeRetried() {
         let app = XCUIApplication()
-        app.launchArguments = ["-camera-scenario", "failed"]
+        app.launchArguments = LaunchArgument.cameraScenario("failed")
         app.launch()
 
         let retry = app.buttons["Try Again"]
@@ -100,7 +98,7 @@ final class CameraUITests: XCTestCase {
         keepScreenshot(app, named: "Camera 7 Failed")
         retry.tap()
 
-        XCTAssertTrue(app.descendants(matching: .any)["viewfinder"].waitForExistence(timeout: 5))
+        XCTAssertTrue(app.descendants(matching: .any)[AccessibilityID.viewfinder].waitForExistence(timeout: 5))
         XCTAssertTrue(app.buttons["Take Photo"].isEnabled)
     }
 

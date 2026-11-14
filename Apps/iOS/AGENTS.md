@@ -14,6 +14,7 @@
   - Active division/occlusion regions displace the image into a contiguous usable rectangle; system navigation owns vertical bars. Never infer a model from device dimensions. Native Duo fold proof remains open (MOV-62/63).
 - **Accessibility:** every control has a label and supports Dynamic Type.
 - Folders are organized by feature (`Camera/`, `Library/`, `Editor/`), with helpers used by several features in `Shared/`. Models and app logic live in `Packages/EmulsionKit`, not in the app.
+- Launch arguments and accessibility identifiers live in `Shared/LaunchArgument.swift` and `Shared/AccessibilityID.swift`; `EmulsionUITests/` mirrors them in files of the same names. Change both together.
 - **Run it before every app PR.** Build, then run the UI walkthrough on a fresh install. The camera walkthrough runs on the Simulator's stand-in camera (the sample photos as a live viewfinder); the library walkthrough launches with `--library`. It adds the sample photos, edits, compares, rotates and saves to Photos, and keeps screenshots in the result bundle for the PR Proof:
   ```bash
   xcrun simctl uninstall booted com.hammad.emulsion; rm -rf /tmp/ui.xcresult /tmp/ui-shots

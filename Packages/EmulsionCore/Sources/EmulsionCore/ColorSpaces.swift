@@ -38,19 +38,21 @@ public enum InputColorSpace: String, CaseIterable, Identifiable, Codable, Sendab
     }
 
     /// Curve identifier understood by the `inputTransform` kernel.
-    var curve: Int {
+    var curve: Int { transferCurve.rawValue }
+
+    var transferCurve: TransferCurve {
         switch self {
-        case .appleLog: return 1
-        case .sLog3SGamut3Cine: return 2
-        case .arriLogC3: return 3
-        case .arriLogC4: return 4
-        case .vLog: return 5
-        case .davinciIntermediate: return 6
-        case .acescct: return 7
-        case .hlgRec2020: return 8
-        case .rec709: return 9  // BT.1886 display (gamma 2.4)
-        case .displayP3: return 10  // sRGB piecewise transfer
-        case .linearP3: return 0
+        case .appleLog: .appleLog
+        case .sLog3SGamut3Cine: .sLog3
+        case .arriLogC3: .arriLogC3
+        case .arriLogC4: .arriLogC4
+        case .vLog: .vLog
+        case .davinciIntermediate: .davinciIntermediate
+        case .acescct: .acescct
+        case .hlgRec2020: .hlg
+        case .rec709: .bt1886
+        case .displayP3: .sRGB
+        case .linearP3: .linear
         }
     }
 
@@ -81,7 +83,10 @@ public enum InputColorSpace: String, CaseIterable, Identifiable, Codable, Sendab
 
     /// E′ → the formula's input: code / 1023 = (64 + 876·E′) / 1023 for code-value curves (BT.2100
     /// narrow range), E′ itself otherwise.
-    var curveInputFromSignal: (scale: Double, offset: Double) { formulaTakesCodeValues ? (876.0 / 1023, 64.0 / 1023) : (1, 0) }
+    var curveInputFromSignal: (scale: Double, offset: Double) {
+        let legal = SignalRange.legal
+        return formulaTakesCodeValues ? (legal.lumaSpan / SignalRange.largestCode, legal.lumaBlack / SignalRange.largestCode) : (1, 0)
+    }
 
     /// Normalized signal E′ → linear in the source primaries.
     func decode(signal e: Double) -> Double {
@@ -111,10 +116,28 @@ public enum InputColorSpace: String, CaseIterable, Identifiable, Codable, Sendab
         let p = primaries
         let toXYZ = ColorMath.rgbToXYZ(p.r, p.g, p.b, white: p.white)
         let adapt = ColorMath.bradford(from: p.white, to: Self.d65)
-        let w = InputColorSpace.rec709.primaries  // the working space: linear sRGB / Rec.709
-        let sRGB = ColorMath.rgbToXYZ(w.r, w.g, w.b, white: w.white)
-        return sRGB.inverse * adapt * toXYZ
+        return ColorMath.xyzToLinearSRGB * adapt * toXYZ
     }
+}
+
+/// Transfer curves of the input transforms; the raw value is the curve identifier the
+/// `inputTransform` kernel switches on (`decodeCurve`), so it must match the Metal source.
+enum TransferCurve: Int {
+    case linear = 0
+    case appleLog = 1
+    case sLog3 = 2
+    /// EI 800.
+    case arriLogC3 = 3
+    case arriLogC4 = 4
+    case vLog = 5
+    case davinciIntermediate = 6
+    case acescct = 7
+    /// BT.2100 HLG inverse OETF.
+    case hlg = 8
+    /// BT.1886 display, gamma 2.4.
+    case bt1886 = 9
+    /// The sRGB piecewise transfer (IEC 61966-2-1).
+    case sRGB = 10
 }
 
 enum ColorMath {
@@ -138,8 +161,12 @@ enum ColorMath {
     /// Reference decode in Swift (mirrors `decodeCurve`), from each curve's own domain: code
     /// value / 1023 or signal E′ (see `InputColorSpace.formulaTakesCodeValues`).
     static func decode(_ v: Double, curve: Int) -> Double {
+        decode(v, curve: TransferCurve(rawValue: curve) ?? .linear)
+    }
+
+    static func decode(_ v: Double, curve: TransferCurve) -> Double {
         switch curve {
-        case 1:  // Apple Log
+        case .appleLog:
             let r0 = -0.05641088
             let rt = 0.01
             let sigma = 47.28711236
@@ -149,35 +176,40 @@ enum ColorMath {
             let pt = sigma * (rt - r0) * (rt - r0)
             if v >= pt { return pow(2, (v - delta) / gamma) - beta }
             return v >= 0 ? (v / sigma).squareRoot() + r0 : r0
-        case 2:  // S-Log3 (10-bit code value / 1023, reflection)
+        case .sLog3:  // 10-bit code value / 1023, reflection
             if v >= 171.2102946929 / 1023 { return pow(10, (1023 * v - 420) / 261.5) * 0.19 - 0.01 }
             return (1023 * v - 95) * 0.01125 / (171.2102946929 - 95)
-        case 3:  // ARRI LogC3, EI 800
+        case .arriLogC3:
             if v > 0.149658 { return (pow(10, (v - 0.385537) / 0.247190) - 0.052272) / 5.555556 }
             return (v - 0.092809) / 5.367655
-        case 4:  // ARRI LogC4
+        case .arriLogC4:
             let (a, b, c) = (LogC4.a, LogC4.b, LogC4.c)
             let s = (7 * log(2) * pow(2, 7 - 14 * c / b)) / (a * b)
             let t = (pow(2, 14 * (-c / b) + 6) - 64) / a
             return v >= 0 ? (pow(2, 14 * ((v - c) / b) + 6) - 64) / a : v * s + t
-        case 5:  // Panasonic V-Log
+        case .vLog:
             return v < 0.181 ? (v - 0.125) / 5.6 : pow(10, (v - 0.598206) / 0.241514) - 0.00873
-        case 6:  // DaVinci Intermediate
+        case .davinciIntermediate:
             return v > 0.02740668 ? pow(2, v / 0.07329248 - 7) - 0.0075 : v / 10.44426855
-        case 7:  // ACEScct
+        case .acescct:
             return v <= 0.155251141552511 ? (v - 0.0729055341958355) / 10.5402377416545 : min(pow(2, v * 17.52 - 9.72), 65504)
-        case 8:  // BT.2100 HLG inverse OETF, scaled so 38% signal = 18% gray (ITU-R BT.2408);
-            // sub-black signals mirror (odd extension) so the curve stays monotonic
+        case .hlg:
+            // Scaled so 38 % signal = 18 % gray (ITU-R BT.2408); sub-black signals mirror (odd
+            // extension) so the curve stays monotonic.
             let (a, b, c) = (HLG.a, HLG.b, HLG.c)
             let e = v <= 0.5 ? v * abs(v) / 3 : (exp((v - c) / a) + b) / 12
             return e * HLG.sceneScale
-        case 9: return v < 0 ? -pow(-v, 2.4) : pow(v, 2.4)  // odd extension below 0 (sub-black policy, ENGINE.md)
-        case 10: return v <= 0.04045 ? v / 12.92 : pow((v + 0.055) / 1.055, 2.4)
-        default:
+        case .bt1886:
+            // Odd extension below 0: the sub-black policy (ENGINE.md).
+            return v < 0 ? -pow(-v, 2.4) : pow(v, 2.4)
+        case .sRGB:
+            return v <= 0.04045 ? v / 12.92 : pow((v + 0.055) / 1.055, 2.4)
+        case .linear:
             return v
         }
     }
-    /// The sRGB transfer function (IEC 61966-2-1), linear → encoded: the inverse of `decode(_:curve: 10)`.
+
+    /// The sRGB transfer function (IEC 61966-2-1), linear → encoded: the inverse of `decode(_:curve: .sRGB)`.
     static func encodeSRGB(_ linear: Double) -> Double {
         linear <= 0.0031308 ? 12.92 * linear : 1.055 * pow(linear, 1 / 2.4) - 0.055
     }

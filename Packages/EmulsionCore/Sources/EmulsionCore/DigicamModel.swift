@@ -40,7 +40,7 @@ struct DigicamModel {
         let s = t < p ? p * lo * lo : 1 - (1 - p) * hi * hi
         let v = t + (s - t) * DigicamLook.contrast
         let floor = DigicamLook.blackFloorCode
-        return ColorMath.decode(floor + (1 - floor) * v, curve: srgbCurve)
+        return ColorMath.decode(floor + (1 - floor) * v, curve: .sRGB)
     }
 
     // MARK: White balance
@@ -51,12 +51,12 @@ struct DigicamModel {
     /// and the user's Warmth and Tint. The develop has already neutralised the light, so the gains
     /// are light ÷ the camera's white.
     static func whiteBalanceGains(asShotTemperature: Double?, warmth: Double, tint: Double) -> SIMD3<Double> {
-        let reference = 1e6 / DigicamLook.whiteBalanceReference
-        let light = asShotTemperature.map { 1e6 / $0 } ?? reference
+        let reference = mireds(kelvin: DigicamLook.whiteBalanceReference)
+        let light = asShotTemperature.map { mireds(kelvin: $0) } ?? reference
         let cameraWhite =
             reference + DigicamLook.whiteBalanceCorrection * (light - reference) + DigicamLook.biasMireds - warmth
             * DigicamLook.warmthMireds
-        var gains = planckianSRGB(kelvin: 1e6 / light) / planckianSRGB(kelvin: 1e6 / cameraWhite)
+        var gains = planckianSRGB(kelvin: kelvin(mireds: light)) / planckianSRGB(kelvin: kelvin(mireds: cameraWhite))
         gains.y *= 1 - DigicamLook.biasMagenta - tint * DigicamLook.tintGreen
         return gains / luma(gains)
     }
@@ -66,10 +66,13 @@ struct DigicamModel {
         ColorMath.xyzToLinearSRGB * ColorMath.xyz(ColorMath.planckianChromaticity(kelvin: kelvin))
     }
 
+    private static func mireds(kelvin: Double) -> Double { 1e6 / kelvin }
+    private static func kelvin(mireds: Double) -> Double { 1e6 / mireds }
+
     // MARK: Encoding
 
-    /// The sRGB transfer function's curve in `ColorMath.decode` (Display P3 shares it).
-    private static let srgbCurve = InputColorSpace.displayP3.curve
+    /// ITU-R BT.709 luma weights, as the kernel's `digicamLuma709`.
+    private static let rec709LumaWeights = SIMD3(0.2126, 0.7152, 0.0722)
 
-    static func luma(_ rgb: SIMD3<Double>) -> Double { (rgb * SIMD3(0.2126, 0.7152, 0.0722)).sum() }
+    static func luma(_ rgb: SIMD3<Double>) -> Double { (rgb * rec709LumaWeights).sum() }
 }

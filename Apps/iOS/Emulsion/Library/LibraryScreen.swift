@@ -2,17 +2,15 @@ import EmulsionKit
 import EmulsionUI
 import SwiftUI
 
-/// The photo library: every imported photo with its film look, newest first.
-/// Opens over the camera, with a button back to it.
 struct LibraryScreen: View {
     @Environment(PhotoStore.self) private var store
     @Environment(\.isPresented) private var isPresented
     @Environment(\.dismiss) private var dismiss
+    @Environment(\.horizontalSizeClass) private var horizontalSizeClass
+    @Environment(\.verticalSizeClass) private var verticalSizeClass
     @State private var path: [PhotoRecord.ID] = []
     @State private var selection = LibrarySelection()
     @State private var previewID: PhotoRecord.ID?
-    @Environment(\.horizontalSizeClass) private var horizontalSizeClass
-    @Environment(\.verticalSizeClass) private var verticalSizeClass
     @State private var importError: String?
     @Namespace private var editorTransition
     /// An even column count for the grid beside the preview (HIG, iPhone Duo inner display).

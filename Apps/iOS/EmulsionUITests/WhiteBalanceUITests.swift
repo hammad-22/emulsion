@@ -6,17 +6,15 @@ import XCTest
 final class WhiteBalanceUITests: XCTestCase {
     @MainActor
     func testRAWPhotoWhiteBalanceRulers() throws {
-        let app = XCUIApplication()
-        app.launchArguments = ["--library"]
-        app.launch()
+        let app = XCUIApplication.launchLibrary()
         XCTAssertTrue(app.navigationBars["Library"].waitForExistence(timeout: 5))
         // A library folder filled by hand has no index, which the app reports once.
         if app.alerts.buttons["OK"].waitForExistence(timeout: 2) { app.alerts.buttons["OK"].tap() }
-        let photo = app.buttons.matching(NSPredicate(format: "label BEGINSWITH 'Photo from'")).firstMatch
+        let photo = app.photos.firstMatch
         guard photo.waitForExistence(timeout: 2) else { throw XCTSkip("Needs a RAW photo in the library.") }
         photo.tap()
         app.buttons["Adjust"].tap()
-        let ruler = app.otherElements["adjustment-ruler"]
+        let ruler = app.otherElements[AccessibilityID.adjustmentRuler]
         XCTAssertTrue(ruler.waitForExistence(timeout: 5))
         app.buttons["Adjustment group"].tap()
         keepScreenshot(app, named: "WB 0 Adjustment groups")
@@ -65,9 +63,9 @@ final class WhiteBalanceUITests: XCTestCase {
     @MainActor
     func testInspectorShowsWhiteBalanceRulers() throws {
         let app = XCUIApplication()
-        app.launchArguments = ["--component-gallery"]
+        app.launchArguments = LaunchArgument.componentGallery
         app.launch()
-        let rulers = app.otherElements.matching(identifier: "adjustment-ruler")
+        let rulers = app.otherElements.matching(identifier: AccessibilityID.adjustmentRuler)
         let temperature = rulers.matching(NSPredicate(format: "label == 'Temperature'")).firstMatch
         let tint = rulers.matching(NSPredicate(format: "label == 'White Balance Tint'")).firstMatch
         XCTAssertTrue(app.staticTexts["White Balance"].waitForExistence(timeout: 5))

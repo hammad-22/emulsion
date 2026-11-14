@@ -11,11 +11,9 @@ public enum CameraEvent: Equatable, Sendable {
 
 /// Why the system paused the camera (`AVCaptureSession.InterruptionReason`).
 public enum CameraInterruption: Equatable, Sendable {
-    /// Another app took the camera.
     case inUseByAnotherApp
     /// Another app is on screen beside this one (Stage Manager, iPhone Duo's split screen).
     case multipleForegroundApps
-    /// The device is too hot, or short of power, to run the camera.
     case systemPressure
     /// Any other reason: the app moved to the background, a call took the audio.
     case other

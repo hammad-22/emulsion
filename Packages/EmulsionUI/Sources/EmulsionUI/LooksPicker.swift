@@ -12,7 +12,7 @@ struct LooksPicker: View {
     @State private var name = ""
     @State private var errorMessage: String?
     @State private var deleting: Recipe?
-    // Keeps the Mac sheet usable at its smallest size.
+    /// Keeps the Mac sheet usable at its smallest size.
     private let minimumSheetSize = CGSize(width: 300, height: 320)
 
     var body: some View {

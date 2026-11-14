@@ -47,7 +47,7 @@ public struct AdjustmentInspector: View {
         .onChange(of: adjustments) { old, new in select(changedFrom: old, to: new) }
     }
 
-    /// A ruler move changes one control; Reset Edits changes several and keeps the selection.
+    /// Reset Edits changes several controls, which keeps the selection.
     private func select(changedFrom old: Adjustments, to new: Adjustments) {
         guard let changed = AdjustmentGroup.changedControl(from: old, to: new, whiteBalanceAsShot: whiteBalanceAsShot) else { return }
         if group != changed.group { group = changed.group }

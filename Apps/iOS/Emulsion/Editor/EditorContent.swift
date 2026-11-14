@@ -2,7 +2,7 @@ import EmulsionKit
 import EmulsionUI
 import SwiftUI
 
-/// Owns edit and control selection independently of the current display arrangement.
+/// Owns edit and control selection above the layout branches, so folding keeps them.
 struct EditorContent: View {
     @Bindable var session: EditSession
 
@@ -20,7 +20,6 @@ struct EditorContent: View {
     var body: some View {
         GeometryReader { geometry in
             let isExpanded = geometry.isExpandedCanvas(horizontalSizeClass: horizontalSizeClass, verticalSizeClass: verticalSizeClass)
-            // The user's last Adjust choice survives folding; until then, the canvas decides.
             let showsAdjustments = adjustmentsPreference ?? isExpanded
             workspace(geometry, isExpanded: isExpanded, showsAdjustments: showsAdjustments)
                 .toolbar {
@@ -30,7 +29,7 @@ struct EditorContent: View {
                 }
         }
         .background(.black)
-        // An intentionally neutral dark workspace keeps the photograph visually central.
+        // A neutral dark workspace keeps the photograph visually central.
         .preferredColorScheme(.dark)
         .tint(.white)
         .navigationTitle(showsOriginal ? Text("Original") : Text(""))

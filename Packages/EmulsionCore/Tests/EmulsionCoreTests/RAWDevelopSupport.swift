@@ -7,8 +7,7 @@ import simd
 
 /// Helpers shared by the RAW develop, exposure anchor and white balance tests and `RAWDevelopProbe`.
 enum RAWDevelopSupport {
-    /// ":"-separated folders of real DNGs (opt-in; real samples never enter the repo).
-    static let samplesFolders = ProcessInfo.processInfo.environment["EMULSION_RAW_SAMPLES"]
+    static let samplesFolders = TestEnvironment.rawSamples.value
 
     /// Long edge of the scaled real-file decode, to keep 48 MP files fast.
     static let previewLongEdge: CGFloat = 1024
@@ -16,7 +15,7 @@ enum RAWDevelopSupport {
     /// A highlight that reaches 4.0 in scene light is two stops above the old ceiling of 1.0.
     static let headroomFloor = 4.0
 
-    /// Every .dng (any case) in the folders of EMULSION_RAW_SAMPLES, sorted by name per folder.
+    /// Every .dng (any case) in the sample folders, sorted by name per folder.
     static func sampleURLs() throws -> [URL] {
         guard let samplesFolders else { return [] }
         return try samplesFolders.split(separator: ":").flatMap { path in
@@ -42,6 +41,7 @@ enum RAWDevelopSupport {
         var negative: Negative
         var pixels: [SIMD3<Double>]
         var means: [SIMD3<Double>]
+        var maxValue: Double { RAWDevelopSupport.maxValue(pixels) }
 
         init(chart: PatchChart, _ negative: Negative) {
             self.negative = negative
@@ -67,22 +67,21 @@ enum RAWDevelopSupport {
         zip(a, b).map { (abs($0 - $1) / max(abs($1), SIMD3(repeating: floor))).max() }.max() ?? .nan
     }
 
-    /// Rec. 709 / sRGB luminance (Y) of linear sRGB.
+    /// Rec. 709 luminance (Y) of linear sRGB.
     static func luminance(_ c: SIMD3<Double>) -> Double { (SyntheticDNG.xyzFromLinearSRGB * c).y }
 
     /// How far a colour is from neutral: max(|R/G − 1|, |B/G − 1|).
     static func neutralError(_ c: SIMD3<Double>) -> Double { max(abs(c.x / c.y - 1), abs(c.z / c.y - 1)) }
 
-    /// The brightest channel value over all pixels.
     static func maxValue(_ pixels: [SIMD3<Double>]) -> Double { pixels.map { $0.max() }.max() ?? .nan }
 
     /// Highlight statistics of a developed frame (linear sRGB pixels).
     struct FrameStats {
         let maxValue: Double
-        /// 50th and 99.9th percentiles of luminance.
         let medianLuminance: Double
+        /// 99.9th percentile of luminance.
         let p999: Double
-        /// Fractions of pixels whose brightest channel exceeds 1, 2 and 4.
+        /// Fraction of pixels whose brightest channel exceeds 1 (and 2, 4 below).
         let over1: Double
         let over2: Double
         let over4: Double
@@ -112,7 +111,6 @@ enum RAWDevelopSupport {
         raw.extendedDynamicRangeAmount = 0
     }
 
-    /// A negative developed with the pre-MOV-79 configuration.
     static func preMOV79Negative(_ raw: CIRAWFilter, maxDimension: CGFloat? = nil) throws -> Negative {
         applyPreMOV79Develop(raw)
         Developer.applyPreviewScale(raw, maxDimension: maxDimension, allowsDraftMode: true)
@@ -124,12 +122,11 @@ enum RAWDevelopSupport {
 }
 
 extension Double {
-    /// Four significant digits, for probe and real-file tables.
+    /// Four significant digits, for the probe and real-file tables.
     var fourDigits: String { String(format: "%.4g", self) }
 }
 
 extension Duration {
-    /// Elapsed time in milliseconds, for probe timings.
     var milliseconds: Double {
         Double(components.seconds) * 1000 + Double(components.attoseconds) / 1e15
     }

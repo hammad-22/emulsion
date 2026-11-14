@@ -43,6 +43,9 @@ public enum VideoFixtures {
         return try await firstFrame(of: url, format: format)
     }
 
+    /// 10-bit codes sit in the high bits of each 16-bit sample.
+    private static let tenBitCodeShift: UInt16 = 6
+
     static func frame(_ patches: [SIMD3<UInt16>], format: OSType) throws -> CVPixelBuffer {
         var created: CVPixelBuffer?
         let attributes = [kCVPixelBufferIOSurfacePropertiesKey: [:]] as CFDictionary
@@ -58,13 +61,12 @@ public enum VideoFixtures {
             let patchWidth = width / patches.count
             for y in 0..<CVPixelBufferGetHeightOfPlane(buffer, plane) {
                 for x in 0..<width {
-                    // 10-bit codes sit in the high bits of each 16-bit sample.
                     let code = patches[x / patchWidth]
                     if plane == 0 {
-                        samples[y * row + x] = code.x << 6
+                        samples[y * row + x] = code.x << tenBitCodeShift
                     } else {
-                        samples[y * row + 2 * x] = code.y << 6
-                        samples[y * row + 2 * x + 1] = code.z << 6
+                        samples[y * row + 2 * x] = code.y << tenBitCodeShift
+                        samples[y * row + 2 * x + 1] = code.z << tenBitCodeShift
                     }
                 }
             }

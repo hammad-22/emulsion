@@ -1,16 +1,14 @@
 import CoreGraphics
 import Foundation
 
-/// The most recent editor-sized film render of each photo, so a photo view rebuilt in a new
-/// layout (folding or unfolding iPhone Duo, opening the editor from the library preview)
-/// shows the photo at once while it renders again at its new size. Never holds an original.
+/// The latest editor-sized render of each photo, so a view rebuilt in a new layout (folding
+/// iPhone Duo, opening the editor) shows the photo at once while it renders again.
 ///
 /// `@unchecked Sendable` is safe: the state is an `NSCache`, which Apple documents as
 /// thread-safe, and a dictionary only touched under `lock`, both holding immutable `CGImage`s.
 final class LatestRenderCache: @unchecked Sendable {
     /// The editor's photo plus the library preview: the large views that get rebuilt.
     static let countLimit = 2
-    /// The app's store: the system may purge it whenever memory is short.
     private let images = NSCache<NSString, CGImage>()
     /// The tests' store: never purged, so whether a render was kept is checkable (MOV-130).
     private var unpurged: [NSString: CGImage] = [:]

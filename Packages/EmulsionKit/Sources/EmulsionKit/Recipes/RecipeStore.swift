@@ -8,12 +8,12 @@ public final class RecipeStore {
     public private(set) var recipes: [Recipe] = []
     public private(set) var loadError: EmulsionError?
     private let folder: URL
-    private var indexURL: URL { folder.appending(path: "recipes.json") }
+    private var indexURL: URL { folder.appending(path: StoredFileName.recipes) }
     private static let maximumRecipes = 256
-    private static let maximumIndexSize = 4_194_304
+    private static let maximumIndexSize = 4 * 1024 * 1024
 
     public convenience init() {
-        self.init(folder: URL.applicationSupportDirectory.appending(path: "Emulsion", directoryHint: .isDirectory))
+        self.init(folder: StoredFileName.appFolderURL)
     }
 
     init(folder: URL) {

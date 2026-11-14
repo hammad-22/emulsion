@@ -2,16 +2,12 @@ import EmulsionKit
 import EmulsionUI
 import SwiftUI
 
-/// Lenses, the shutter, the library and the recipe. A row under the viewfinder in portrait; a
-/// vertical rail beside it when wide, with the format bar at its top and the library and recipe
-/// at its foot.
 struct CameraControls: View {
     let model: CameraModel
     let axis: Axis
     @Binding var showsLibrary: Bool
     let transition: Namespace.ID
     let isShowingRecipes: Bool
-    /// Nil where the recipe strip is always visible.
     let toggleRecipes: (() -> Void)?
 
     @Environment(PhotoStore.self) private var store
@@ -25,8 +21,6 @@ struct CameraControls: View {
 
     @ViewBuilder private var controls: some View {
         if axis == .vertical {
-            // At accessibility text sizes the rail can outgrow a short screen; it scrolls
-            // then instead of clipping.
             ViewThatFits(in: .vertical) {
                 rail
                 ScrollView { rail }.scrollIndicators(.hidden)
@@ -34,7 +28,6 @@ struct CameraControls: View {
         } else {
             VStack(spacing: FilmLabLayout.space) {
                 lenses
-                // Equal flexible sides keep the shutter centred.
                 HStack {
                     library.frame(maxWidth: .infinity, alignment: .leading)
                     shutter

@@ -3,8 +3,7 @@
     import EmulsionKit
     import SwiftUI
 
-    /// The shared controls on one screen, for checking them in light and dark, at large text
-    /// sizes and with Reduce Transparency. The iOS debug build opens it with `--component-gallery`.
+    /// The shared controls on one screen, for accessibility proof (`--component-gallery` on iOS).
     public struct ComponentGallery: View {
         @State private var adjustments = Adjustments()
         @State private var isComparing = false

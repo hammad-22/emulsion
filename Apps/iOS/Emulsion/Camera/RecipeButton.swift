@@ -2,8 +2,7 @@ import EmulsionCore
 import EmulsionKit
 import SwiftUI
 
-/// The current recipe beside the shutter. Toggles the recipe strip; where the strip is always
-/// visible (`toggle` is nil) it only names the recipe.
+/// Toggles the recipe strip; where the strip is always visible (`toggle` is nil) it only names the recipe.
 struct RecipeButton: View {
     let recipe: Recipe
     let isShowingRecipes: Bool
@@ -15,6 +14,8 @@ struct RecipeButton: View {
     /// With the glass button's vertical padding, about the library button's height.
     private static let labelHeight: CGFloat = 44
     private static let symbol = "camera.filters"
+    private static let symbolToNameSpacing: CGFloat = 2
+    private static let nameMinimumScale = 0.7
 
     var body: some View {
         if let toggle {
@@ -35,7 +36,7 @@ struct RecipeButton: View {
     }
 
     private var label: some View {
-        VStack(spacing: 2) {
+        VStack(spacing: Self.symbolToNameSpacing) {
             Image(systemName: Self.symbol)
                 .font(.body.weight(.semibold))
                 .symbolVariant(isShowingRecipes ? .fill : .none)
@@ -44,7 +45,7 @@ struct RecipeButton: View {
                 Text(recipe.name)
                     .font(.caption2.weight(.semibold))
                     .lineLimit(1)
-                    .minimumScaleFactor(0.7)
+                    .minimumScaleFactor(Self.nameMinimumScale)
             }
         }
         // A fixed width, so switching recipes never moves the button.

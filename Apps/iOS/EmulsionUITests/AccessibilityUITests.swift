@@ -19,7 +19,7 @@ final class AccessibilityUITests: XCTestCase {
         let app = XCUIApplication()
         app.launchArguments = XCUIApplication.Presentation.largestText
         app.launch()
-        XCTAssertTrue(app.descendants(matching: .any)["viewfinder"].waitForExistence(timeout: 10))
+        XCTAssertTrue(app.descendants(matching: .any)[AccessibilityID.viewfinder].waitForExistence(timeout: 10))
         XCTAssertTrue(app.buttons["Take Photo"].waitForExistence(timeout: 5))
         try keepProof(app, named: "Camera AX5")
         // The recipe strip scrolls sideways, which the audit reads as clipped text, so text
@@ -37,9 +37,7 @@ final class AccessibilityUITests: XCTestCase {
         recipe.tap()
     }
 
-    /// Camera → library → editor → Looks at the default text size, keeping a screenshot and
-    /// the spoken elements of each screen. Run with Reduce Transparency or Reduce Motion set
-    /// on the simulator for those proofs.
+    /// Run with Reduce Transparency or Reduce Motion set on the simulator for those proofs.
     @MainActor
     func testWalkthroughKeepsSpokenElements() throws {
         let camera = XCUIApplication()
@@ -63,8 +61,6 @@ final class AccessibilityUITests: XCTestCase {
         try keepProof(app, named: "Walkthrough 4 looks")
     }
 
-    /// The editor's toolbar and adjustment panel at the largest text size: every control stays
-    /// labelled and reachable.
     @MainActor
     func testEditorAtLargestText() throws {
         let app = try XCUIApplication.launchSampleLibrary(XCUIApplication.Presentation.largestText)
@@ -109,7 +105,7 @@ final class AccessibilityUITests: XCTestCase {
         if editPhoto.waitForExistence(timeout: 2) { editPhoto.tap() }
         XCTAssertTrue(app.buttons["Looks"].waitForExistence(timeout: 5))
         if app.buttons["Adjust"].exists { app.buttons["Adjust"].tap() }
-        let ruler = app.otherElements.matching(identifier: "adjustment-ruler").firstMatch
+        let ruler = app.otherElements.matching(identifier: AccessibilityID.adjustmentRuler).firstMatch
         XCTAssertTrue(ruler.waitForExistence(timeout: 5))
         XCTAssertEqual(ruler.label, "Exposure")
         return ruler

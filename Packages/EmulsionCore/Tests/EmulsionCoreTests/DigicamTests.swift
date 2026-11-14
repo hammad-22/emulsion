@@ -39,13 +39,26 @@ struct DigicamTests {
 
     static func mean(_ values: [Double]) -> Double { values.reduce(0, +) / Double(values.count) }
 
+    /// The 5 MP sensor frame every large source is rendered at.
+    static let sensorWidth = 2592, sensorHeight = 1944
+    /// ISO 12232 mid-gray and the lifted black floor, sRGB codes of 255.
+    static let middleGrayCode = 118.0, blackFloorCode = 22.0
+    static let tungstenKelvin = 2850.0
+    /// A 4 × 3 chart of mid-gray patches.
+    static let grayChart = PatchChart(Array(repeating: SIMD3(repeating: 0.18), count: 12), cell: 48, columns: 4)
+
     /// Pixels of a centred `size` × `size` window of a `width`-wide image (bottom row first).
     static func centre(_ pixels: [SIMD3<Double>], width: Int, height: Int, size: Int) -> [SIMD3<Double>] {
         let (x0, y0) = ((width - size) / 2, (height - size) / 2)
         return (y0..<y0 + size).flatMap { y in (x0..<x0 + size).map { pixels[y * width + $0] } }
     }
 
-    // MARK: Pointwise
+    /// Mean sRGB codes of the centre 16 × 16 of a negative rendered by the clean process.
+    static func centreCodes(_ negative: Negative) throws -> SIMD3<Double> {
+        let image = try renderer.render(negative, clean)
+        let pixels = centre(codes(image), width: Int(image.extent.width), height: Int(image.extent.height), size: 16)
+        return pixels.reduce(.zero, +) / Double(pixels.count)
+    }
 
     /// Chromatic patches, a gray ramp and over-clip light, in 8 px blocks on a 4:3 frame.
     static let patches: [SIMD3<Double>] =
@@ -86,15 +99,15 @@ struct DigicamTests {
     @Test func midGrayLandsOnItsCodeAndBlackOnTheFloor() throws {
         let encoded = { (x: Double) in ColorMath.encodeSRGB(DigicamModel.toneCurve(x)) * 255 }
         let x = (0.18 / DigicamLook.clip - DigicamLook.blackOffset) / (1 - DigicamLook.blackOffset)
-        #expect(abs(encoded(x) - 118) < 1e-9)
+        #expect(abs(encoded(x) - Self.middleGrayCode) < 1e-9)
         #expect(abs(encoded(1) - 255) < 1e-9, "the clip reaches white")
-        #expect(abs(encoded(0) - 22) < 1e-9, "black is lifted to the floor")
+        #expect(abs(encoded(0) - Self.blackFloorCode) < 1e-9, "black is lifted to the floor")
         // On the GPU, through the white balance's cool bias: luma within 1 code; scene black on the floor.
         let scene = Fixtures.image(width: 40, height: 30, space: SceneFixtures.linear) { x, _ in SIMD3(repeating: x < 20 ? 0 : 0.18) }
         let pixels = Self.codes(try Self.render(scene, Self.clean))
         let (black, gray) = (pixels[15 * 40 + 10], pixels[15 * 40 + 30])
-        #expect(abs(DigicamModel.luma(gray) - 118) < 1, "\(gray)")
-        #expect(abs(DigicamModel.luma(black) - 22) < 0.5, "\(black)")
+        #expect(abs(DigicamModel.luma(gray) - Self.middleGrayCode) < 1, "\(gray)")
+        #expect(abs(DigicamModel.luma(black) - Self.blackFloorCode) < 0.5, "\(black)")
     }
 
     @Test func lightAboveTheClipIsWhiteInThatChannelAndShiftsHue() throws {
@@ -109,8 +122,6 @@ struct DigicamTests {
         let hueShift = Fixtures.hueDifference(lab[15 * 40 + 10], lab[15 * 40 + 30])
         #expect(hueShift > 10, "per-channel clipping turns the sky toward cyan: \(hueShift)° (dim \(dim), bright \(bright))")
     }
-
-    // MARK: Geometry
 
     @Test(arguments: [
         (4032, 3024, 2592, 1944), (4032, 2268, 2592, 1944), (3024, 4032, 1944, 2592), (8064, 6048, 2592, 1944),
@@ -139,8 +150,6 @@ struct DigicamTests {
         #expect(abs(edge[0].y - edge[1].y) < 1, "\(edge)")
     }
 
-    // MARK: Noise
-
     @Test func noiseIsDeterministicSeededAndZeroMean() throws {
         let scene = Self.flat(0.09, width: 1200, height: 900)
         func lumas(_ seed: Double, grain: Double = 1) throws -> [Double] {
@@ -164,18 +173,17 @@ struct DigicamTests {
 
     @Test func defaultNoiseIsTheOwnerDirectedAmount() throws {
         let a = Self.adjust { ($0.grain, $0.halation, $0.seed) = (DigicamLook.defaultNoise, DigicamLook.defaultProcessing, 5) }
-        let image = try Self.render(Self.flat(0.18 / 4, width: 2592, height: 1944), a, intent: .export)
-        let pixels = Self.centre(Self.codes(image), width: 2592, height: 1944, size: 256)
+        let (w, h) = (Self.sensorWidth, Self.sensorHeight)
+        let image = try Self.render(Self.flat(0.18 / 4, width: w, height: h), a, intent: .export)
+        let pixels = Self.centre(Self.codes(image), width: w, height: h, size: 256)
         let sigma = EmulsionTestCase.sd(pixels.map(DigicamModel.luma))
         #expect(abs(sigma - Self.defaultNoiseCodes) <= Self.noiseTolerance, "luma σ \(sigma) codes")
     }
 
-    // MARK: Processing
-
     /// Overshoot of a vertical step edge (scene 0.045 → 0.36) at sensor size, as a fraction of the
     /// step in sRGB codes, on the bright side.
     static func overshoot(processing: Double) throws -> Double {
-        let (w, h) = (2592, 1944)
+        let (w, h) = (sensorWidth, sensorHeight)
         let scene = Fixtures.image(width: w, height: h, space: SceneFixtures.linear) { x, _ in
             SIMD3(repeating: x < w / 2 ? 0.045 : 0.36)
         }
@@ -200,12 +208,12 @@ struct DigicamTests {
     /// (× processing) is below the whole-frame lens blur, and used to leave the corners crisper.
     @Test(arguments: [0, 0.2])
     func cornersAreNoSharperThanTheCentre(processing: Double) throws {
-        let (w, h) = (2592, 1944)
+        let (w, h) = (Self.sensorWidth, Self.sensorHeight)
         let stripes = Fixtures.image(width: w, height: h, space: SceneFixtures.linear) { x, _ in
             SIMD3(repeating: x.isMultiple(of: 2) ? 0.09 : 0.36)
         }
         let image = try Self.render(stripes, Self.adjust { $0.halation = processing })
-        /// Luma σ (codes) of a 32 × 32 window, a local contrast.
+        /// Local contrast: luma σ (codes) of a 32 × 32 window.
         func contrast(x: Int, y: Int) -> Double {
             let window = Self.codes(image.cropped(to: CGRect(x: x, y: y, width: 32, height: 32)))
             return EmulsionTestCase.sd(window.map(DigicamModel.luma))
@@ -245,27 +253,19 @@ struct DigicamTests {
         #expect(gain > 5, "violet fringe, codes of blue over green: \(gain)")
     }
 
-    // MARK: White balance
-
     /// Mid-gray under 2850 K against a neutral render, in code values: R +17.0 %, B −30.5 % (measured).
     /// Owner direction (MOV-149 review), beyond period compacts under tungsten (published lab tests:
     /// R +9.5…11.6 %, B −9.9…−17 %). The develop neutralises the light; the digicam process puts back
     /// what its auto white balance leaves.
     @Test(arguments: SyntheticDNG.Mosaic.allCases)
     func tungstenRAWKeepsAWarmCast(_ mosaic: SyntheticDNG.Mosaic) throws {
-        let chart = PatchChart(Array(repeating: SIMD3(repeating: 0.18), count: 12), cell: 48, columns: 4)
-        let light = SyntheticDNG.planckianChromaticity(kelvin: 2850)
-        let negative = try Self.renderer.developer.develop(RAWDevelopChart.dng(mosaic, chart: chart, light: light, taggedLight: light))
+        let light = SyntheticDNG.planckianChromaticity(kelvin: Self.tungstenKelvin)
+        let negative = try Self.renderer.developer.develop(
+            RAWDevelopChart.dng(mosaic, chart: Self.grayChart, light: light, taggedLight: light))
         let asShot = try #require(negative.asShotWhiteBalance)
-        #expect(abs(asShot.temperature - 2850) < 20)
+        #expect(abs(asShot.temperature - Self.tungstenKelvin) < 20)
         let unknownLight = Negative(image: negative.image, contract: negative.contract)
-        func centreCodes(_ n: Negative) throws -> SIMD3<Double> {
-            let image = try Self.renderer.render(n, Self.clean)
-            let (w, h) = (Int(image.extent.width), Int(image.extent.height))
-            let pixels = Self.centre(Self.codes(image), width: w, height: h, size: 16)
-            return pixels.reduce(.zero, +) / Double(pixels.count)
-        }
-        let ratio = try centreCodes(negative) / centreCodes(unknownLight)
+        let ratio = try Self.centreCodes(negative) / Self.centreCodes(unknownLight)
         #expect(ratio.x >= 1.15 && ratio.x <= 1.19, "R \(ratio.x)")
         #expect(ratio.z >= 0.67 && ratio.z <= 0.72, "B \(ratio.z)")
     }
@@ -273,20 +273,13 @@ struct DigicamTests {
     /// A white balance set at develop is applied on top of the camera's cast: the negative still
     /// reports the as-shot light, so the residual cast follows the light the photo was shot under.
     @Test func developWhiteBalanceKeepsTheAsShotCast() throws {
-        let chart = PatchChart(Array(repeating: SIMD3(repeating: 0.18), count: 12), cell: 48, columns: 4)
-        let light = SyntheticDNG.planckianChromaticity(kelvin: 2850)
-        let data = RAWDevelopChart.dng(.linearRGB, chart: chart, light: light, taggedLight: light)
+        let light = SyntheticDNG.planckianChromaticity(kelvin: Self.tungstenKelvin)
+        let data = RAWDevelopChart.dng(.linearRGB, chart: Self.grayChart, light: light, taggedLight: light)
         let developed = try Self.renderer.developer.develop(data, whiteBalance: CameraWhiteBalance(temperature: 4500, tint: 0))
         let asShot = try #require(developed.asShotWhiteBalance)
-        #expect(abs(asShot.temperature - 2850) < 20, "the as-shot light, not the develop's")
-        func centre(_ n: Negative) throws -> SIMD3<Double> {
-            let image = try Self.renderer.render(n, Self.clean)
-            let (w, h) = (Int(image.extent.width), Int(image.extent.height))
-            let pixels = Self.centre(Self.codes(image), width: w, height: h, size: 16)
-            return pixels.reduce(.zero, +) / Double(pixels.count)
-        }
-        let withCast = try centre(developed)
-        let withoutCast = try centre(Negative(image: developed.image, contract: developed.contract))
+        #expect(abs(asShot.temperature - Self.tungstenKelvin) < 20, "the as-shot light, not the develop's")
+        let withCast = try Self.centreCodes(developed)
+        let withoutCast = try Self.centreCodes(Negative(image: developed.image, contract: developed.contract))
         #expect(withCast.x / withCast.z > 1.3 * withoutCast.x / withoutCast.z, "cast \(withCast), none \(withoutCast)")
     }
 
@@ -308,8 +301,6 @@ struct DigicamTests {
         #expect(magenta.y < neutral.y)
         for g in [neutral, warm, magenta] { #expect(abs(DigicamModel.luma(g) - 1) < 1e-12) }
     }
-
-    // MARK: Persistence
 
     @Test func recipesCarryTheProcessInTheEngineModel() throws {
         let look = try #require(CuratedLooks.recipes.first { $0.adjustments.process == .digicam })

@@ -21,6 +21,10 @@ Delete a comment when the code already says it. Keep or write one only for:
 - the safety argument on every `@unchecked Sendable` or `nonisolated(unsafe)`.
 
 Rules:
+- **One line per comment.** A comment is a single line (about 100 characters): what the value is, its unit, and `measured`, `sourced` or `artistic`. If the reason needs more than one line, the long form goes in the docs (`docs/ENGINE.md`, `docs/FILM-THEORY.md`, or the folder's `AGENTS.md`) under a heading named after the type, and the code keeps a short pointer (`See docs/ENGINE.md, "Digicam constants".`) on the type, not on every member.
+- **One comment per group.** Related constants share one line above the group; don't repeat the same status word on each.
+- **No history.** What a value used to be, what a review asked for, and which experiment failed belong in the commit, the PR or the docs.
+- **Tests explain themselves by name.** A test's name says what it proves; keep a comment only for the source of an expected number.
 - Doc comments (`///`) belong on `public` API and on anything whose contract isn't obvious from its name and types. One summary sentence; add parameters only when they need explaining. Don't document `private` helpers whose names are clear.
 - Before deleting a comment that explains something real, move the knowledge into a name: rename the variable, extract a function, or name the constant.
 - No section banners, no commented-out code, no "what changed" notes (that is the commit message), no restating the type or the next line.

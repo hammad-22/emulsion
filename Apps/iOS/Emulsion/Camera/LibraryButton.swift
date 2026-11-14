@@ -2,7 +2,6 @@ import EmulsionKit
 import EmulsionUI
 import SwiftUI
 
-/// The newest photo, opening the library; the library zooms out of it.
 struct LibraryButton: View {
     let photo: PhotoRecord?
     let transition: Namespace.ID

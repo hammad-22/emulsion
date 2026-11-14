@@ -3,8 +3,7 @@ import EmulsionKit
 import EmulsionUI
 import SwiftUI
 
-/// The phone editor: the photo with one ruler's panel below it, or beside it in landscape,
-/// revealed by Adjust.
+/// The phone editor: one ruler's panel below the photo, or beside it in landscape.
 struct CompactEditorLayout<Photo: View>: View {
     /// The height available, which caps the stacked panel.
     let height: CGFloat
@@ -36,8 +35,6 @@ struct CompactEditorLayout<Photo: View>: View {
         }
     }
 
-    /// Stacked, the panel is as tall as its content up to the cap, and scrolls past it (large
-    /// text). Beside the photo it has the full height, centred while it fits.
     private var controls: some View {
         ScrollView {
             panel.onGeometryChange(for: CGFloat.self, of: \.size.height) { panelHeight = $0 }

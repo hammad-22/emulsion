@@ -2,20 +2,19 @@ import EmulsionKit
 import SwiftUI
 import UIKit
 
-/// In place of the viewfinder when the camera can't run; the library stays reachable.
 struct CameraUnavailableView: View {
     enum Reason {
-        /// The user turned camera access off; Settings can turn it back on.
         case denied
         /// Screen Time or a management profile blocks the camera; Emulsion's settings can't help.
         case restricted
-        /// The camera failed; starting it again may work.
         case unavailable(retry: () -> Void)
     }
 
     let reason: Reason
 
     @Environment(\.openURL) private var openURL
+    // Force unwrap: a constant system URL.
+    private static let settingsURL = URL(string: UIApplication.openSettingsURLString)!
 
     var body: some View {
         ContentUnavailableView {
@@ -25,8 +24,7 @@ struct CameraUnavailableView: View {
         } actions: {
             switch reason {
             case .denied:
-                // A constant system URL.
-                Button("Open Settings") { openURL(URL(string: UIApplication.openSettingsURLString)!) }
+                Button("Open Settings") { openURL(Self.settingsURL) }
                     .buttonStyle(.glass)
             case .restricted:
                 EmptyView()

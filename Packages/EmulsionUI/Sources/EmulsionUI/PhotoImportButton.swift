@@ -3,8 +3,8 @@ import EmulsionKit
 import PhotosUI
 import SwiftUI
 
-/// Picks photos from the system library and adds their original files to the store.
-/// Reports the first failure through `onError`; the rest of the batch still imports.
+/// Adds the picked photos' original files to the store, reporting the first failure through
+/// `onError`; the rest of the batch still imports.
 public struct PhotoImportButton: View {
     @Environment(PhotoStore.self) private var store
     @State private var selection: [PhotosPickerItem] = []

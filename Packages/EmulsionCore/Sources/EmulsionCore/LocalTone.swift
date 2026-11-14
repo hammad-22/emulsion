@@ -14,6 +14,8 @@ public enum LocalTone {
     /// monotone: slope ≥ 1 − 0.4·2.2 > 0.
     static let negativeScale = 0.4
     static let block: CGFloat = 16
+    /// 2⁴ = `block`.
+    static let blockHalvings = 4
     static let spatialSigma = 1.0, lumaSigma = 0.01
 
     static func amount(_ x: Double) -> Double { x < 0 ? x * negativeScale : x }
@@ -42,7 +44,7 @@ extension Kernels {
         let origin = CGAffineTransform(translationX: -extent.minX, y: -extent.minY)
         let paddedGuide = guide.transformed(by: origin).clampedToExtent().cropped(to: padded)
         var small = paddedGuide
-        for _ in 0..<4 { small = small.transformed(by: CGAffineTransform(scaleX: 0.5, y: 0.5)) }
+        for _ in 0..<LocalTone.blockHalvings { small = small.transformed(by: CGAffineTransform(scaleX: 0.5, y: 0.5)) }
         let smallRect = CGRect(x: 0, y: 0, width: padded.width / b, height: padded.height / b)
         small = small.cropped(to: smallRect).clampedToExtent().cropped(to: smallRect)
         let base = paddedGuide.applyingFilter(

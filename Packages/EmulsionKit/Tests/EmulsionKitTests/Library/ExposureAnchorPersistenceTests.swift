@@ -111,9 +111,7 @@ struct ExposureAnchorPersistenceTests {
     @Test func aFailedAnchorSaveIsReported() async throws {
         let library = TestLibrary()
         let photo = try await library.store.add(TestPhoto.anchoredRAW, fileExtension: "dng")
-        // A folder where the index should be makes every index write fail.
-        try FileManager.default.removeItem(at: library.store.indexURL)
-        try FileManager.default.createDirectory(at: library.store.indexURL, withIntermediateDirectories: false)
+        try library.blockIndexWrites()
 
         _ = try await library.renderService.image(library.store.url(for: photo), .init(), maxDimension: 256)
         let deadline = ContinuousClock.now + .seconds(60)

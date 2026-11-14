@@ -10,17 +10,18 @@ import Foundation
         case multitasking, overheated, critical
 
         static var launched: CameraScenario? {
-            UserDefaults.standard.string(forKey: "camera-scenario").flatMap(CameraScenario.init)
+            UserDefaults.standard.string(forKey: LaunchArgument.cameraScenario).flatMap(CameraScenario.init)
         }
 
-        /// The stand-in camera, reporting the scenario's event once the viewfinder has shown a
-        /// moment of frames.
+        /// Lets the viewfinder show frames before the scenario's event arrives.
+        private static let eventDelay = Duration.seconds(2)
+
         func makeSource() -> MockCameraSource {
             if let startError { return MockCameraSource(failingStartWith: startError) }
             let source = MockCameraSource()
             if let event {
                 Task {
-                    try? await Task.sleep(for: .seconds(2))
+                    try? await Task.sleep(for: Self.eventDelay)
                     await source.emit(event)
                 }
             }
