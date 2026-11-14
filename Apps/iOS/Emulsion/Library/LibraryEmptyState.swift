@@ -8,13 +8,17 @@ struct LibraryEmptyState: View {
     @Binding var error: String?
 
     @Environment(PhotoStore.self) private var store
+    @Environment(\.dynamicTypeSize) private var dynamicTypeSize
+    @Environment(\.colorScheme) private var colorScheme
     /// Both actions share a scaled width, constrained by the available canvas.
     @ScaledMetric private var buttonWidth: CGFloat = 260
 
     var body: some View {
         ScrollView {
             VStack(spacing: FilmLabLayout.generous) {
-                SamplePrints()
+                // At accessibility text sizes the decorative prints give way, so the two
+                // actions aren't pushed off screen (MOV-140).
+                if !dynamicTypeSize.isAccessibilitySize { SamplePrints() }
                 VStack(spacing: FilmLabLayout.gap) {
                     Text("Make room for light")
                         .font(.largeTitle.weight(.semibold))
@@ -25,6 +29,11 @@ struct LibraryEmptyState: View {
                     VStack(spacing: FilmLabLayout.gap) {
                         PhotoImportButton(fillsWidth: true) { error = $0.localizedDescription }
                             .buttonStyle(.glassProminent)
+                            // Neutral, like the editor's Save: white on the system blue failed the
+                            // contrast audit (MOV-59); this inverts with the appearance at ~19:1.
+                            // `.background` as the label style renders invisible in dark mode.
+                            .tint(.primary)
+                            .foregroundStyle(colorScheme == .dark ? .black : .white)
                         Button(action: addSamples) {
                             Label("Try Sample Photos", systemImage: "photo.stack")
                                 .frame(maxWidth: .infinity)

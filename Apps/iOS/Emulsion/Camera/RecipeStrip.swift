@@ -13,6 +13,8 @@ struct RecipeStrip: View {
     let selection: Recipe
     let select: (Recipe) -> Void
 
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+
     var body: some View {
         // Centred when every chip fits (iPhone Duo unfolded); scrolling otherwise.
         ViewThatFits(in: .horizontal) {
@@ -22,7 +24,7 @@ struct RecipeStrip: View {
                     .scrollIndicators(.hidden)
                     .onAppear { proxy.scrollTo(selection.id, anchor: .center) }
                     .onChange(of: selection.id) { _, id in
-                        withAnimation(.snappy) { proxy.scrollTo(id, anchor: .center) }
+                        withAnimation(reduceMotion ? nil : .snappy) { proxy.scrollTo(id, anchor: .center) }
                     }
             }
         }
@@ -67,5 +69,7 @@ private struct RecipeChip: View {
         .glassEffect(.regular.interactive(), in: .capsule)
         .accessibilityLabel(recipe.name)
         .accessibilityAddTraits(isSelected ? .isSelected : [])
+        // The strip stops growing at the first accessibility size; a long press shows the name large.
+        .accessibilityShowsLargeContentViewer { Text(recipe.name) }
     }
 }

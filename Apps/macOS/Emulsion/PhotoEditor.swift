@@ -40,6 +40,7 @@ struct PhotoEditor: View {
             LooksButton(session: session).disabled(showsOriginal)
             Toggle("Compare", systemImage: "square.split.2x1", isOn: $showsOriginal)
             Button("Reset Edits", systemImage: "arrow.counterclockwise") { session.reset() }
+                .disabled(!session.isEdited)
         }
         .task { await session.editorAppeared() }
         .onDisappear { session.close() }
