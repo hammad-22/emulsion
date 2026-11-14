@@ -4,18 +4,11 @@ import XCTest
 /// right to left (MOV-140). Native audits use the same engine as Accessibility Inspector; they
 /// don't replace a human VoiceOver walkthrough. Run on a fresh install of an isolated bundle ID.
 final class AccessibilityUITests: XCTestCase {
-    private let photoQuery = NSPredicate(format: "label BEGINSWITH 'Photo from'")
-
     /// "Try Sample Photos" must stay whole and reachable at the largest accessibility size.
     @MainActor
     func testEmptyLibraryActionsAtLargestText() throws {
-        let app = XCUIApplication.launchLibrary(XCUIApplication.Presentation.largestText)
-        let samples = app.buttons["Try Sample Photos"]
-        guard samples.waitForExistence(timeout: 5) else {
-            throw XCTSkip("Needs an empty library; uninstall the isolated proof app first.")
-        }
-        for _ in 0..<3 where !samples.isHittable { app.swipeUp() }
-        XCTAssertTrue(samples.isHittable)
+        let app = try XCUIApplication.launchEmptyLibrary(XCUIApplication.Presentation.largestText)
+        XCTAssertTrue(app.buttons["Try Sample Photos"].isHittable)
         XCTAssertTrue(app.buttons["Import"].isHittable)
         try keepProof(app, named: "Empty library AX5")
         try app.audit([.textClipped, .sufficientElementDescription, .trait])
@@ -56,16 +49,14 @@ final class AccessibilityUITests: XCTestCase {
         try keepProof(camera, named: "Walkthrough 1 camera")
         camera.terminate()
 
-        let app = try launchSamples([])
-        defer { removeSamples(app) }
+        let app = try XCUIApplication.launchSampleLibrary()
+        defer { app.removeSamples() }
         sleep(2)
         try keepProof(app, named: "Walkthrough 2 library")
         let ruler = try openAdjustments(app)
         XCTAssertEqual(ruler.value as? String, "0.0 EV")
         try keepProof(app, named: "Walkthrough 3 editor")
-        var checks: XCUIAccessibilityAuditType = [.sufficientElementDescription, .trait, .hitRegion]
-        if !XCUIApplication.hasDarkScreen { checks.insert(.contrast) }
-        try app.audit(checks)
+        try app.audit([.sufficientElementDescription, .trait, .hitRegion, .contrast])
         app.buttons["Looks"].tap()
         XCTAssertTrue(app.navigationBars["Looks"].waitForExistence(timeout: 5))
         sleep(1)
@@ -76,8 +67,8 @@ final class AccessibilityUITests: XCTestCase {
     /// labelled and reachable.
     @MainActor
     func testEditorAtLargestText() throws {
-        let app = try launchSamples(XCUIApplication.Presentation.largestText)
-        defer { removeSamples(app) }
+        let app = try XCUIApplication.launchSampleLibrary(XCUIApplication.Presentation.largestText)
+        defer { app.removeSamples() }
         try keepProof(app, named: "Library AX5")
         try app.audit([.sufficientElementDescription, .trait, .textClipped])
         let ruler = try openAdjustments(app)
@@ -94,8 +85,8 @@ final class AccessibilityUITests: XCTestCase {
     /// scale moves.
     @MainActor
     func testRightToLeftWalkthrough() throws {
-        let app = try launchSamples(XCUIApplication.Presentation.rightToLeft)
-        defer { removeSamples(app) }
+        let app = try XCUIApplication.launchSampleLibrary(XCUIApplication.Presentation.rightToLeft)
+        defer { app.removeSamples() }
         try keepProof(app, named: "RTL library")
         let ruler = try openAdjustments(app)
         let start = ruler.coordinate(withNormalizedOffset: CGVector(dx: 0.7, dy: 0.7))
@@ -109,24 +100,11 @@ final class AccessibilityUITests: XCTestCase {
         try keepProof(app, named: "RTL looks")
     }
 
-    @MainActor
-    private func launchSamples(_ presentation: [String]) throws -> XCUIApplication {
-        let app = XCUIApplication.launchLibrary(presentation)
-        let samples = app.buttons["Try Sample Photos"]
-        guard samples.waitForExistence(timeout: 5) else {
-            throw XCTSkip("Needs an empty library; uninstall the isolated proof app first.")
-        }
-        for _ in 0..<3 where !samples.isHittable { app.swipeUp() }
-        samples.tap()
-        XCTAssertTrue(app.buttons.matching(photoQuery).firstMatch.waitForExistence(timeout: 10))
-        return app
-    }
-
     /// Opens the first photo's editor with its adjustments showing, and returns the Exposure
     /// ruler. The expanded canvas (iPhone Duo unfolded) shows every ruler without a tap.
     @MainActor
     private func openAdjustments(_ app: XCUIApplication) throws -> XCUIElement {
-        app.buttons.matching(photoQuery).firstMatch.tap()
+        app.photos.firstMatch.tap()
         let editPhoto = app.buttons["Edit Photo"]
         if editPhoto.waitForExistence(timeout: 2) { editPhoto.tap() }
         XCTAssertTrue(app.buttons["Looks"].waitForExistence(timeout: 5))
@@ -135,19 +113,5 @@ final class AccessibilityUITests: XCTestCase {
         XCTAssertTrue(ruler.waitForExistence(timeout: 5))
         XCTAssertEqual(ruler.label, "Exposure")
         return ruler
-    }
-
-    @MainActor
-    private func removeSamples(_ app: XCUIApplication) {
-        if app.navigationBars["Looks"].exists { app.buttons["Done"].tap() }
-        if !app.navigationBars["Library"].exists { app.buttons["BackButton"].tap() }
-        guard app.buttons["Select"].waitForExistence(timeout: 5) else { return }
-        app.buttons["Select"].tap()
-        let photos = app.buttons.matching(photoQuery)
-        let count = photos.count
-        for index in 0..<count { photos.element(boundBy: index).tap() }
-        app.buttons["Delete"].tap()
-        app.buttons["Delete \(count) Photos"].tap()
-        XCTAssertTrue(app.buttons["Try Sample Photos"].waitForExistence(timeout: 5))
     }
 }

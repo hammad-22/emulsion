@@ -14,6 +14,7 @@ struct RecipeButton: View {
     private static let labelPadding: CGFloat = 12
     /// With the glass button's vertical padding, about the library button's height.
     private static let labelHeight: CGFloat = 44
+    private static let symbol = "camera.filters"
 
     var body: some View {
         if let toggle {
@@ -22,7 +23,7 @@ struct RecipeButton: View {
                 .accessibilityLabel("Recipe")
                 .accessibilityValue(recipe.name)
                 .accessibilityHint(isShowingRecipes ? "Hides the recipes" : "Shows the recipes")
-                .accessibilityShowsLargeContentViewer { Label(recipe.name, systemImage: "camera.filters") }
+                .accessibilityShowsLargeContentViewer { Label(recipe.name, systemImage: Self.symbol) }
         } else {
             label
                 .padding(.horizontal, Self.labelPadding)
@@ -35,11 +36,10 @@ struct RecipeButton: View {
 
     private var label: some View {
         VStack(spacing: 2) {
-            Image(systemName: "camera.filters")
+            Image(systemName: Self.symbol)
                 .font(.body.weight(.semibold))
                 .symbolVariant(isShowingRecipes ? .fill : .none)
-            // At accessibility sizes the name can't fit the fixed width; the icon stays, and
-            // VoiceOver and the large content viewer still give the name.
+            // Doesn't fit the fixed width at accessibility sizes; the large content viewer shows it.
             if !dynamicTypeSize.isAccessibilitySize {
                 Text(recipe.name)
                     .font(.caption2.weight(.semibold))

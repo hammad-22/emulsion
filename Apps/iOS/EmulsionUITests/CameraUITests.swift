@@ -12,7 +12,7 @@ final class CameraUITests: XCTestCase {
         let viewfinder = app.descendants(matching: .any)["viewfinder"]
         XCTAssertTrue(viewfinder.waitForExistence(timeout: 10))
         let library = app.buttons["Library"]
-        let photos = app.buttons.matching(NSPredicate(format: "label BEGINSWITH 'Photo from'"))
+        let photos = app.photos
         let photosBefore = try countPhotos(app, library: library, photos: photos)
         XCTAssertTrue(viewfinder.waitForExistence(timeout: 5))
         sleep(1)

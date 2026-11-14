@@ -6,18 +6,17 @@ extension XCTestCase {
     func keepScreenshot(_ app: XCUIApplication, named name: String) {
         // iPhone Duo has two screens, and the app's own screenshot is blank on the inner one.
         let screens = XCUIScreen.screens
+        let isDuo = screens.count > 1
         for (index, screen) in screens.enumerated() {
-            let attachment = XCTAttachment(screenshot: screens.count > 1 ? screen.screenshot() : app.screenshot())
-            attachment.name = screens.count > 1 ? "\(name) screen \(index + 1)" : name
+            let attachment = XCTAttachment(screenshot: isDuo ? screen.screenshot() : app.screenshot())
+            attachment.name = isDuo ? "\(name) screen \(index + 1)" : name
             attachment.lifetime = .keepAlways
             add(attachment)
         }
     }
 
-    /// Keeps a screenshot and, beside it, what assistive technology is given for the screen in
-    /// reading order: each labelled element's role, label, value and state. A record of the
-    /// accessibility tree (containers and their children both appear), not of a person using
-    /// VoiceOver.
+    /// Keeps a screenshot and the screen's accessibility tree in reading order: each labelled
+    /// element's role, label, value and state. Not a record of a person using VoiceOver.
     @MainActor
     func keepProof(_ app: XCUIApplication, named name: String) throws {
         keepScreenshot(app, named: name)
@@ -26,8 +25,7 @@ extension XCTestCase {
             if !element.label.isEmpty {
                 let value = (element.value as? String).flatMap { $0.isEmpty ? nil : ", value \"\($0)\"" } ?? ""
                 let state = (element.isSelected ? ", selected" : "") + (element.isEnabled ? "" : ", dimmed")
-                let line = "\(Self.role(element.elementType)) \"\(element.label)\"\(value)\(state)"
-                lines.append(line)
+                lines.append("\(Self.role(element.elementType)) \"\(element.label)\"\(value)\(state)")
             }
             element.children.forEach(visit)
         }

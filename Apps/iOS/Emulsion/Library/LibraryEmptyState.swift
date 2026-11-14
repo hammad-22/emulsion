@@ -29,8 +29,9 @@ struct LibraryEmptyState: View {
                     VStack(spacing: FilmLabLayout.gap) {
                         PhotoImportButton(fillsWidth: true) { error = $0.localizedDescription }
                             .buttonStyle(.glassProminent)
-                            // Neutral, like the editor's Save: white on the system blue measured
-                            // under 4.5:1 (MOV-59 audit); primary on background is far over it.
+                            // Neutral, like the editor's Save: white on the system blue failed the
+                            // contrast audit (MOV-59); this inverts with the appearance at ~19:1.
+                            // `.background` as the label style renders invisible in dark mode.
                             .tint(.primary)
                             .foregroundStyle(colorScheme == .dark ? .black : .white)
                         Button(action: addSamples) {

@@ -22,8 +22,8 @@ public struct AdjustmentInspector: View {
                 ForEach(AdjustmentGroup.allCases) { section in
                     VStack(alignment: .leading, spacing: FilmLabLayout.gap) {
                         Text(section.title)
-                            // Primary, not secondary: on dark glass secondary measured 3.2:1,
-                            // under the 4.5:1 minimum for small text (MOV-140).
+                            // Set apart by case, not a dimmer style: secondary measured 3.2:1 on
+                            // dark glass, under the 4.5:1 minimum for small text (MOV-140).
                             .font(.footnote.weight(.semibold))
                             .textCase(.uppercase)
                             .accessibilityAddTraits(.isHeader)

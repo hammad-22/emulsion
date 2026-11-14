@@ -57,8 +57,7 @@ public struct AdjustmentPanel: View {
         }
     }
 
-    /// A row that scrolls sideways; at accessibility text sizes a column instead, so no name is
-    /// cut off at the panel's edge (HIG, Typography: stack items at large sizes).
+    /// A row that scrolls sideways; a column at accessibility sizes, so no name is cut off.
     @ViewBuilder private var controlPicker: some View {
         if dynamicTypeSize.isAccessibilitySize {
             VStack(alignment: .leading, spacing: FilmLabLayout.hairline) { controlButtons }

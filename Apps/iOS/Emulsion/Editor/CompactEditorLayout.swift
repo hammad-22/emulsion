@@ -22,6 +22,7 @@ struct CompactEditorLayout<Photo: View>: View {
     /// Stacked, the photo keeps at least half the height; at accessibility text sizes the
     /// panel scrolls instead of shrinking the photo further.
     private let maximumPanelFraction: CGFloat = 0.5
+
     @State private var panelHeight: CGFloat = 0
 
     var body: some View {
@@ -42,7 +43,7 @@ struct CompactEditorLayout<Photo: View>: View {
         }
         .scrollBounceBehavior(.basedOnSize)
         .defaultScrollAnchor(.center, for: .alignment)
-        .frame(height: showsAdjustments ? (isWide ? nil : min(panelHeight, height * maximumPanelFraction)) : 0)
+        .frame(height: controlsHeight)
         .clipped()
         .opacity(showsAdjustments ? 1 : 0)
         .allowsHitTesting(showsAdjustments)
@@ -52,6 +53,12 @@ struct CompactEditorLayout<Photo: View>: View {
     private var panel: some View {
         AdjustmentPanel(adjustments: $adjustments, group: $group, selection: $selection)
             .padding(.horizontal, FilmLabLayout.inset)
+    }
+
+    /// Nil beside the photo, where the panel takes the full height.
+    private var controlsHeight: CGFloat? {
+        guard showsAdjustments else { return 0 }
+        return isWide ? nil : min(panelHeight, height * maximumPanelFraction)
     }
 
     private var isWide: Bool { horizontalSizeClass == .regular || verticalSizeClass == .compact }
