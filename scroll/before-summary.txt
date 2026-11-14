@@ -1,0 +1,16 @@
+Test Case '-[EmulsionUITests.LibraryToEditorUITests testLooksContrastAndTextClipping]' started.
+Looks scroll 1: Emulsion
+<unknown>:0: error: -[EmulsionUITests.LibraryToEditorUITests testLooksContrastAndTextClipping] : Contrast failed
+Looks scroll 2: Emulsion
+<unknown>:0: error: -[EmulsionUITests.LibraryToEditorUITests testLooksContrastAndTextClipping] : Contrast failed
+Looks scroll 3: Emulsion
+<unknown>:0: error: -[EmulsionUITests.LibraryToEditorUITests testLooksContrastAndTextClipping] : Contrast failed
+Looks scroll 4: <unbound>
+<unknown>:0: error: -[EmulsionUITests.LibraryToEditorUITests testLooksContrastAndTextClipping] : Contrast failed
+Looks scroll 5: <unbound>
+<unknown>:0: error: -[EmulsionUITests.LibraryToEditorUITests testLooksContrastAndTextClipping] : Contrast failed
+Test Case '-[EmulsionUITests.LibraryToEditorUITests testLooksContrastAndTextClipping]' failed (51.036 seconds).
+	 Executed 1 test, with 5 failures (0 unexpected) in 51.036 (51.037) seconds
+	 Executed 1 test, with 5 failures (0 unexpected) in 51.036 (51.038) seconds
+	 Executed 1 test, with 5 failures (0 unexpected) in 51.036 (51.039) seconds
+** TEST FAILED **

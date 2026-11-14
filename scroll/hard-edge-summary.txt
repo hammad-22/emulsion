@@ -1,0 +1,6 @@
+Test Case '-[EmulsionUITests.LibraryToEditorUITests testLooksContrastAndTextClipping]' started.
+Test Case '-[EmulsionUITests.LibraryToEditorUITests testLooksContrastAndTextClipping]' passed (39.899 seconds).
+	 Executed 1 test, with 0 failures (0 unexpected) in 39.899 (39.900) seconds
+	 Executed 1 test, with 0 failures (0 unexpected) in 39.899 (39.900) seconds
+	 Executed 1 test, with 0 failures (0 unexpected) in 39.899 (39.901) seconds
+** TEST SUCCEEDED **

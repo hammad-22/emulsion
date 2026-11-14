@@ -1,0 +1,9 @@
+Test Case '-[EmulsionUITests.LibraryToEditorUITests testLooksContrastAndTextClipping]' started.
+<unknown>:0: error: -[EmulsionUITests.LibraryToEditorUITests testLooksContrastAndTextClipping] : Contrast failed
+Test Case '-[EmulsionUITests.LibraryToEditorUITests testLooksContrastAndTextClipping]' failed (53.667 seconds).
+Test Case '-[EmulsionUITests.LibraryToEditorUITests testLooksSaveApplyAndDelete]' started.
+Test Case '-[EmulsionUITests.LibraryToEditorUITests testLooksSaveApplyAndDelete]' passed (65.187 seconds).
+	 Executed 2 tests, with 1 failure (0 unexpected) in 118.855 (118.856) seconds
+	 Executed 2 tests, with 1 failure (0 unexpected) in 118.855 (118.857) seconds
+	 Executed 2 tests, with 1 failure (0 unexpected) in 118.855 (118.858) seconds
+** TEST FAILED **

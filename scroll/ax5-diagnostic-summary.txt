@@ -1,0 +1,8 @@
+Test Case '-[EmulsionUITests.LibraryToEditorUITests testLooksContrastAndTextClipping]' started.
+SCROLL_DIAGNOSTIC page=1 label=Balanced color with gentle texture. frame=(32.0, -217.33333333333337, 154.66666666666666, 348.66666666666663) hittable=true list=(0.0, 62.0, 402.0, 812.0)
+<unknown>:0: error: -[EmulsionUITests.LibraryToEditorUITests testLooksContrastAndTextClipping] : Contrast failed
+Test Case '-[EmulsionUITests.LibraryToEditorUITests testLooksContrastAndTextClipping]' failed (63.439 seconds).
+	 Executed 1 test, with 1 failure (0 unexpected) in 63.439 (63.442) seconds
+	 Executed 1 test, with 1 failure (0 unexpected) in 63.439 (63.449) seconds
+	 Executed 1 test, with 1 failure (0 unexpected) in 63.439 (63.452) seconds
+** TEST FAILED **
