@@ -13,9 +13,14 @@ enum VisualRegression {
         let max: Double
         /// Judge `max` on the 99.9th percentile: up to one pixel in a thousand may exceed it.
         var allowsIsolatedOutliers = false
+        /// Lowest SSIM (`StructuralSimilarity`) against the golden; `nil` for cases not checked.
+        var minimumStructuralSimilarity: Double? = nil
 
-        func accepts(_ s: ColorDifference.Summary) -> Bool {
-            s.mean <= mean && s.p95 <= p95 && (allowsIsolatedOutliers ? s.p999 : s.max) <= max
+        /// With a structural floor, a missing SSIM (image smaller than its window) fails.
+        func accepts(_ s: ColorDifference.Summary, structuralSimilarity: Double? = nil) -> Bool {
+            let colourPasses = s.mean <= mean && s.p95 <= p95 && (allowsIsolatedOutliers ? s.p999 : s.max) <= max
+            guard let minimum = minimumStructuralSimilarity else { return colourPasses }
+            return colourPasses && (structuralSimilarity ?? -1) >= minimum
         }
     }
 
@@ -36,7 +41,17 @@ enum VisualRegression {
     /// agree within 0.04. The suspect is Core Image's edge-preserving upsample of the local-tone
     /// base (not proven). These cases keep mean and p95 and apply the per-pixel limit to the
     /// 99.9th percentile.
-    static let photoLocalToneThresholds = Thresholds(mean: 0.2, p95: 0.5, max: 1.0, allowsIsolatedOutliers: true)
+    static let photoLocalToneThresholds = Thresholds(
+        mean: thresholds.mean, p95: thresholds.p95, max: thresholds.max, allowsIsolatedOutliers: true,
+        minimumStructuralSimilarity: 0.999)
+    /// Real photographs: the ΔE00 limits plus structure (MOV-146). ΔE00 misses grain: removing the
+    /// default look's grain (0.35) from a frozen photo moves it by mean 0.075, p95 0.19, max 0.40,
+    /// inside every limit, but drops SSIM to 0.99952 (iPhone 12 Pro) and 0.99970 (Pixel 8 Pro); a
+    /// new grain seed drops it to 0.99906 and 0.99941. Blur of σ 0.3 px gives 0.994–0.997. Rendered
+    /// twice, SSIM is 1. The local-tone cases above take 0.999 instead: CI's isolated outliers
+    /// (16 pixels moved ≈ 4 ΔE00, simulated) cost them up to 0.00034, and they have no grain.
+    static let photoThresholds = Thresholds(
+        mean: thresholds.mean, p95: thresholds.p95, max: thresholds.max, minimumStructuralSimilarity: 0.9998)
     /// ΔE00 shown as white in diff heat maps: twice the per-pixel limit.
     static let heatMapFullScale = 2.0
     /// Patch rows (one pixel high) are enlarged to cells this size in report images.
@@ -50,17 +65,26 @@ enum VisualRegression {
         return RegressionImage(rendering: try renderer.render(negative, adjustments))
     }
 
-    /// Per-pixel CIEDE2000 and its summary.
+    /// Per-pixel CIEDE2000 and its summary, and SSIM when asked for and the image is large enough
+    /// for its window.
     struct Comparison {
         let deltaE: [Double]
         let summary: ColorDifference.Summary
+        let structuralSimilarity: Double?
     }
 
-    /// `nil` when the sizes differ.
-    static func compare(_ golden: RegressionImage, _ actual: RegressionImage) -> Comparison? {
+    /// `nil` when the sizes differ. Each image is converted to CIELAB once, for both measures.
+    static func compare(_ golden: RegressionImage, _ actual: RegressionImage, structure: Bool = false) -> Comparison? {
         guard golden.width == actual.width, golden.height == actual.height else { return nil }
-        let deltaE = golden.deltaE(to: actual)
-        return Comparison(deltaE: deltaE, summary: ColorDifference.Summary(deltaE))
+        let goldenLab = golden.encoded.map(ColorDifference.lab(fromDisplayP3:))
+        let actualLab = actual.encoded.map(ColorDifference.lab(fromDisplayP3:))
+        let deltaE = zip(goldenLab, actualLab).map { ColorDifference.deltaE2000($0, $1) }
+        var ssim: Double?
+        if structure, min(golden.width, golden.height) >= StructuralSimilarity.windowSize {
+            ssim = StructuralSimilarity.index(
+                goldenLab.map { Float($0.x) }, actualLab.map { Float($0.x) }, width: golden.width, height: golden.height)
+        }
+        return Comparison(deltaE: deltaE, summary: ColorDifference.Summary(deltaE), structuralSimilarity: ssim)
     }
 
     // MARK: Environment
@@ -143,6 +167,7 @@ enum VisualRegression {
         }
         let name: String
         let summary: ColorDifference.Summary?
+        var structuralSimilarity: Double? = nil
         let status: Status
         /// Judged with `Thresholds.allowsIsolatedOutliers`.
         var allowsIsolatedOutliers = false
@@ -204,8 +229,8 @@ enum VisualRegression {
         let actual = try item.render()
         let stored = store.golden(item.name)
         let golden = try? stored?.get()
-        let comparison = golden.flatMap { compare($0, actual) }
-        let passes = comparison.map { item.thresholds.accepts($0.summary) } ?? false
+        let comparison = golden.flatMap { compare($0, actual, structure: item.thresholds.minimumStructuralSimilarity != nil) }
+        let passes = comparison.map { item.thresholds.accepts($0.summary, structuralSimilarity: $0.structuralSimilarity) } ?? false
         var outcome: Outcome
         switch mode {
         case .none:
@@ -214,8 +239,7 @@ enum VisualRegression {
             if !passes {
                 let unreadable = stored != nil && golden == nil
                 Issue.record(
-                    Comment(
-                        rawValue: failureMessage(item, status, comparison?.summary, unreadable: unreadable, regenerate: regenerate)))
+                    Comment(rawValue: failureMessage(item, status, comparison, unreadable: unreadable, regenerate: regenerate)))
             }
         case .failing, .all:
             let rewrite = mode == .all || !passes
@@ -225,6 +249,7 @@ enum VisualRegression {
             outcome.rewritten = rewrite
         }
         outcome.allowsIsolatedOutliers = item.thresholds.allowsIsolatedOutliers
+        outcome.structuralSimilarity = comparison?.structuralSimilarity
         if !outcome.status.isClean || writesAllImages {
             try files.writeImages(item.name, actual: actual, golden: golden, deltaE: comparison?.deltaE)
         }
@@ -232,16 +257,21 @@ enum VisualRegression {
     }
 
     private static func failureMessage(
-        _ item: Item, _ status: Outcome.Status, _ summary: ColorDifference.Summary?, unreadable: Bool, regenerate: String
+        _ item: Item, _ status: Outcome.Status, _ comparison: Comparison?, unreadable: Bool, regenerate: String
     ) -> String {
         let (name, t) = (item.name, item.thresholds)
         let hint = "If the change is intended: \(regenerate)"
         if status == .missing { return "\(name): missing golden. \(hint)" }
         if unreadable { return "\(name): unreadable golden (not a 16-bit RGB PNG). \(hint)" }
-        guard let s = summary else { return "\(name): golden and render differ in size. \(hint)" }
+        guard let comparison else { return "\(name): golden and render differ in size. \(hint)" }
+        let s = comparison.summary
         let measured = String(format: "mean %.3f, p95 %.3f, p99.9 %.3f, max %.3f", s.mean, s.p95, s.p999, s.max)
         let limit = t.allowsIsolatedOutliers ? "p99.9" : "max"
-        return "\(name): ΔE00 \(measured) exceeds mean \(t.mean), p95 \(t.p95), \(limit) \(t.max). \(hint)"
+        var message = "\(name): ΔE00 \(measured) against mean \(t.mean), p95 \(t.p95), \(limit) \(t.max)"
+        if let minimum = t.minimumStructuralSimilarity, let ssim = comparison.structuralSimilarity {
+            message += String(format: "; SSIM %.5f against ≥ %g", ssim, minimum)
+        }
+        return "\(message). \(hint)"
     }
 
     static func write(_ image: RegressionImage, to url: URL) throws {
