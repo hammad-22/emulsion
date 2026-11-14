@@ -11,8 +11,7 @@ import Testing
 ///
 /// `EMULSION_REVIEW_INCLUDE_LOCAL=1` also renders the samples that aren't CC0, into a `local-only/`
 /// subfolder: for the owner's own review, never shared or posted. `EMULSION_REVIEW_LOOK=<name>` renders
-/// one look only, so each look can get its own process: that reduces MOV-147's corrupt tiles in
-/// full-size renders but doesn't prevent them, so check renders by majority hash and by eye.
+/// one look only.
 ///
 /// Kept free of other test-target helpers: the script copies this file into an older checkout
 /// when that checkout does not have it (one older than the digicam process, MOV-149, can't build it).

@@ -30,19 +30,8 @@ git -C "$root" worktree add --quiet --detach "$tmp/base" "$base_sha"
 # An older base has no ReviewRenders: give it this checkout's copy (it uses only the public render API).
 [ -f "$tmp/base/$test_file" ] || cp "$root/$test_file" "$tmp/base/$test_file"
 
-# One test process per look reduces, but doesn't prevent, corrupt tiles in full-size renders (MOV-147):
-# check the renders by majority hash across repeated runs and by eye. A base whose ReviewRenders
-# predates EMULSION_REVIEW_LOOK renders every look at once.
-looks="neutral default digicam digicam-strong"
-render() { # <package folder> <label>
-  if grep -q EMULSION_REVIEW_LOOK "$1/Tests/EmulsionCoreTests/ReviewRenders.swift"; then
-    for look in $looks; do (cd "$1" && EMULSION_REVIEW_LABEL=$2 EMULSION_REVIEW_LOOK=$look swift test --filter ReviewRenders); done
-  else
-    (cd "$1" && EMULSION_REVIEW_LABEL=$2 swift test --filter ReviewRenders)
-  fi
-}
 echo "Rendering before ($base_sha)..."
-render "$tmp/base/Packages/EmulsionCore" before
+(cd "$tmp/base/Packages/EmulsionCore" && EMULSION_REVIEW_LABEL=before swift test --filter ReviewRenders)
 echo "Rendering after ($head_sha)..."
-render "$root/Packages/EmulsionCore" after
+(cd "$root/Packages/EmulsionCore" && EMULSION_REVIEW_LABEL=after swift test --filter ReviewRenders)
 echo "Review renders: $out"
