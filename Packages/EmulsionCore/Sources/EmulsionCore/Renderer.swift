@@ -5,19 +5,23 @@ import Foundation
 import ImageIO
 import UniformTypeIdentifiers
 
-/// Renders a Negative with the Emulsion look and the user's adjustments. One instance per
-/// render actor; previews and exports run the same graph, with spatial effects sized
-/// relative to the image so they agree across resolutions.
+/// Renders a Negative with the Emulsion look and the user's adjustments, through the film process
+/// or the digicam process (`Renderer+Digicam.swift`). One instance per render actor; previews and
+/// exports run the same graph, with spatial effects sized relative to the image so they agree
+/// across resolutions.
 public final class Renderer: @unchecked Sendable {
     public static let outputSpace = CGColorSpace(name: CGColorSpace.displayP3)!
     /// Core Image working space: extended linear sRGB, half float.
     static let workingSpace = CGColorSpace(name: CGColorSpace.extendedLinearSRGB)!
-    private let kernels: Kernels
+    let kernels: Kernels
+    let digicamKernels: DigicamKernels
     public let developer: Developer
-    private let context: CIContext
+    let context: CIContext
 
     public init() throws {
-        kernels = try Kernels()
+        let library = try Kernels.library()
+        kernels = try Kernels(library: library)
+        digicamKernels = try DigicamKernels(library: library)
         context = Self.context(cachesIntermediates: false)
         developer = Developer(kernels: kernels, context: Self.context(cachesIntermediates: true))
     }
@@ -30,9 +34,17 @@ public final class Renderer: @unchecked Sendable {
     }
 
     /// Scene light → display light (in the working space), look applied. Display-referred
-    /// negatives are printed relative to the photo they were developed from.
+    /// negatives are printed relative to the photo they were developed from. The digicam process
+    /// crops to 4:3 and caps the size at its sensor's (`renderDigicam`).
     public func render(_ negative: Negative, _ adjustments: Adjustments) throws -> CIImage {
         let a = adjustments.clamped()
+        switch a.process {
+        case .film: return try renderFilm(negative, a)
+        case .digicam: return try renderDigicam(negative, a)
+        }
+    }
+
+    private func renderFilm(_ negative: Negative, _ a: Adjustments) throws -> CIImage {
         var image = negative.image
         let extent = image.extent
         let longEdge = max(extent.width, extent.height)

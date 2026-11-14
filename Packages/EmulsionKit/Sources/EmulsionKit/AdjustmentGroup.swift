@@ -2,7 +2,8 @@ import EmulsionCore
 
 /// The editor's controls, grouped the way the film process is: exposure and local tone,
 /// printer lights and color density, then texture. Shared so iOS and Mac show the same
-/// controls with the same ranges; the iPhone panel shows one group at a time.
+/// controls with the same ranges; the iPhone panel shows one group at a time. The digicam
+/// process uses the same controls, two of them under its own names (`controls(for:)`).
 public enum AdjustmentGroup: String, CaseIterable, Identifiable, Sendable {
     case light, color, texture
 
@@ -27,30 +28,49 @@ public enum AdjustmentGroup: String, CaseIterable, Identifiable, Sendable {
         group: AdjustmentGroup, control: AdjustmentControl.ID
     )? {
         let changed = allCases.flatMap { group in
-            group.controls.filter { old[keyPath: $0.keyPath] != new[keyPath: $0.keyPath] }.map { (group: group, control: $0.id) }
+            group.controls(for: .film).filter { old[keyPath: $0.keyPath] != new[keyPath: $0.keyPath] }.map {
+                (group: group, control: $0.id)
+            }
         }
         return changed.count == 1 ? changed[0] : nil
     }
 
-    public var controls: [AdjustmentControl] {
+    /// The group's controls, titled for `process`: in the digicam process Grain is sensor noise and
+    /// Halation the in-camera processing (sharpening, fringing, JPEG).
+    public func controls(for process: RenderProcess) -> [AdjustmentControl] {
         switch self {
         case .light:
             [
-                .init(title: String(localized: "Exposure", bundle: .module), keyPath: \.exposure, range: Self.exposureRange, unit: .stops),
-                .init(title: String(localized: "Highlights", bundle: .module), keyPath: \.highlights, range: Self.balanceRange),
-                .init(title: String(localized: "Shadows", bundle: .module), keyPath: \.shadows, range: Self.balanceRange),
+                .init(
+                    id: "exposure", title: String(localized: "Exposure", bundle: .module), keyPath: \.exposure, range: Self.exposureRange,
+                    unit: .stops),
+                .init(
+                    id: "highlights", title: String(localized: "Highlights", bundle: .module), keyPath: \.highlights,
+                    range: Self.balanceRange),
+                .init(id: "shadows", title: String(localized: "Shadows", bundle: .module), keyPath: \.shadows, range: Self.balanceRange),
             ]
         case .color:
             [
-                .init(title: String(localized: "Warmth", bundle: .module), keyPath: \.warmth, range: Self.balanceRange),
-                .init(title: String(localized: "Tint", bundle: .module), keyPath: \.tint, range: Self.balanceRange),
-                .init(title: String(localized: "Color", bundle: .module), keyPath: \.color, range: Self.balanceRange),
+                .init(id: "warmth", title: String(localized: "Warmth", bundle: .module), keyPath: \.warmth, range: Self.balanceRange),
+                .init(id: "tint", title: String(localized: "Tint", bundle: .module), keyPath: \.tint, range: Self.balanceRange),
+                .init(id: "color", title: String(localized: "Color", bundle: .module), keyPath: \.color, range: Self.balanceRange),
             ]
         case .texture:
-            [
-                .init(title: String(localized: "Grain", bundle: .module), keyPath: \.grain, range: Self.amountRange),
-                .init(title: String(localized: "Halation", bundle: .module), keyPath: \.halation, range: Self.amountRange),
-            ]
+            switch process {
+            case .film:
+                [
+                    .init(id: "grain", title: String(localized: "Grain", bundle: .module), keyPath: \.grain, range: Self.amountRange),
+                    .init(
+                        id: "halation", title: String(localized: "Halation", bundle: .module), keyPath: \.halation, range: Self.amountRange),
+                ]
+            case .digicam:
+                [
+                    .init(id: "grain", title: String(localized: "Noise", bundle: .module), keyPath: \.grain, range: Self.amountRange),
+                    .init(
+                        id: "halation", title: String(localized: "Processing", bundle: .module), keyPath: \.halation,
+                        range: Self.amountRange),
+                ]
+            }
         }
     }
 }
@@ -59,14 +79,15 @@ public enum AdjustmentGroup: String, CaseIterable, Identifiable, Sendable {
 public struct AdjustmentControl: Identifiable {
     enum Unit { case stops, amount }
 
+    /// Stable across processes and languages, unlike the title.
+    public let id: String
     public let title: String
     public let keyPath: WritableKeyPath<Adjustments, Double>
     public let range: ClosedRange<Double>
     let unit: Unit
 
-    public var id: String { title }
-
-    init(title: String, keyPath: WritableKeyPath<Adjustments, Double>, range: ClosedRange<Double>, unit: Unit = .amount) {
+    init(id: String, title: String, keyPath: WritableKeyPath<Adjustments, Double>, range: ClosedRange<Double>, unit: Unit = .amount) {
+        self.id = id
         self.title = title
         self.keyPath = keyPath
         self.range = range

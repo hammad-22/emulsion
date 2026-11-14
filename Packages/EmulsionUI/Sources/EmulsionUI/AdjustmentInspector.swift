@@ -25,7 +25,7 @@ public struct AdjustmentInspector: View {
                             .font(.footnote.weight(.semibold))
                             .foregroundStyle(.secondary)
                             .accessibilityAddTraits(.isHeader)
-                        ForEach(section.controls) { control in
+                        ForEach(section.controls(for: adjustments.process)) { control in
                             AdjustmentRuler(control: control, adjustments: $adjustments, isCompact: true)
                         }
                     }

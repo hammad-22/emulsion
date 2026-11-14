@@ -6,6 +6,8 @@ The UI should stay simple, while the engine underneath is something a colorist c
 
 ## Architecture
 
+Every photo renders through one process, `Adjustments.process`: the film process below (the default) or a non-film process that shares the input side and the controls (see [Non-film looks: Digicam 2004](#non-film-looks-digicam-2004)). `Renderer.render` dispatches on it.
+
 ```
 source ──▶ input transform ──▶ scene light (linear, 0.18 = mid-gray) ──▶ grade ──▶ film system ──▶ output
           RAW develop         one working space for every source          exposure   negative → print   P3 today;
@@ -156,6 +158,50 @@ Display-referred photo (developed and materialized once, render only; Mac, three
 | 48 MP | 37.6–45.8 ms | 87.8–94.2 ms |
 
 **Device numbers are still needed.**
+
+## Non-film looks: Digicam 2004
+
+A curated look ("Digicam 2004", MOV-149) that renders a photo like the in-camera JPEG of a mid-2000s compact CCD camera. It is not a film process: no negative, no print, no printer lights. It is a separate, deterministic render path beside negative → print, so the film model stays honest about what it models and the camera look can be measured against cameras rather than stocks.
+
+**Where it plugs in.** `RenderProcess` (`film`, `digicam`) is stored on `Adjustments.process` (a library index without it, or with a process this version doesn't know, renders film rather than failing to load). A recipe carries it as its `engineModel`: film keeps `emulsion-default-v1`, so film recipe files are byte-for-byte unchanged, and digicam is `emulsion-digicam-v1`; an app that predates a process refuses its recipes (`recipeModelUnsupported`) instead of printing them as film. `CuratedLooks` has the look (id …0005). `Renderer.render` dispatches to `Renderer+Digicam.swift`; constants are `DigicamLook`, the pointwise maths and its Swift mirror `DigicamModel`, the kernels `Kernels/Digicam.ci.metal` (`DigicamKernels`), linked into the same metallib as the film kernels.
+
+**Graph** (working space extended linear sRGB):
+1. *Sensor frame.* Centre crop to 4:3 (landscape or portrait, as the source), output at the origin; if the long edge exceeds 2592 px it is Lanczos-downscaled to 2592 × 1944 (5.0 MP). Smaller renders (previews) keep their size. Spatial sizes are in sensor pixels × (output long edge / 2592), so a preview is close to a downscale of the export.
+2. *Lens*, scene light: vignette (0.6 stop at the corners, ∝ r²), soft corners (a σ 1.5 px blur blended in with weight r²), purple fringing (a mask of near-clip light, blurred by σ 2.5 px, minus itself, tinted violet, added × processing).
+3. *White balance and exposure:* von Kries channel gains in linear sRGB, normalised to luminance 1, times 2^exposure. The develop already neutralised the light; the simulated auto white balance corrects only 80 % of the distance in mireds from 5500 K to the RAW file's as-shot temperature, so the gains are the light's Planckian sRGB (Kim et al. 2002 chromaticity) over the camera's white. Tungsten stays warm, shade slightly cool; a small constant cool-magenta bias and the Warmth/Tint controls shift the camera's white. Photos that aren't RAW get the bias and Warmth/Tint only. The residual uses the as-shot temperature whatever the develop's white balance is set to.
+4. *Sensor:* noise in linear before the clip, σ ∝ √(signal / clip) plus a read floor: per-pixel luminance noise and blotchy chroma noise (value noise in 4 px cells), deterministic per `seed`, attenuated below a pixel like film grain. Then a hard per-channel clip 2.5 stops over mid-gray (per-channel clipping gives the hue-shifted blown skies of small sensors) and a black offset 4.5 stops under mid-gray.
+5. *Colour:* luma-preserving saturation in linear light, 1.15 × the Color control.
+6. *Tone:* the JPEG curve on light / clip: sRGB encode, a power that puts mid-gray on code 118, and an S curve pivoting there whose slope at the clip is 0.5, so highlights reach white at the clip with no shoulder. Output is display-linear sRGB in 0…1 (sRGB gamut, as the cameras wrote).
+7. *Local tone* (Highlights/Shadows, the film path's kernel) when set.
+8. *Sharpening:* unsharp mask on gamma-encoded luma (σ 1.2 px), clipped to 0…1, so edges carry bright and dark halos.
+9. *JPEG:* only at sensor size (an export of a photo at least 2592 px long) and when processing is on: a real Core Image JPEG encode and decode in sRGB at quality 0.85. At preview sizes the 8 × 8 blocks would be sub-pixel.
+
+**Controls in the digicam process.** Exposure is set before the sensor clip. Warmth and Tint shift the camera's white balance (60 mired and 12 % green gain per unit), not printer lights. Color scales the saturation. Highlights/Shadows are the same local tone, after the tone curve. Grain is the sensor noise ("Noise" in the editor). Halation is the in-camera processing ("Processing": sharpening halos and purple fringing scale with it, and it switches the JPEG step on; 0 is clean). Defaults: noise 0.35, processing 0.6.
+
+**Constants** (`DigicamLook`). Measured values are from period files we read, or published lab tests of period compacts; artistic ones are choices, labelled as such.
+
+| Constant | Value | Status |
+| --- | --- | --- |
+| `sensorLongEdge`, `aspectRatio` | 2592 px, 4:3 (5.0 MP) | Measured: period file headers |
+| `clipStops` | +2.5 stops over mid-gray | Artistic, consistent with ISO 12232 standard output sensitivity (code 118 with an sRGB curve leaves ≈ 2.5 stops); period DSLR JPEGs measured +2.7…2.8 |
+| `blackStops` | −4.5 stops | Artistic; period DSLR JPEGs measured −4.6…−4.7 |
+| `middleGrayCode` | 118 / 255 | ISO 12232 standard output sensitivity |
+| `saturation` (`colorBoost`, `colorCut`) | 1.15 (0.5, 0.8 per unit of Color) | Measured: period compacts 109–117 % mean chart saturation. Their extra red saturation (+5 %) and cyan turned ≈ 5° toward blue are not modelled: a hue-selective change isn't a single 3 × 3 matrix |
+| `contrastPower`, `contrast` | 2, 0.5 | Artistic |
+| `whiteBalanceCorrection`, `whiteBalanceReference` | 0.8, 5500 K | Fitted to period compacts under tungsten (measured R +9.5…11.6 %, B −9.9…−17 %); at 2850 K this gives mid-gray R +9.6 %, B −19.5 % in code values: a residual along the Planckian locus can't hold both ends |
+| `biasMireds`, `biasMagenta` | +4 mired (cooler), green −1.5 % | Artistic |
+| `warmthMireds`, `tintGreen` | 60 mired, 12 % per unit | Artistic |
+| `shotNoise`, `readNoise`, `chromaNoiseShare`, `chromaNoiseCell` | 0.024, 0.0048 (of the clip), 1.5, 4 px | Set so a flat patch 2 stops under mid-gray has luma σ ≈ 2 codes at noise 0.35 as exported (measured 2.06); target from our rough reading of period JPEGs (n = 4), as is the 4 px chroma cell |
+| `sharpenRadius`, `sharpenAmount` | σ 1.2 px, 0.55 | Set so a step edge at sensor size overshoots ≈ 18 % at processing 1 (measured 18.6 %; 10.4 % at the default 0.6); period compacts measured 9–21 % |
+| `jpegQuality` | 0.85 | Period files measure ≈ IJG quality 93; Apple's scale isn't IJG's, so artistic approximation. Period files used 4:2:2 chroma; Core Image picks its own subsampling, not controlled here |
+| `vignetteStops`, `cornerSoftnessSigma` | 0.6 stop, σ 1.5 px | Artistic, unmeasured |
+| `fringeOnset`, `fringeRadius`, `fringeColor`, `fringeStrength` | 0.7 of clip, σ 2.5 px, (0.55, 0.2, 1.0), 0.6 | Artistic, unmeasured |
+
+**Verified** (`DigicamTests`, `swift test`): the GPU matches the Swift mirror within 0.002 (sRGB-encoded) on chromatic patches, a gray ramp and over-clip light, at three edits and with and without an as-shot light; mid-gray lands on code 118 (the curve exactly; the GPU's luma within 1 code through the bias); a channel above the clip is exactly 255 and per-channel clipping turns a bright sky's hue by more than 10°; the output frame (4032 × 3024 and 8064 × 6048 → 2592 × 1944, 16:9 → 4:3 crop, portrait, previews keep their size, output at the origin, the crop centred and downscaled edges not darkened); noise is deterministic per seed, differs between seeds, is zero-mean within half a code and absent at 0; the default noise is 2 ± 0.5 codes as above; sharpening overshoot is 15–21 % at processing 1 and under 1 % at 0; processing adds a violet fringe around clipped light; a synthetic 2850 K RAW (linear and Bayer) renders mid-gray R +8…12 %, B −17…−22 % against the same develop with no as-shot light, shade renders cooler and an unknown light equals 5500 K; recipes carry the process in the engine model, old film recipe files decode and re-encode byte-identically, and edits without a process or with an unknown one render film. Visual regression has `chart24-grid.digicam` and `iphone12pro-proraw.digicam`; every film golden is unchanged.
+
+**Speed** (`PerformanceProbe.testDigicamTimings`, Mac M4 Max GPU, render + read back, median of 4): 1600 px preview 7.4 ms; 12 MP source → 5 MP export 36 ms with the JPEG step, 16 ms without (processing 0). Device numbers are still needed.
+
+**Limits.** Display-referred photos (JPEG/HEIC) are rendered from their scene estimate, not relative to themselves as the film process does, so zero edits don't reproduce them. The viewfinder previews the digicam look on the camera's video frame, 4:3-cropped. The library and editor show the 4:3 frame the process makes. Not modelled: per-hue colour errors, demosaic artefacts, lens distortion, CCD smear and blooming, in-camera noise reduction.
 
 ## Roadmap, in order of colorist value
 

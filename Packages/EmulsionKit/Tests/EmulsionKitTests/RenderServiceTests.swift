@@ -53,6 +53,22 @@ extension RenderServiceTests {
         #expect(service.cachedThumbnail(url, .init(), maxDimension: 300) == nil)
     }
 
+    /// The process is part of the edit, so a digicam thumbnail never stands in for the film one (MOV-149).
+    @Test func thumbnailsAreKeptPerProcess() async throws {
+        let library = TestLibrary()
+        let url = library.store.url(for: try await library.store.add(TestPhoto.jpeg, fileExtension: "jpg"))
+        let service = library.renderService
+        var digicam = Adjustments()
+        digicam.process = .digicam
+
+        let film = try await service.image(url, .init(), maxDimension: 300)
+        #expect(service.cachedThumbnail(url, digicam, maxDimension: 300) == nil)
+        let rendered = try await service.image(url, digicam, maxDimension: 300)
+        #expect(rendered !== film)
+        #expect(service.cachedThumbnail(url, digicam, maxDimension: 300) === rendered)
+        #expect(service.cachedThumbnail(url, .init(), maxDimension: 300) === film)
+    }
+
     @Test func latestEditorRenderIsKeptUntilThePhotoIsForgotten() async throws {
         let library = TestLibrary()
         let url = library.store.url(for: try await library.store.add(TestPhoto.jpeg, fileExtension: "jpg"))

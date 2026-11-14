@@ -1,10 +1,9 @@
 import Foundation
 
-/// An artistic adjustment snapshot for the single built-in film model. A photo owns its grain
+/// An artistic adjustment snapshot for one of the built-in render processes. A photo owns its grain
 /// seed and its RAW white balance, which describes the light it was shot under.
 public struct Recipe: Codable, Equatable, Identifiable, Sendable {
     public static let formatVersion = 1
-    public static let engineModel = "emulsion-default-v1"
     public static let maximumFileSize = 65_536
 
     // Bounds combining-character sequences as well as visible character counts.
@@ -45,6 +44,16 @@ public struct Recipe: Codable, Equatable, Identifiable, Sendable {
         applying(to: current) == current
     }
 
+    /// The engine model a recipe file names for each process. The film model keeps the name it had
+    /// before there were processes, so film recipes are byte-for-byte unchanged; an app that predates
+    /// a process refuses its recipes (`recipeModelUnsupported`) instead of printing them as film.
+    public static func engineModel(for process: RenderProcess) -> String {
+        switch process {
+        case .film: "emulsion-default-v1"
+        case .digicam: "emulsion-digicam-v1"
+        }
+    }
+
     public static func decode(_ data: Data) throws(EmulsionError) -> Recipe {
         guard data.count <= maximumFileSize else { throw .invalidRecipe }
         do { return try JSONDecoder().decode(Self.self, from: data) } catch let error as EmulsionError { throw error } catch {
@@ -65,11 +74,13 @@ public struct Recipe: Codable, Equatable, Identifiable, Sendable {
         guard try container.decode(Int.self, forKey: .formatVersion) == Self.formatVersion else {
             throw EmulsionError.recipeVersionUnsupported
         }
-        guard try container.decode(String.self, forKey: .engineModel) == Self.engineModel else {
+        let model = try container.decode(String.self, forKey: .engineModel)
+        guard let process = RenderProcess.allCases.first(where: { Self.engineModel(for: $0) == model }) else {
             throw EmulsionError.recipeModelUnsupported
         }
         let settings = try container.nestedContainer(keyedBy: Field.self, forKey: .adjustments)
         var adjustments = Adjustments()
+        adjustments.process = process
         for key in Field.allCases { adjustments[keyPath: key.path] = try settings.decode(Double.self, forKey: key) }
         try self.init(
             id: container.decode(UUID.self, forKey: .id), name: container.decode(String.self, forKey: .name),
@@ -79,7 +90,7 @@ public struct Recipe: Codable, Equatable, Identifiable, Sendable {
     public func encode(to encoder: any Encoder) throws {
         var container = encoder.container(keyedBy: CodingKeys.self)
         try container.encode(Self.formatVersion, forKey: .formatVersion)
-        try container.encode(Self.engineModel, forKey: .engineModel)
+        try container.encode(Self.engineModel(for: adjustments.process), forKey: .engineModel)
         try container.encode(id, forKey: .id)
         try container.encode(name, forKey: .name)
         try container.encode(summary, forKey: .summary)
