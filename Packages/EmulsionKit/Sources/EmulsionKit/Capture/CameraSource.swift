@@ -1,7 +1,7 @@
 import CoreGraphics
 import QuartzCore
 
-/// `AVCameraSource` on device, `MockCameraSource` elsewhere. See NOTES.md, "CameraSource".
+/// `AVCameraSource` on device, `MockCameraSource` elsewhere. See Packages/EmulsionKit/NOTES.md, "CameraSource".
 public protocol CameraSource: Sendable {
     func frames() -> AsyncStream<CameraFrame>
     func events() -> AsyncStream<CameraEvent>

@@ -7,16 +7,14 @@ struct LensPicker: View {
     let select: (CameraLens) -> Void
 
     @ScaledMetric private var buttonSize = FilmLabLayout.minimumControlHeight
-    private let spacing = FilmLabLayout.hairline
-    private let titleMinimumScale = 0.7
 
     var body: some View {
-        HStack(spacing: spacing) {
+        HStack(spacing: FilmLabLayout.hairline) {
             ForEach(capabilities.lenses) { option in
                 lensButton(option, isSelected: option.lens == capabilities.lens)
             }
         }
-        .padding(spacing)
+        .padding(FilmLabLayout.hairline)
         .glassEffect(.regular, in: .capsule)
     }
 
@@ -28,7 +26,7 @@ struct LensPicker: View {
                 .font(isSelected ? .footnote.weight(.bold) : .caption.weight(.semibold))
                 .monospacedDigit()
                 .lineLimit(1)
-                .minimumScaleFactor(titleMinimumScale)
+                .minimumScaleFactor(0.7)
                 .frame(width: buttonSize, height: buttonSize)
                 .background(.white.opacity(isSelected ? FilmLabLayout.selectedFill : 0), in: .circle)
                 .contentShape(.circle)

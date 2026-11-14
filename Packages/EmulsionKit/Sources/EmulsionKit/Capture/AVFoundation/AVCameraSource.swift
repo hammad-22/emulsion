@@ -2,7 +2,7 @@
     import AVFoundation
     import os
 
-    /// The back cameras capturing RAW, following Apple's AVCam sample. See NOTES.md, "AVCameraSource".
+    /// The back cameras capturing RAW, following Apple's AVCam sample. See Packages/EmulsionKit/NOTES.md, "AVCameraSource".
     public actor AVCameraSource: CameraSource {
         private let sessionQueue = DispatchSerialQueue(label: "com.hammad.emulsion.capture-session")
         let frameQueue = DispatchQueue(label: "com.hammad.emulsion.viewfinder-frames")

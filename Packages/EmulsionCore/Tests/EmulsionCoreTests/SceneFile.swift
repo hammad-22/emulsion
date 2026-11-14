@@ -10,6 +10,7 @@ enum SceneFile {
     struct HalfImage: Equatable {
         let width: Int
         let height: Int
+        /// RGBA samples as IEEE 754 binary16 bit patterns, top row first.
         let bits: [UInt16]
     }
 

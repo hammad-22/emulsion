@@ -1,6 +1,6 @@
 import Foundation
 
-/// A RAW photo's exposure anchor (MOV-134, MOV-141). See NOTES.md, "PhotoRecord and StoredExposureAnchor".
+/// A RAW photo's exposure anchor (MOV-134, MOV-141). See Packages/EmulsionKit/NOTES.md, "PhotoRecord and StoredExposureAnchor".
 struct StoredExposureAnchor: Codable, Equatable, Sendable {
     let stops: Double
     let source: Source

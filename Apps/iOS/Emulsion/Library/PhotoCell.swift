@@ -10,7 +10,7 @@ struct PhotoCell: View {
     let activate: (PhotoRecord.ID) -> Void
 
     @Environment(PhotoStore.self) private var store
-    private let selectedWash = 0.3
+    private static let selectedWash = 0.3
 
     private var isSelected: Bool { selection.photos.contains(photo.id) }
 
@@ -24,7 +24,7 @@ struct PhotoCell: View {
                         Rectangle().strokeBorder(Color.primary, lineWidth: FilmLabLayout.hairline)
                     }
                 }
-                .overlay { if isSelected { Color.white.opacity(selectedWash) } }
+                .overlay { if isSelected { Color.white.opacity(Self.selectedWash) } }
                 .overlay(alignment: .bottomTrailing) {
                     if selection.isActive { SelectionBadge(isSelected: isSelected) }
                 }

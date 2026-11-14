@@ -2,6 +2,7 @@
 
 Shared app logic for the iOS and Mac apps: the photo library (`Library/`: `PhotoStore`, `PhotoRecord`), rendering off the main actor (`RenderService`), the editor's controls and edit session (`AdjustmentGroup`, `EditSession`), settings and export (`AppSettings`, `Export/PhotoLibrarySaver`), camera capture (`Capture/`: `CameraModel`, `CameraSource` with `AVCameraSource` on iOS in `Capture/AVFoundation/` and `MockCameraSource` for the Simulator and tests), bundled sample photos. Recipes (`Recipes/`) use `RecipeStore` for persistence and bounded JSON import; metadata and CloudKit sync remain later work (MOV-120). Names of files stored on disk live in `StoredFileName`; never rename one. Tests mirror the folders, with shared fixtures in `…TestSupport.swift`.
 
+- **Long reasons** live in `NOTES.md`, by type name; sources keep a one-line pointer.
 - **No UI.** No SwiftUI views here; shared views live in `EmulsionUI`. Only non-UI Apple frameworks (Foundation, Observation, Photos, ImageIO, UniformTypeIdentifiers, CoreTransferable) and `EmulsionCore`; for capture only, also AVFoundation, CoreVideo and QuartzCore's `CALayer` (the rotation coordinator needs the viewfinder's layer), still no views.
 - **Both platforms.** Everything must build for iOS and macOS. If an API differs, put a small adapter behind `#if os(...)` here, never in the apps.
 - **Feature logic lands here or in EmulsionCore**, so the iOS app (curated subset) and the Mac app (everything) never duplicate it.

@@ -13,7 +13,6 @@ struct ViewfinderView<Accessory: View>: View {
     @State private var size = CGSize.zero
     /// Larger frames cost render time without visible gain on a phone.
     private let maxPixels: CGFloat = 1920
-    private let timingOverlayPadding: CGFloat = 8
 
     var body: some View {
         ViewfinderLayerView(display: display)
@@ -50,7 +49,7 @@ struct ViewfinderView<Accessory: View>: View {
 
     @ViewBuilder private var timingOverlay: some View {
         #if DEBUG
-            if ViewfinderTimingOverlay.isEnabled { ViewfinderTimingOverlay(model: model).padding(timingOverlayPadding) }
+            if ViewfinderTimingOverlay.isEnabled { ViewfinderTimingOverlay(model: model).padding(8) }
         #endif
     }
 
@@ -77,16 +76,16 @@ struct ViewfinderView<Accessory: View>: View {
 private struct ShutterBlink: ViewModifier {
     let captureCount: Int
 
-    private let peakOpacity = 0.8
-    private let closeDuration = 0.04
-    private let openDuration = 0.18
+    private static let peakOpacity = 0.8
+    private static let closeDuration = 0.04
+    private static let openDuration = 0.18
 
     func body(content: Content) -> some View {
         content.keyframeAnimator(initialValue: 0.0, trigger: captureCount) { view, blink in
             view.overlay { Color.black.opacity(blink).allowsHitTesting(false) }
         } keyframes: { _ in
-            LinearKeyframe(peakOpacity, duration: closeDuration)
-            LinearKeyframe(0, duration: openDuration)
+            LinearKeyframe(Self.peakOpacity, duration: Self.closeDuration)
+            LinearKeyframe(0, duration: Self.openDuration)
         }
     }
 }

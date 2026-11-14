@@ -2,7 +2,7 @@ import CoreGraphics
 import CoreImage
 import CoreVideo
 
-/// A frame and the clockwise rotation that turns it upright. See NOTES.md, "CameraFrame".
+/// A frame and the clockwise rotation that turns it upright. See Packages/EmulsionKit/NOTES.md, "CameraFrame".
 /// `@unchecked Sendable` is safe: nothing writes to the pixel buffer after the camera delivers it.
 public struct CameraFrame: @unchecked Sendable {
     public let pixelBuffer: CVPixelBuffer

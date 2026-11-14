@@ -14,8 +14,8 @@ struct CameraContent: View {
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @State private var showsRecipes = false
 
-    private let recipesAnimation = Animation.snappy(duration: 0.3)
-    private let reducedMotionRecipesAnimation = Animation.easeInOut(duration: 0.2)
+    private static let recipesAnimation = Animation.snappy(duration: 0.3)
+    private static let reducedMotionRecipesAnimation = Animation.easeInOut(duration: 0.2)
 
     var body: some View {
         Group {
@@ -74,7 +74,7 @@ struct CameraContent: View {
     }
 
     private func toggleRecipes() {
-        withAnimation(reduceMotion ? reducedMotionRecipesAnimation : recipesAnimation) { showsRecipes.toggle() }
+        withAnimation(reduceMotion ? Self.reducedMotionRecipesAnimation : Self.recipesAnimation) { showsRecipes.toggle() }
     }
 
     private var isWide: Bool { horizontalSizeClass == .regular || verticalSizeClass == .compact }

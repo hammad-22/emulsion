@@ -59,7 +59,7 @@ final class WhiteBalanceUITests: XCTestCase {
     @MainActor
     func testInspectorShowsWhiteBalanceRulers() throws {
         let app = XCUIApplication()
-        app.launchArguments = LaunchArgument.componentGallery
+        app.launchArguments = LaunchArgument.componentGalleryArguments
         app.launch()
         let rulers = app.otherElements.matching(identifier: AccessibilityID.adjustmentRuler)
         let temperature = rulers.matching(NSPredicate(format: "label == 'Temperature'")).firstMatch

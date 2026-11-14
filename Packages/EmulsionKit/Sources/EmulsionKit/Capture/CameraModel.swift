@@ -3,7 +3,7 @@ import EmulsionCore
 import Foundation
 import Observation
 
-/// The camera screen's state. See NOTES.md, "CameraModel".
+/// The camera screen's state. See Packages/EmulsionKit/NOTES.md, "CameraModel".
 @MainActor @Observable
 public final class CameraModel {
     public enum Status: Equatable, Sendable {

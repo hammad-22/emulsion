@@ -14,7 +14,7 @@ struct LibraryScreen: View {
     @State private var importError: String?
     @Namespace private var editorTransition
     /// An even column count for the grid beside the preview (HIG, iPhone Duo inner display).
-    private let expandedColumnCount = 4
+    private static let expandedColumnCount = 4
 
     var body: some View {
         NavigationStack(path: $path) {
@@ -74,7 +74,7 @@ struct LibraryScreen: View {
     private var expandedLibrary: some View {
         ArrangementView {
             PhotoGrid(
-                selection: $selection, transition: editorTransition, columnCount: expandedColumnCount,
+                selection: $selection, transition: editorTransition, columnCount: Self.expandedColumnCount,
                 previewID: shownPreviewID, edit: openEditor
             ) {
                 previewID = $0

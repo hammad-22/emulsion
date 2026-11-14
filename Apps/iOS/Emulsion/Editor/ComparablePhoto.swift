@@ -10,7 +10,7 @@ struct ComparablePhoto: View {
 
     @GestureState private var isPressed = false
     /// Long enough that taps and slider reaches don't flash the original.
-    private let holdDuration = 0.2
+    private static let holdDuration = 0.2
 
     private var showsOriginal: Bool { isComparing || isPressed }
 
@@ -24,7 +24,7 @@ struct ComparablePhoto: View {
     }
 
     private var hold: some Gesture {
-        LongPressGesture(minimumDuration: holdDuration)
+        LongPressGesture(minimumDuration: Self.holdDuration)
             .sequenced(before: DragGesture(minimumDistance: 0))
             .updating($isPressed) { value, isPressed, _ in
                 if case .second(true, _) = value { isPressed = true }

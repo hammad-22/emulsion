@@ -7,8 +7,6 @@ struct RecipeChip: View {
     let isSelected: Bool
     let action: () -> Void
 
-    private let horizontalPadding: CGFloat = 14
-
     var body: some View {
         Button(action: action) {
             HStack(spacing: FilmLabLayout.hairline) {
@@ -17,7 +15,7 @@ struct RecipeChip: View {
                     .font(isSelected ? .subheadline.weight(.bold) : .subheadline.weight(.medium))
                     .lineLimit(1)
             }
-            .padding(.horizontal, horizontalPadding)
+            .padding(.horizontal, 14)
             .frame(minHeight: FilmLabLayout.minimumControlHeight)
             .background(.white.opacity(isSelected ? FilmLabLayout.selectedFill : 0), in: .capsule)
             .contentShape(.capsule)

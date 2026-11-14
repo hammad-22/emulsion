@@ -13,8 +13,8 @@ struct PhotoGrid: View {
     @Environment(PhotoStore.self) private var store
 
     /// Three columns on a 402 pt wide iPhone; more as the canvas widens.
-    private let minimumCellWidth: CGFloat = 110
-    private var adaptiveColumn: GridItem { GridItem(.adaptive(minimum: minimumCellWidth), spacing: FilmLabLayout.gridSpacing) }
+    private static let minimumCellWidth: CGFloat = 110
+    private var adaptiveColumn: GridItem { GridItem(.adaptive(minimum: Self.minimumCellWidth), spacing: FilmLabLayout.gridSpacing) }
 
     private var columns: [GridItem] {
         guard let columnCount else { return [adaptiveColumn] }

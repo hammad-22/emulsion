@@ -2,7 +2,7 @@ import EmulsionCore
 import Foundation
 import Observation
 
-/// Originals and an index of their edits, in one folder. See NOTES.md, "PhotoStore".
+/// Originals and an index of their edits, in one folder. See Packages/EmulsionKit/NOTES.md, "PhotoStore".
 @MainActor @Observable
 public final class PhotoStore {
     public private(set) var photos: [PhotoRecord] = []

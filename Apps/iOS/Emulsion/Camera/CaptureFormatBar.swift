@@ -6,7 +6,6 @@ struct CaptureFormatBar: View {
     let capabilities: CameraCapabilities?
 
     @Environment(AppSettings.self) private var settings
-    private let formatLabelMinimumHeight: CGFloat = 34
 
     var body: some View {
         GlassEffectContainer {
@@ -15,7 +14,7 @@ struct CaptureFormatBar: View {
                     Text(capabilities.rawFormat.title)
                         .font(.caption.weight(.bold))
                         .padding(.horizontal, FilmLabLayout.gap)
-                        .frame(minHeight: formatLabelMinimumHeight)
+                        .frame(minHeight: 34)
                         .glassEffect(.regular, in: .capsule)
                         .accessibilityLabel("Format: \(capabilities.rawFormat.title)")
                     resolution(capabilities)

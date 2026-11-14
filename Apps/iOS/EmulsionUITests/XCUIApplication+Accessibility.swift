@@ -13,7 +13,7 @@ extension XCUIApplication {
     @MainActor
     static func launchLibrary(_ presentation: [String] = []) -> XCUIApplication {
         let app = XCUIApplication()
-        app.launchArguments = LaunchArgument.library + presentation
+        app.launchArguments = LaunchArgument.libraryArguments + presentation
         app.launch()
         return app
     }

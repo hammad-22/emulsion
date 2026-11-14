@@ -72,7 +72,7 @@ final class CameraUITests: XCTestCase {
     @MainActor
     func testInterruptionPausesTheCamera() {
         let app = XCUIApplication()
-        app.launchArguments = LaunchArgument.cameraScenario("in-use")
+        app.launchArguments = LaunchArgument.cameraScenarioArguments("in-use")
         app.launch()
 
         XCTAssertTrue(app.descendants(matching: .any)[AccessibilityID.cameraPaused].waitForExistence(timeout: 10))
@@ -85,7 +85,7 @@ final class CameraUITests: XCTestCase {
     @MainActor
     func testFailedCameraCanBeRetried() {
         let app = XCUIApplication()
-        app.launchArguments = LaunchArgument.cameraScenario("failed")
+        app.launchArguments = LaunchArgument.cameraScenarioArguments("failed")
         app.launch()
 
         let retry = app.buttons["Try Again"]

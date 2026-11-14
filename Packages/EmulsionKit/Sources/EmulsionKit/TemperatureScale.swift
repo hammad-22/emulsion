@@ -1,6 +1,6 @@
 import EmulsionCore
 
-/// Negative mired (−10⁶ / kelvin). See NOTES.md, "TemperatureScale".
+/// Negative mired (−10⁶ / kelvin). See Packages/EmulsionKit/NOTES.md, "TemperatureScale".
 enum TemperatureScale {
     private static let miredPerInverseKelvin = 1_000_000.0
     /// One ruler tick, in mired: about 150 K at 5500 K, 20 K at 2000 K.

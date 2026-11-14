@@ -3,7 +3,7 @@ import CoreVideo
 import Foundation
 import ImageIO
 
-/// A stand-in camera for the Simulator and tests. See NOTES.md, "MockCameraSource".
+/// A stand-in camera for the Simulator and tests. See Packages/EmulsionKit/NOTES.md, "MockCameraSource".
 public actor MockCameraSource: CameraSource {
     static let frameSize = CGSize(width: 768, height: 1024)
     /// About 30 fps, the camera's viewfinder rate.

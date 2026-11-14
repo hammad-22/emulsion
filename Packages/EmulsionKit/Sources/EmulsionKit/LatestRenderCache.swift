@@ -1,7 +1,7 @@
 import CoreGraphics
 import Foundation
 
-/// Latest editor-sized render per photo, shown at once after a relayout. See NOTES.md, "LatestRenderCache".
+/// Latest editor-sized render per photo, shown at once after a relayout. See Packages/EmulsionKit/NOTES.md, "LatestRenderCache".
 /// `@unchecked Sendable` is safe: `NSCache` is thread-safe and `unpurged` is only touched under `lock`.
 final class LatestRenderCache: @unchecked Sendable {
     /// The editor's photo plus the library preview.

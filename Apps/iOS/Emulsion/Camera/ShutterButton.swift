@@ -7,21 +7,20 @@ struct ShutterButton: View {
 
     /// Artistic: near the system Camera's shutter, well above the 44 pt minimum target.
     static let diameter: CGFloat = 76
-    private let ring: CGFloat = 4
-    private let gap: CGFloat = 6
-    private let disabledOpacity = 0.5
+    private static let ring: CGFloat = 4
+    private static let gap: CGFloat = 6
 
     var body: some View {
         Button(action: action) {
             Circle()
                 .fill(.white)
-                .padding(ring + gap)
-                .overlay { Circle().strokeBorder(.white, lineWidth: ring) }
+                .padding(Self.ring + Self.gap)
+                .overlay { Circle().strokeBorder(.white, lineWidth: Self.ring) }
                 .frame(width: Self.diameter, height: Self.diameter)
         }
         .buttonStyle(ShutterPressStyle())
         .disabled(!isEnabled)
-        .opacity(isEnabled ? 1 : disabledOpacity)
+        .opacity(isEnabled ? 1 : 0.5)
         .accessibilityLabel("Take Photo")
         .sensoryFeedback(.impact(flexibility: .rigid), trigger: captureCount)
     }

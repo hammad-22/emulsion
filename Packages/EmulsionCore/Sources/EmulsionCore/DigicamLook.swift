@@ -14,21 +14,25 @@ enum DigicamLook {
     static let vignetteStops = 1.0
     static let lensSoftnessSigma = 0.8
     static let cornerSoftnessSigma = 3.0
-    static let minimumBlurSigma = 0.5
     static let fringeOnset = 0.85
     static let fringeRadius = 3.5
     static let fringeColor = SIMD3(0.55, 0.2, 1.0)
     static let fringeStrength = 1.0
 
-    // Partial auto white balance (mireds, gains). Owner direction.
+    // Smallest blur worth applying (output px); below it nothing visible changes. Artistic.
+    static let minimumBlurSigma = 0.5
+
+    // Partial auto white balance from a daylight reference (K, mireds, gains); status per member in docs.
     static let whiteBalanceCorrection = 0.6
     static let whiteBalanceReference = 5500.0
     static let biasMireds = 12.0
     static let biasMagenta = 0.008
+
+    // Warmth (mireds) and Tint (green gain) per unit of the control. Artistic.
     static let warmthMireds = 60.0
     static let tintGreen = 0.12
 
-    // Hard per-channel clip and black floor, stops from mid-gray. Owner direction.
+    // Hard per-channel clip (owner direction) and black floor (artistic), stops from mid-gray.
     static let clipStops = 2.0
     static let clip = 0.18 * pow(2, clipStops)
     static let blackStops = 4.5

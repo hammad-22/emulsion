@@ -24,7 +24,7 @@
             }
         }
 
-        /// 20 fps from `serious` (AVCam sample), 10 from `critical` (artistic). See NOTES.md.
+        /// 20 fps from `serious` (AVCam sample), 10 from `critical` (artistic). See Packages/EmulsionKit/NOTES.md.
         var throttledFrameRate: Int32? {
             switch self {
             case .nominal, .fair: nil

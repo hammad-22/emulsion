@@ -8,12 +8,7 @@ struct RecipeButton: View {
     let toggle: (() -> Void)?
 
     @Environment(\.dynamicTypeSize) private var dynamicTypeSize
-    /// Match the glass button's padding and, with it, the library button's height.
-    private static let labelPadding: CGFloat = 12
-    private static let labelHeight: CGFloat = 44
     private static let symbol = "camera.filters"
-    private static let symbolToNameSpacing: CGFloat = 2
-    private static let nameMinimumScale = 0.7
 
     var body: some View {
         if let toggle {
@@ -25,7 +20,7 @@ struct RecipeButton: View {
                 .accessibilityShowsLargeContentViewer { Label(recipe.name, systemImage: Self.symbol) }
         } else {
             label
-                .padding(.horizontal, Self.labelPadding)
+                .padding(.horizontal, Layout.labelPadding)
                 .glassEffect(.regular, in: .capsule)
                 .accessibilityElement(children: .ignore)
                 .accessibilityLabel("Recipe")
@@ -34,7 +29,7 @@ struct RecipeButton: View {
     }
 
     private var label: some View {
-        VStack(spacing: Self.symbolToNameSpacing) {
+        VStack(spacing: 2) {
             Image(systemName: Self.symbol)
                 .font(.body.weight(.semibold))
                 .symbolVariant(isShowingRecipes ? .fill : .none)
@@ -42,9 +37,15 @@ struct RecipeButton: View {
                 Text(recipe.name)
                     .font(.caption2.weight(.semibold))
                     .lineLimit(1)
-                    .minimumScaleFactor(Self.nameMinimumScale)
+                    .minimumScaleFactor(0.7)
             }
         }
-        .frame(width: LibraryButton.size, height: Self.labelHeight)
+        .frame(width: LibraryButton.size, height: Layout.labelHeight)
+    }
+
+    // Match the glass button's padding and, with it, the library button's height.
+    private enum Layout {
+        static let labelPadding: CGFloat = 12
+        static let labelHeight: CGFloat = 44
     }
 }

@@ -2,7 +2,7 @@ import EmulsionCore
 import Foundation
 import Observation
 
-/// Saved looks. See NOTES.md, "RecipeStore and RecipeTransfer".
+/// Saved looks. See Packages/EmulsionKit/NOTES.md, "RecipeStore and RecipeTransfer".
 @MainActor @Observable
 public final class RecipeStore {
     public private(set) var recipes: [Recipe] = []

@@ -25,5 +25,6 @@ struct ArrangementWorkspace<Photo: View, Inspector: View>: View {
         .arrangementViewStyle(.split.axes(splitAxes))
     }
 
+    // Hiding drops the split's axes, not the arrangement, so the photo view and its last render stay.
     private var splitAxes: Axis.Set { showsInspector ? [.horizontal, .vertical] : [] }
 }
