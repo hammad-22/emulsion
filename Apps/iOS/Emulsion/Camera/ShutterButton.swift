@@ -5,7 +5,7 @@ struct ShutterButton: View {
     let captureCount: Int
     let action: () -> Void
 
-    /// Close to the system Camera's shutter; well above the 44 pt minimum target.
+    /// Artistic: near the system Camera's shutter, well above the 44 pt minimum target.
     static let diameter: CGFloat = 76
     private let ring: CGFloat = 4
     private let gap: CGFloat = 6

@@ -2,7 +2,6 @@ import Foundation
 
 @testable import EmulsionKit
 
-/// POSIX modes the library tests put files and folders in.
 enum FilePermissions {
     static let none = 0
     static let readOnlyFolder = 0o555
@@ -15,8 +14,7 @@ enum FilePermissions {
 }
 
 extension TestLibrary {
-    /// Replaces the photo's original with a locked folder, so deleting it fails. Unlock it with
-    /// `FilePermissions.set(FilePermissions.folder, at:)` on the returned URL.
+    /// Unlock the returned URL with `FilePermissions.folder` after the test.
     func blockRemoval(of photo: PhotoRecord) throws -> URL {
         let original = store.url(for: photo)
         try FileManager.default.removeItem(at: original)
@@ -26,7 +24,6 @@ extension TestLibrary {
         return original
     }
 
-    /// A folder where the index should be makes every index write fail.
     func blockIndexWrites() throws {
         try FileManager.default.removeItem(at: store.indexURL)
         try FileManager.default.createDirectory(at: store.indexURL, withIntermediateDirectories: false)

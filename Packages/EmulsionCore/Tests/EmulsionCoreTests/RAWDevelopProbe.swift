@@ -6,13 +6,9 @@ import simd
 
 @testable import EmulsionCore
 
-/// Measures how Apple's CIRAWFilter develops synthetic DNGs (MOV-79): scale, clipping, EDR,
-/// gamut mapping, highlight recovery, decoder versions and white balance. Prints tables and
-/// asserts nothing about Apple's behaviour. Opt-in: EMULSION_RAW_PROBE=1; set
-/// EMULSION_RAW_PROBE_DUMP=<dir> to also write the wedge DNGs there.
+/// Prints how CIRAWFilter develops synthetic DNGs (MOV-79); asserts nothing. See docs/CONSTANTS.md.
 @Suite(.enabled(if: TestEnvironment.rawProbe.isSet), .serialized)
 struct RAWDevelopProbe {
-    /// BaselineExposure tags every synthetic file is probed at.
     static let baselineStopsSweep = [0.0, 2.0]
     static let edrAmounts: [Float] = [0, 1, 2]
 
@@ -60,7 +56,6 @@ struct RAWDevelopProbe {
 
     static func pad(_ s: String, _ n: Int) -> String { s.padding(toLength: max(n, s.count), withPad: " ", startingAt: 0) }
 
-    /// Alpha and RGB through a chosen context, bottom row first.
     static func rgba(_ image: CIImage, context: CIContext) -> [SIMD4<Float>] {
         let w = Int(image.extent.width)
         let h = Int(image.extent.height)

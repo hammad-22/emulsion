@@ -1,6 +1,6 @@
 import Foundation
 
-/// The TIFF and DNG tags `SyntheticDNG` writes (TIFF 6.0, TIFF/EP, DNG 1.6).
+/// Sourced: TIFF 6.0, TIFF/EP and DNG 1.6.
 enum TIFFTag: UInt16 {
     case newSubFileType = 254
     case imageWidth = 256
@@ -30,7 +30,6 @@ enum TIFFTag: UInt16 {
     case profileGainTableMap = 52525
 }
 
-/// TIFF 6.0 field types.
 enum TIFFFieldType: UInt16 {
     case byte = 1
     case ascii = 2
@@ -48,7 +47,7 @@ struct TIFFEntry {
     let count: Int
     let payload: [UInt8]
 
-    /// Denominator for (signed) rationals: six decimal places.
+    /// Six decimal places.
     private static let rationalDenominator = 1_000_000
 
     static func bytes(_ tag: TIFFTag, _ values: [UInt8]) -> TIFFEntry {
@@ -80,8 +79,7 @@ struct TIFFEntry {
     }
 }
 
-/// Little-endian TIFF with one IFD: header, IFD, out-of-line values, the single strip, then zero
-/// padding up to `minimumSize`. StripOffsets is filled in.
+/// Little-endian TIFF with one IFD and one strip, zero-padded to `minimumSize`.
 enum TIFFWriter {
     private static let littleEndianMarker = "II"
     private static let magicNumber: UInt16 = 42

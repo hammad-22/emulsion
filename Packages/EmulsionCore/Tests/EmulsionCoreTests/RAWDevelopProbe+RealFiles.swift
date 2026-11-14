@@ -6,19 +6,16 @@ import simd
 
 @testable import EmulsionCore
 
-/// Real DNGs from the EMULSION_RAW_SAMPLES folders (never checked in). Skipped when unset.
 extension RAWDevelopProbe {
-    /// Files with the highest scaled-decode maximum that also get a full-size decode.
     static let fullSizeFileCount = 3
     static let daylightKelvin: Float = 5500
 
-    /// The statistics `RAWDevelopRealFileTests` reports, plus the ones only the probe prints.
     struct DetailedStats {
         let frame: RAWDevelopSupport.FrameStats
         let max: SIMD3<Double>
         let min: Double
         let mean: SIMD3<Double>
-        /// Mean R/G and B/G of the brightest 0.1 % of pixels by luminance: the colour of clipped highlights.
+        /// Mean R/G and B/G of the brightest 0.1 % of pixels: the colour of clipped highlights.
         let highlightRatios: SIMD2<Double>
 
         init(_ pixels: [SIMD3<Double>]) {
@@ -39,7 +36,7 @@ extension RAWDevelopProbe {
         }
     }
 
-    /// TIFF tags and values the raw-layout readout uses (TIFF 6.0, TIFF/EP, DNG).
+    /// Sourced: TIFF 6.0, TIFF/EP and DNG.
     private enum TIFF {
         static let newSubFileType = 254
         static let imageWidth = 256
@@ -51,18 +48,14 @@ extension RAWDevelopProbe {
         static let subIFDs = 330
         static let linearizationTable = 50712
         static let whiteLevel = 50717
-        /// PhotometricInterpretation of raw data: CFA and DNG LinearRaw.
         static let rawPhotometrics = [32803, 34892]
-        /// Bytes per value of each field type.
         static let typeSizes = [1: 1, 2: 1, 3: 2, 4: 4, 5: 8, 7: 1, 8: 2, 9: 4, 10: 8, 13: 4]
         static let entrySize = 12
         static let inlineCapacity = 4
-        /// Values printed per tag.
         static let printedValues = 8
     }
 
-    /// BitsPerSample, PhotometricInterpretation, Compression and SamplesPerPixel of the full-size
-    /// raw IFD (NewSubFileType 0), read from the TIFF structure (IFD chain and SubIFDs).
+    /// The full-size raw IFD (NewSubFileType 0), found through the IFD chain and SubIFDs.
     static func rawLayout(_ url: URL) throws -> String {
         let data = try Data(contentsOf: url, options: .mappedIfSafe)
         let little = data.prefix(2) == Data("II".utf8)
@@ -107,7 +100,6 @@ extension RAWDevelopProbe {
         return raw
     }
 
-    /// Per-channel maximum computed on the GPU, for full-size frames too large to read back.
     static func areaMaximum(_ image: CIImage) -> SIMD3<Double> {
         let max = image.applyingFilter("CIAreaMaximum", parameters: [kCIInputExtentKey: CIVector(cgRect: image.extent)])
         var pixel = [Float](repeating: 0, count: 4)
@@ -198,7 +190,6 @@ extension RAWDevelopProbe {
         }
     }
 
-    /// Two lowest as-shot temperatures (tungsten interiors) and the two closest to 5500 K (daylight).
     func realWhiteBalance(_ urls: [URL], asShot: [(name: String, temperature: Float)]) throws {
         let tungsten = asShot.sorted { $0.temperature < $1.temperature }.prefix(2)
         let daylight = asShot.sorted { abs($0.temperature - Self.daylightKelvin) < abs($1.temperature - Self.daylightKelvin) }.prefix(2)

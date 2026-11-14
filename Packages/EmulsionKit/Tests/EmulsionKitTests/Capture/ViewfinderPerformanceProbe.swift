@@ -4,8 +4,7 @@ import Testing
 
 @testable import EmulsionKit
 
-/// Mean viewfinder render time (film look included) at typical iPhone viewfinder sizes, with
-/// the default look and with grain and halation off. Opt-in: EMULSION_PERF=1. Mac numbers only.
+/// Mean viewfinder render time at iPhone viewfinder sizes. Opt-in: EMULSION_PERF=1; Mac numbers only.
 @MainActor
 struct ViewfinderPerformanceProbe {
     @Test(.enabled(if: ProcessInfo.processInfo.environment["EMULSION_PERF"] != nil, "set EMULSION_PERF=1 to run"))

@@ -1,6 +1,5 @@
 import SwiftUI
 
-/// A square where the user tapped to focus.
 struct FocusReticle: View {
     let point: CGPoint?
 

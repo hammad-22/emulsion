@@ -9,8 +9,7 @@ import simd
 extension RAWDevelopProbe {
     static let tungstenKelvin = 2856.0
 
-    /// CIE 1931 xy of CIE daylight (D series) at correlated colour temperature `t`, CIE 15:2004
-    /// eq. 3.3–3.4. Defined for 4000–25000 K only.
+    /// CIE daylight xy, CIE 15:2004 eq. 3.3–3.4; defined for 4000–25000 K only.
     static func daylightChromaticity(kelvin t: Double) -> SIMD2<Double>? {
         guard (4000...25000).contains(t) else { return nil }
         let t3 = t * t * t
@@ -21,7 +20,6 @@ extension RAWDevelopProbe {
         return SIMD2(x, -3.000 * x * x + 2.870 * x - 0.275)
     }
 
-    /// The gray patch's colour, ratios and OKLab distance (×100) from a neutral of equal luminance.
     static func grayLine(_ rgb: SIMD3<Double>) -> String {
         let neutral = SIMD3(repeating: RAWDevelopSupport.luminance(rgb))
         let dE = Fixtures.deltaE(Fixtures.toOKLab(rgb), Fixtures.toOKLab(neutral))
@@ -40,7 +38,6 @@ extension RAWDevelopProbe {
         for (cameraName, cm) in [("wide-gamut camera", RAWDevelopChart.camera), ("sRGB camera", SyntheticDNG.sRGBCameraFromXYZ)] {
             let d65Camera = SyntheticDNG.camera(chromaticity: SyntheticDNG.d65Chromaticity, cameraFromXYZ: cm)
             let tungstenCamera = SyntheticDNG.camera(chromaticity: tungstenXY, cameraFromXYZ: cm)
-            // Camera-space von Kries: exact for the gray patch, an approximation for chromatic ones.
             let lightRatio = tungstenCamera / d65Camera
             let underD65 = RAWDevelopChart.cameraValues(scene, cameraFromXYZ: cm)
             let underTungsten = underD65.map { $0 * lightRatio }

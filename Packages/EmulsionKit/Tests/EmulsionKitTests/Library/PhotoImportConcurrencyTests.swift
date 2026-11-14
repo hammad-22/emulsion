@@ -128,7 +128,7 @@ struct PhotoImportConcurrencyTests {
     }
 }
 
-/// Tests choose exactly when prepared originals may proceed to index commit.
+/// Lets a test choose when prepared originals may proceed to the index commit.
 private actor ImportGate {
     private var entries = 0
     private var paused: [CheckedContinuation<Void, Never>] = []

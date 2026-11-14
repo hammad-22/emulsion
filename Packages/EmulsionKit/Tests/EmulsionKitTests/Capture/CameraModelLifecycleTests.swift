@@ -80,8 +80,7 @@ struct CameraModelLifecycleTests {
         #expect(model.status == .running)
     }
 
-    /// So a later recovery can't restart the camera behind the app.
-    @Test func stoppingAFailedCameraStopsTheSource() async {
+    @Test func stoppingAFailedCameraStopsTheSourceSoRecoveryCantRestartIt() async {
         let library = TestLibrary()
         let source = MockCameraSource()
         let model = library.camera(source)

@@ -2,7 +2,6 @@
     import SwiftUI
     import UIKit
 
-    /// A pan that decides once, as it starts, whether to scrub, claim or yield (`ScrubStart`).
     struct HorizontalPanGesture: UIGestureRecognizerRepresentable {
         let onChanged: (CGSize) -> Void
         let onEnded: () -> Void
@@ -37,8 +36,7 @@
                 return start != .yield
             }
 
-            /// Gestures on views behind the scale (a navigation dismiss, say) wait until this
-            /// pan has decided; when it yields, they proceed.
+            /// Gestures behind the scale wait until this pan decides.
             func gestureRecognizer(
                 _ recognizer: UIGestureRecognizer, shouldBeRequiredToFailBy other: UIGestureRecognizer
             ) -> Bool {
@@ -46,8 +44,7 @@
                 return view.isDescendant(of: otherView)
             }
 
-            /// Walks up from the view under the touch: SwiftUI may attach the recognizer to a
-            /// host view above the scroll view rather than inside it.
+            /// Walks up from the hit view: SwiftUI may attach the recognizer above the scroll view.
             private func canScrollVertically(under pan: UIPanGestureRecognizer) -> Bool {
                 guard let view = pan.view else { return false }
                 var ancestor = view.hitTest(pan.location(in: view), with: nil) ?? view

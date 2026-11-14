@@ -2,13 +2,10 @@ import EmulsionCore
 import Foundation
 
 extension Adjustments {
-    /// Grain seeds are whole numbers below this: small whole numbers keep float precision exact
-    /// in the grain kernel.
+    /// Seeds are whole numbers below this, so they stay exact in the grain kernel's floats.
     static let grainSeedCount = 1024
 
-    /// The starting edit for a photo: `look` (the default look unless a recipe was chosen), with
-    /// a grain seed (0 ..< `grainSeedCount`) derived from the photo's ID so re-renders, exports
-    /// and resets match, and photos differ.
+    /// The seed comes from the photo's ID, so re-renders and exports match and photos differ.
     static func defaults(for id: UUID, look: Adjustments = Adjustments()) -> Adjustments {
         let seedsPerFirstByte = grainSeedCount / (Int(UInt8.max) + 1)
         var adjustments = look

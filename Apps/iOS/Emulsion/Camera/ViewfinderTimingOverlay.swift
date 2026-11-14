@@ -2,7 +2,6 @@ import EmulsionKit
 import SwiftUI
 
 #if DEBUG
-    /// Frame time and rate, for profiling on device (`--viewfinder-timing`).
     struct ViewfinderTimingOverlay: View {
         let model: CameraModel
 

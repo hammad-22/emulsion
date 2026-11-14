@@ -1,16 +1,13 @@
 import XCTest
 
 extension XCUIApplication {
-    /// Launch arguments for the system text size and layout direction, so a test sees the app
-    /// as a user with those settings would without changing the simulator's settings.
     enum Presentation {
-        /// The largest accessibility text size (Settings › Accessibility › Larger Text, AX5).
+        /// AX5, the largest accessibility text size.
         static let largestText = ["-UIPreferredContentSizeCategoryName", "UICTContentSizeCategoryAccessibilityXXXL"]
         /// Xcode's right-to-left pseudolanguage: English text laid out right to left.
         static let rightToLeft = ["-AppleTextDirection", "YES", "-NSForceRightToLeftWritingDirection", "YES"]
     }
 
-    /// The library's photos, matched by the label `PhotoGrid` gives each one.
     var photos: XCUIElementQuery { buttons.matching(NSPredicate(format: "label BEGINSWITH 'Photo from'")) }
 
     @MainActor
@@ -21,8 +18,6 @@ extension XCUIApplication {
         return app
     }
 
-    /// Launches on an empty library, scrolled so "Try Sample Photos" can be tapped, or skips
-    /// the test when the library already has photos.
     @MainActor
     static func launchEmptyLibrary(_ presentation: [String] = []) throws -> XCUIApplication {
         let app = launchLibrary(presentation)
@@ -45,7 +40,6 @@ extension XCUIApplication {
         return app
     }
 
-    /// Deletes every photo, leaving the empty library for the next test.
     @MainActor
     func removeSamples() {
         if navigationBars["Looks"].exists { buttons["Done"].tap() }
@@ -59,12 +53,7 @@ extension XCUIApplication {
         XCTAssertTrue(buttons["Try Sample Photos"].waitForExistence(timeout: 5))
     }
 
-    /// An accessibility audit whose failures name the element.
-    ///
-    /// On a folded iPhone Duo the contrast audit is unreliable: it failed text whose pixels
-    /// measure about 20:1, or threw "Invalid target app" (MOV-140). Unfolded it works. Contrast
-    /// is left out when folded, so folded contrast stays unverified, and a contrast-only audit
-    /// skips the test.
+    /// Skips contrast on a folded iPhone Duo, where that audit is unreliable (MOV-140).
     @MainActor
     func audit(_ types: XCUIAccessibilityAuditType, file: StaticString = #filePath, line: UInt = #line) throws {
         var types = types

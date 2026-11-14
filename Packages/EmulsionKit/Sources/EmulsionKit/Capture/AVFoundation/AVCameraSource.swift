@@ -2,12 +2,7 @@
     import AVFoundation
     import os
 
-    /// The device's back cameras capturing RAW, following Apple's AVCam sample: an actor
-    /// whose executor is the capture session's serial queue, so every session call runs on
-    /// that queue.
-    ///
-    /// Physical cameras only, never a virtual one: Bayer RAW requires a zoom factor of 1
-    /// (AVCapturePhotoOutput.h, Bayer RAW rules), and virtual cameras change lenses by zoom.
+    /// The back cameras capturing RAW, following Apple's AVCam sample. See NOTES.md, "AVCameraSource".
     public actor AVCameraSource: CameraSource {
         private let sessionQueue = DispatchSerialQueue(label: "com.hammad.emulsion.capture-session")
         let frameQueue = DispatchQueue(label: "com.hammad.emulsion.viewfinder-frames")
@@ -30,15 +25,13 @@
         var rotation: AVCaptureDevice.RotationCoordinator?
         var rotationObservation: NSKeyValueObservation?
         var pressureObservation: NSKeyValueObservation?
-        /// Per device, since a lens keeps its throttled rate while another one runs; a device
-        /// not listed runs its format's default.
+        /// Per device: a lens keeps its throttled rate while another one runs.
         var throttledRates: [ObjectIdentifier: Int32] = [:]
         var subjectAreaChanges: Task<Void, Never>?
         var sessionObservers: [any NSObjectProtocol] = []
         let logger = Logger(subsystem: "com.hammad.emulsion", category: "Camera")
 
-        /// The embedded preview's longest side: enough for the editor's "Original" view on a
-        /// phone without decoding the RAW.
+        /// The embedded preview's longest side, in pixels: enough for the editor's "Original" view.
         private static let thumbnailSize = 2048
 
         public init() {}
@@ -92,8 +85,7 @@
             if let size = PhotoDimensions.choose(resolution, from: photoDimensions) {
                 settings.maxPhotoDimensions = CMVideoDimensions(width: size.width, height: size.height)
             }
-            // Bayer RAW must prioritize speed; ProRAW may use the output's maximum, quality
-            // (AVCapturePhotoOutput.h, RAW rules).
+            // Bayer RAW must prioritize speed; ProRAW may use quality (AVCapturePhotoOutput.h).
             settings.photoQualityPrioritization = rawFormat == .bayer ? .speed : .quality
             if let codec = Self.preferredThumbnailCodec(settings.availableRawEmbeddedThumbnailPhotoCodecTypes) {
                 settings.rawEmbeddedThumbnailPhotoFormat = [

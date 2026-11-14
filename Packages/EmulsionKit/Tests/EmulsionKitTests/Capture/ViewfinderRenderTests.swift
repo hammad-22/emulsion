@@ -16,9 +16,7 @@ struct ViewfinderRenderTests {
         #expect(image.height == 240)
     }
 
-    /// A fractional fitted size is floored, as `Renderer.resized` does, so there's no partly
-    /// covered (translucent) edge row or column.
-    @Test func viewfinderFitHasNoPartialEdgePixels() async throws {
+    @Test func viewfinderFitFloorsFractionalSizesSoEdgePixelsAreOpaque() async throws {
         let library = TestLibrary()
         let frame = try TestFrames.grey(width: 1920, height: 1440)
 
@@ -34,8 +32,7 @@ struct ViewfinderRenderTests {
         #expect(edges.allSatisfy { pixels[$0 * 4 + 3] == 255 }, "edge pixels are opaque")
     }
 
-    /// A frame stuck behind the actor never finishes, so the time limit cancels the test, which
-    /// frees the actor and fails the expectation instead of hanging.
+    /// A stuck frame hits the time limit, which frees the actor: the test fails instead of hanging.
     @Test(.timeLimit(.minutes(5)))
     func viewfinderRendersWhileTheServiceIsBusy() async throws {
         let library = TestLibrary()
@@ -65,10 +62,8 @@ struct ViewfinderRenderTests {
         #expect(image.height == 320)
     }
 
-    /// Kit adds nothing to Core's viewfinder develop: the same pixels through Core's reference
-    /// path give the same picture (the estimate's accuracy is Core's `ViewfinderEstimateTests`).
     @Test(arguments: [Adjustments(), .neutral])
-    func viewfinderMatchesCoresViewfinderDevelop(look: Adjustments) async throws {
+    func viewfinderAddsNothingToCoresViewfinderDevelop(look: Adjustments) async throws {
         let library = TestLibrary()
         let renderer = try #require(TestLibrary.renderer)
         let frame = try TestFrames.sample()

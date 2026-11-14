@@ -6,7 +6,6 @@ struct LibraryScreen: View {
     @Environment(PhotoStore.self) private var store
     @State private var selection: PhotoRecord.ID?
     @State private var importError: String?
-    /// Large enough to tell photos apart in the sidebar, with the date beside it.
     private let thumbnailSize: CGFloat = 56
     private let sidebarWidth: CGFloat = 220
 

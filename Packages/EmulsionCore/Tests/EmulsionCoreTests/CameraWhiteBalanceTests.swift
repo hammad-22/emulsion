@@ -6,9 +6,7 @@ import simd
 
 @testable import EmulsionCore
 
-/// RAW white balance (MOV-10) on synthetic DNGs of the wide-gamut camera: a chart lit by a
-/// 2856 K Planckian light, tagged with that light or wrongly with D65. The independent
-/// reference is the light's Planckian chromaticity (Kim et al. 2002).
+/// RAW white balance (MOV-10); reference: the light's Planckian xy (Kim et al. 2002).
 struct CameraWhiteBalanceTests {
     static var renderer: Renderer { EmulsionTestCase.sharedRenderer }
     static var developer: Developer { renderer.developer }
@@ -16,7 +14,7 @@ struct CameraWhiteBalanceTests {
     static let tungstenKelvin = SyntheticDNG.illuminantAKelvin
     static let tungsten = SyntheticDNG.planckianChromaticity(kelvin: tungstenKelvin)
     static let d65 = SyntheticDNG.d65Chromaticity
-    /// D65 at its CCT, 6504 K (CIE 15:2004).
+    /// Sourced: CIE 15:2004.
     static let d65Kelvin = 6504.0
 
     static let neutralScene = [0.045, 0.09, 0.18, 0.36].map { SIMD3<Double>(repeating: $0) }
@@ -39,38 +37,23 @@ struct CameraWhiteBalanceTests {
         neutralIndices.map { RAWDevelopSupport.neutralError(means[$0]) }.max() ?? .nan
     }
 
-    /// Relative to the larger of this and the reference value: chromatic patches have channels near 0.
     static let relativeFloor = 0.01
 
-    // Tolerances are about 2× the worst value measured on macOS 27.2, Bayer and linear files.
+    // Measured tolerances, about 2× the worst on macOS 27.2: docs/CONSTANTS.md, "Test tolerances".
 
-    /// Measured worst 6.8 K (2862.8 K read for 2856 K; 6502.0 K for 6504 K).
     static let asShotTemperatureTolerance = 15.0
-    /// Measured worst 0.25 from the expected tint (0.25 for 2856 K; 9.77 for D65, expected 9.52).
     static let asShotTintTolerance = 0.5
-    /// Measured worst 0.0012 (max |R/G − 1|, |B/G − 1|) on the gray patches.
     static let taggedNeutralTolerance = 0.0025
-    /// The wrongly tagged file as shot: measured worst neutral error 1.22; a cast at least this large.
     static let wrongTagCast = 1.0
-    /// Measured worst 0.0053 on the gray patches at 2856 K, tint 0.
     static let correctedNeutralTolerance = 0.011
-    /// Measured worst 0.0183 (relative, any channel; chromatic patches, gray 0.0053) between the
-    /// develop at 2856 K, tint 0, and the correctly tagged file: Apple reads that file as 2862.8 K.
     static let correctedMatchTolerance = 0.037
-    /// Measured worst 0.0056 (Bayer; linear 2.5e-5) at the temperature and tint read from the
-    /// correctly tagged file.
     static let readBackMatchTolerance = 0.012
-    /// Measured worst 7.4e-6 (absolute, any channel and pixel) setting the as-shot values back.
     static let asShotRepeatTolerance = 2e-5
-    /// Measured worst 0.0009 (relative to max(1, value)), draft half size vs full.
     static let previewTolerance = 0.002
 
-    /// Apple's tint is the light's distance from the Planckian locus (Duv, CIE 1960 uv) × 3000,
-    /// positive above the locus (green light, magenta correction): the scale of the DNG SDK's
-    /// `dng_temperature` (|kTintScale| = 3000). Measured here, not documented by Apple.
+    /// Measured: Apple's tint is Duv × 3000, the DNG SDK's `kTintScale` (docs/CONSTANTS.md).
     static let tintPerDuv = 3000.0
 
-    /// Duv of a chromaticity from the Planckian locus at `kelvin`, its CCT.
     static func duv(_ xy: SIMD2<Double>, kelvin: Double) -> Double {
         func uv(_ c: SIMD2<Double>) -> SIMD2<Double> { SIMD2(4 * c.x, 6 * c.y) / (-2 * c.x + 12 * c.y + 3) }
         let offset = uv(xy) - uv(SyntheticDNG.planckianChromaticity(kelvin: kelvin))
@@ -106,8 +89,6 @@ struct CameraWhiteBalanceTests {
         #expect(worst < Self.taggedNeutralTolerance, "worst neutral error \(worst)")
     }
 
-    /// True RAW white balance: a tungsten scene the camera tagged as daylight develops neutral once
-    /// told the light was 2856 K, and like the file tagged correctly, chromatic patches included.
     @Test(arguments: SyntheticDNG.Mosaic.allCases)
     func whiteBalanceCorrectsAWrongTag(_ mosaic: SyntheticDNG.Mosaic) throws {
         let wrong = Self.tungstenScene(mosaic, taggedLight: Self.d65)
@@ -197,8 +178,6 @@ struct CameraWhiteBalanceTests {
         #expect(worst < Self.previewTolerance, "worst difference \(worst)")
     }
 
-    /// On a "48 MP-like" profile file the anchor is measured at the as-shot white balance, so it
-    /// is the same whatever white balance develops the image; values above 1.0 keep their headroom.
     @Test(arguments: SyntheticDNG.Mosaic.allCases)
     func whiteBalanceLeavesTheExposureAnchorAlone(_ mosaic: SyntheticDNG.Mosaic) throws {
         let chart = ExposureAnchorDevelopTests.chart
@@ -228,7 +207,6 @@ struct CameraWhiteBalanceTests {
         #expect(Fixtures.linear(plain.image) == Fixtures.linear(balanced.image))
     }
 
-    /// White balance acts at develop; Warmth and Tint are printer lights, at print.
     @Test func printerLightsStaySeparate() throws {
         let negative = try Self.develop(Self.tungstenScene(.linearRGB, taggedLight: Self.tungsten)).negative
         var balanced = Adjustments.neutral

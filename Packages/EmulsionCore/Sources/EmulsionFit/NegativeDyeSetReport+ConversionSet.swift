@@ -3,8 +3,7 @@ extension NegativeDyeSetReport {
         let printingDensity: String
         let fits: [PrintingDensityConversion]
 
-        /// Every fit the report compares: each model on the neutral scale and lattice, the engine form at each
-        /// `neutralScaleWeightSweep` weight, and the Status M fits on the neutral scale alone.
+        /// Each model on both sets, the engine form at each weight, Status M on the neutral scale.
         static func fitting(
             printingDensity: String, neutralScale: [PrintingDensityConversion.Point], lattice: [PrintingDensityConversion.Point]
         ) throws(DyeSetError) -> ConversionSet {
@@ -30,7 +29,6 @@ extension NegativeDyeSetReport {
             fits.first { $0.model == model && $0.fittedOn == fitSet && $0.neutralScaleWeight == neutralScaleWeight }
         }
 
-        /// The conversion the engine uses.
         var engine: PrintingDensityConversion? {
             fit(.dyeAmountsWithOffset, neutralScaleWeight: PrintingDensityConversion.engineNeutralScaleWeight)
         }

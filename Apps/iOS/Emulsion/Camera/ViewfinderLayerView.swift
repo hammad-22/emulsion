@@ -8,7 +8,7 @@ final class ViewfinderDisplay {
     init() {
         view.backgroundColor = .black
         view.layer.contentsGravity = .resizeAspect
-        // Taps belong to SwiftUI's gesture, which knows the picture's size.
+        // Taps go to SwiftUI's gesture, which knows the picture's size.
         view.isUserInteractionEnabled = false
     }
 

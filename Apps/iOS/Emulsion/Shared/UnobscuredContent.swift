@@ -1,7 +1,6 @@
 import EmulsionUI
 import SwiftUI
 
-/// Keeps the content in the largest rectangle clear of occlusions, without cropping.
 @available(iOS 27.1, *)
 struct UnobscuredContent<Content: View>: View {
     var avoidsDivision = false

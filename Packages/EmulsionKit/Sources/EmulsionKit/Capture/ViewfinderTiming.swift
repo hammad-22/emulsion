@@ -1,7 +1,6 @@
 import Foundation
 
-/// Rolling viewfinder performance over the last `window` frames: how long each render took
-/// and how many frames reached the screen per second. For the debug overlay.
+/// Render time and frame rate over the last `window` frames, for the debug overlay.
 public struct ViewfinderTiming: Sendable {
     private static let window = 60
     private var samples: [(renderSeconds: Double, shownAt: ContinuousClock.Instant)] = []

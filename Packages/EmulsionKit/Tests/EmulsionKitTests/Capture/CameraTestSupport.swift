@@ -4,8 +4,7 @@ import Testing
 
 @MainActor
 enum CameraTestSupport {
-    /// Lets the model's event task run until `condition` holds; a bounded number of turns, not
-    /// a wall-clock wait (MOV-138).
+    /// A bounded number of turns, not a wall-clock wait (MOV-138).
     static func settle(until condition: () -> Bool) async {
         for _ in 0..<1000 where !condition() { await Task.yield() }
     }

@@ -6,22 +6,16 @@ import simd
 
 @testable import EmulsionCore
 
-/// The anchor through `Developer.develop` on synthetic DNGs whose profile carries a gain table
-/// and a tone curve, which CIRAWFilter applies (macOS 27.2) as it does for real ProRAW.
 struct ExposureAnchorDevelopTests {
     static var developer: Developer { RAWDevelopTests.developer }
 
-    /// Same camera values in both files: a "48 MP-like" profile (BaselineExposure 0.5, gain ×4)
-    /// and a "12 MP-like" one (BaselineExposure 2.5, gain ×1) render the same picture, so their
-    /// anchored develops must agree; both put the chart's scene at its linear sRGB values.
+    /// A "48 MP-like" and a "12 MP-like" profile file that render the same picture (docs).
     static let gainStops = 2.0
     static let twelveBaselineStops = 2.5
     static let fortyEightBaselineStops = twelveBaselineStops - gainStops
     static let scene = RAWDevelopChart.scene
     static let chart = PatchChart(scene.map { $0 * pow(2, -twelveBaselineStops) })
-    /// TC(m) = 0.7 m up to 0.9, so over the whole window, chromatic patches included. Points every
-    /// 0.05: the profile tone curve is interpolated with a cubic spline, which longer segments
-    /// bow (one segment to 0.9 moved the anchor 0.032 stops, points every 0.1 by 0.008).
+    /// Points every 0.05: longer spline segments bow (measured 0.032 stops at one segment).
     static let darkeningCurve: [SIMD2<Float>] =
         stride(from: Float(0), through: 0.9, by: 0.05).map { SIMD2($0, Float(darkeningCurveSlope) * $0) } + [SIMD2(1, 1)]
     static let darkeningCurveSlope = 0.7
@@ -39,21 +33,14 @@ struct ExposureAnchorDevelopTests {
             maxDimension: maxDimension, anchor: anchor)
     }
 
-    // Tolerances are about 2× the worst value measured on macOS 27.2, Bayer and linear files.
+    // Measured tolerances, about 2× the worst on macOS 27.2: docs/CONSTANTS.md, "Test tolerances".
 
-    /// Measured worst 3.0e-4 stops (12 MP-like, identity curve).
     static let identityAnchorTolerance = 6e-4
-    /// Measured worst 8.1e-7 stops: 48 MP-like anchor − 12 MP-like anchor − 2.
     static let pairAnchorTolerance = 2e-6
-    /// Measured worst 2.1e-4 (relative, any channel, any patch) between the two anchored develops.
     static let pairValueTolerance = 4e-4
-    /// Measured worst 0.0014 (relative to the larger of 1 and the value, any channel) against the scene.
     static let sceneTolerance = 0.003
-    /// Measured worst 2.2e-4 stops: tone-curve anchor shift against log2(0.7).
     static let toneCurveShiftTolerance = 5e-4
-    /// Measured worst 6.4e-7 (relative) per pixel and channel: anchored ÷ un-anchored against 2^anchor.
     static let scalarTolerance = 2e-6
-    /// Pixels this close to zero have no meaningful ratio.
     static let scalarFloor = 1e-3
     static let concurrentDevelops = 8
 
@@ -80,8 +67,6 @@ struct ExposureAnchorDevelopTests {
         #expect(abs(shift - log2(Self.darkeningCurveSlope)) < Self.toneCurveShiftTolerance, "shift \(shift)")
     }
 
-    /// The anchor is one multiply: every pixel and channel (chromatic, above 1, negative) scales
-    /// by 2^anchor, so ratios between pixels don't change.
     @Test(arguments: SyntheticDNG.Mosaic.allCases)
     func anchorIsAPureScalar(_ mosaic: SyntheticDNG.Mosaic) throws {
         let anchored = try Self.develop(mosaic, baselineStops: Self.fortyEightBaselineStops, profile: Self.fortyEight)
@@ -118,8 +103,6 @@ struct ExposureAnchorDevelopTests {
         #expect(full.negative.size == CGSize(width: Self.chart.width, height: Self.chart.height))
     }
 
-    /// Previews and exports of one file can develop at the same time through the renderer's
-    /// shared context: they must get the same anchor and pixels as each other.
     @Test(arguments: SyntheticDNG.Mosaic.allCases)
     func concurrentDevelopsAgree(_ mosaic: SyntheticDNG.Mosaic) async throws {
         let data = RAWDevelopChart.dng(
@@ -153,10 +136,6 @@ struct ExposureAnchorDevelopTests {
         #expect(try Self.developer.develop(data).exposureAnchorStops == 0)
     }
 
-    /// A develop given the anchor an earlier develop reported (`RenderService` reuses it per file)
-    /// skips the thumbnails: full size it matches the measuring develop exactly; a preview may
-    /// then decode in draft mode, which the measuring develop doesn't (measured worst 0 on these
-    /// files, macOS 27.2), so it gets the draft preview's tolerance.
     @Test(arguments: SyntheticDNG.Mosaic.allCases)
     func givenAnchorReproducesTheMeasuredDevelop(_ mosaic: SyntheticDNG.Mosaic) throws {
         let data = RAWDevelopChart.dng(
@@ -177,8 +156,6 @@ struct ExposureAnchorDevelopTests {
         }
     }
 
-    /// A given anchor is applied as given, without measuring: one stop more than the measured
-    /// anchor develops exactly twice as bright.
     @Test(arguments: SyntheticDNG.Mosaic.allCases)
     func givenAnchorIsAppliedAsGiven(_ mosaic: SyntheticDNG.Mosaic) throws {
         let data = RAWDevelopChart.dng(

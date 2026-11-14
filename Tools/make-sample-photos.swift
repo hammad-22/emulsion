@@ -1,5 +1,4 @@
-// Generates the synthetic sample photos bundled with EmulsionKit, so the app has something
-// to develop on an empty library. Generated, not photographed: no license questions.
+// Generates EmulsionKit's bundled sample photos: synthetic, so no licence questions.
 // Usage: swift Tools/make-sample-photos.swift
 import CoreImage
 import CoreImage.CIFilterBuiltins

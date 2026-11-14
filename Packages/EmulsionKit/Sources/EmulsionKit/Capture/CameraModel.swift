@@ -3,13 +3,11 @@ import EmulsionCore
 import Foundation
 import Observation
 
-/// The camera screen's state; each capture joins the library as an untouched original whose
-/// edit starts as the recipe.
+/// The camera screen's state. See NOTES.md, "CameraModel".
 @MainActor @Observable
 public final class CameraModel {
     public enum Status: Equatable, Sendable {
         case idle, starting, running, unauthorized, restricted, unavailable
-        /// Started, but the system has paused the camera; it resumes by itself.
         case interrupted(CameraInterruption)
 
         init(startFailure error: CameraError) {
@@ -24,7 +22,6 @@ public final class CameraModel {
     public var status: Status {
         if lifecycle == .running, let interruption { .interrupted(interruption) } else { lifecycle }
     }
-    /// The camera lowers its own frame rate under pressure, and with it the film render's cost.
     public private(set) var pressure = CameraPressure.nominal
     public private(set) var capabilities: CameraCapabilities?
     public private(set) var isCapturing = false
@@ -32,21 +29,17 @@ public final class CameraModel {
     public private(set) var lastCapture: PhotoRecord?
     /// 0…1 of the upright frame, until the reticle fades.
     public private(set) var focusPoint: CGPoint?
-    /// For the shutter blink and haptic.
     public private(set) var captureCount = 0
     /// Set it to nil once shown.
     public var error: CameraError?
-    /// Filled only while `recordsViewfinderTiming` is on, so a release build doesn't change an
-    /// observed property 30 times a second.
+    /// Filled only while `recordsViewfinderTiming` is on, sparing release builds 30 changes a second.
     public private(set) var viewfinderTiming = ViewfinderTiming()
     @ObservationIgnored public var recordsViewfinderTiming = false
-    /// The look the viewfinder shows and captures start with; a change shows on the next frame.
     public var recipe: Recipe {
         get { settings.recipe }
         set { settings.recipe = newValue }
     }
 
-    /// What the app asked for (`start`, `stop`) and how that went; never `interrupted`.
     private var lifecycle = Status.idle
     private var interruption: CameraInterruption?
     private let source: any CameraSource
@@ -63,7 +56,6 @@ public final class CameraModel {
         followEvents()
     }
 
-    /// The stream finishes when the source goes away with the model.
     private func followEvents() {
         let events = source.events()
         Task { [weak self] in
@@ -89,7 +81,6 @@ public final class CameraModel {
         }
     }
 
-    /// Prepares the renderer while the camera starts, so the first frame doesn't wait for it.
     public func start() async {
         guard lifecycle != .starting, lifecycle != .running else { return }
         lifecycle = .starting
@@ -117,8 +108,6 @@ public final class CameraModel {
         }
     }
 
-    /// Also stops a camera that failed while running, so it can't restart behind the app. A
-    /// camera that's still taken reports its interruption again on the next start.
     public func stop() async {
         guard lifecycle == .starting || lifecycle == .running || lifecycle == .unavailable else { return }
         lifecycle = .idle
@@ -126,7 +115,6 @@ public final class CameraModel {
         await source.stop()
     }
 
-    /// Ignored while a photo is being taken, so the capture finishes on the lens it started with.
     public func select(_ lens: CameraLens) async {
         guard acceptsInput, lens != capabilities?.lens else { return }
         do {
@@ -136,7 +124,7 @@ public final class CameraModel {
         }
     }
 
-    /// Focuses and exposes at a point of the upright frame (0…1, top-left origin).
+    /// `point` is 0…1 of the upright frame, top-left origin.
     public func focus(at point: CGPoint) async {
         guard status == .running else { return }
         focusPoint = point
@@ -148,7 +136,6 @@ public final class CameraModel {
         await source.focusAndExpose(at: point)
     }
 
-    /// The photo's edit is the recipe shown at the shutter press, whatever happens meanwhile.
     public func capture() async {
         guard acceptsInput, let capabilities else { return }
         isCapturing = true
@@ -170,7 +157,6 @@ public final class CameraModel {
         }
     }
 
-    /// Newest only: while one frame renders, newer ones replace older ones.
     public func viewfinderImages(maxDimension: CGFloat) -> AsyncStream<CGImage> {
         let frames = source.frames()
         let renderService = store.renderService
@@ -201,15 +187,13 @@ public final class CameraModel {
         return images
     }
 
-    /// Once, so a viewfinder that can't render doesn't stay black without a word.
     private func reportViewfinderFailure() {
         guard !hasReportedViewfinderFailure else { return }
         hasReportedViewfinderFailure = true
         error = .unavailable
     }
 
-    /// Artistic: the grain seed changes every frame so the grain looks alive rather than like a
-    /// pattern fixed on the glass.
+    /// Artistic: a new grain seed every frame, so grain looks alive rather than fixed on the glass.
     func viewfinderLook(frameNumber: Int) -> Adjustments {
         var look = recipe.adjustments
         look.seed = Double(frameNumber % Adjustments.grainSeedCount)

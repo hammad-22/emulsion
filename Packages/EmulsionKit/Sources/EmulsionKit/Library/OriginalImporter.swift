@@ -3,7 +3,7 @@ import Foundation
 import ImageIO
 import UniformTypeIdentifiers
 
-/// Owns only original preparation; library snapshots and index commits stay in PhotoStore.
+/// Prepares originals; library snapshots and index commits stay in `PhotoStore`.
 actor OriginalImporter {
     enum Original: Sendable {
         case data(Data, fileExtension: String?)
@@ -43,7 +43,7 @@ actor OriginalImporter {
                 try Task.checkCancellation()
                 try data.write(to: staged, options: .atomic)
                 try Task.checkCancellation()
-                // moveItem fails if the destination already exists; never own or remove it.
+                // Fails if the destination exists, so it never owns or removes someone else's file.
                 try FileManager.default.moveItem(at: staged, to: folder.appending(path: name))
                 added.append(
                     PhotoRecord(id: id, created: .now, fileName: name, isRAW: Developer.isRAW(data), adjustments: .defaults(for: id)))
@@ -62,7 +62,6 @@ actor OriginalImporter {
         for record in records { try? FileManager.default.removeItem(at: folder.appending(path: record.fileName)) }
     }
 
-    /// The supplied extension, or the one the image's type prefers; plain ASCII letters and digits only.
     private static func fileExtension(of data: Data, supplied: String?) throws(EmulsionError) -> String {
         guard let source = CGImageSourceCreateWithData(data as CFData, nil), let identifier = CGImageSourceGetType(source),
             let type = UTType(identifier as String)

@@ -1,7 +1,6 @@
 import EmulsionKit
 import SwiftUI
 
-/// Blurs the frozen viewfinder and says why, like the system Camera's own pause, rather than an alert.
 struct CameraPausedView: View {
     let interruption: CameraInterruption
 

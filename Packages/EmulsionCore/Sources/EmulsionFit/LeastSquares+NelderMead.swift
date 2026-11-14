@@ -1,9 +1,8 @@
 extension LeastSquares {
-    /// The standard Nelder–Mead coefficients.
+    /// Sourced: the standard Nelder–Mead coefficients.
     private static let reflection = 1.0, expansion = 2.0, contraction = 0.5, shrink = 0.5
 
-    /// Bounded by clamping every vertex into the box. Ties are broken by vertex index, so the search
-    /// is deterministic.
+    /// Clamped into the box; ties break by vertex index, so the search is deterministic.
     func nelderMead(from start: [Double]) -> (parameters: [Double], evaluations: Int) {
         let count = start.count
         let evaluationLimit = Self.nelderMeadEvaluationsPerParameter * count

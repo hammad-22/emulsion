@@ -1,6 +1,5 @@
 import SwiftUI
 
-/// The inner disc shrinks slightly while pressed, like the system shutter.
 struct ShutterPressStyle: ButtonStyle {
     private let pressedScale = 0.92
     private let animation = Animation.snappy(duration: 0.15)

@@ -14,8 +14,6 @@
             }
         }
 
-        /// Lowering the frame rate also lightens the viewfinder's film render. From `shutdown`
-        /// the system interrupts the session itself.
         private func respond(to pressure: CameraPressure, ofDevice deviceID: ObjectIdentifier) {
             guard let device = input?.device, ObjectIdentifier(device) == deviceID else { return }
             eventDelivery.yield(.pressure(pressure))
@@ -37,9 +35,7 @@
             throttledRates[deviceID] = rate
         }
 
-        /// Registered before the session starts, since `startRunning` itself may interrupt it (a
-        /// camera another app holds). The session restarts itself after an interruption
-        /// (AVCaptureSession.h).
+        /// Registered before the session starts: `startRunning` itself may interrupt it.
         func observeSession() {
             let center = NotificationCenter.default
             sessionObservers = [
@@ -57,9 +53,6 @@
             ]
         }
 
-        /// Restarts the session after the media services reset, as Apple's AVCam sample does;
-        /// any other runtime error, or a restart that doesn't take, is reported as a failure the
-        /// user can retry.
         private func recover(from code: AVError.Code?) {
             logger.error("Capture session runtime error \(code?.rawValue ?? 0)")
             guard !sessionObservers.isEmpty else { return }
@@ -70,8 +63,7 @@
         func trackRotation(of device: AVCaptureDevice) {
             let coordinator = AVCaptureDevice.RotationCoordinator(device: device, previewLayer: viewfinderLayer?.layer)
             rotation = coordinator
-            // With the viewfinder's layer, the preview angle turns frames upright for the
-            // interface orientation the layer is shown in (AVCaptureDevice.h).
+            // With the viewfinder's layer, the preview angle matches its interface orientation.
             rotationObservation = coordinator.observe(\.videoRotationAngleForHorizonLevelPreview, options: [.initial, .new]) {
                 [frameDelivery] _, change in
                 if let angle = change.newValue { frameDelivery.rotationAngle = angle }
@@ -96,8 +88,6 @@
             }
         }
 
-        /// A camera that can't be locked (another app holds it) keeps its current focus and
-        /// exposure; there's nothing for the user to do.
         func configure(_ device: AVCaptureDevice, _ change: (AVCaptureDevice) -> Void) {
             do {
                 try device.lockForConfiguration()

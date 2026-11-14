@@ -1,13 +1,9 @@
 import Foundation
 
-/// Why the camera can't start or a capture didn't make it into the library.
-/// Lives here rather than in `EmulsionError` because it's app logic, not engine.
 public enum CameraError: LocalizedError, Equatable, Sendable {
     case notAuthorized, unavailable, rawUnsupported, captureFailed
-    /// Camera access is blocked by Screen Time or a device management profile; the user can't
-    /// allow it in Emulsion's settings.
+    /// Blocked by Screen Time or device management; the user can't allow it in Emulsion's settings.
     case restricted
-    /// Captured, but the library couldn't store it.
     case saveFailed
 
     public var errorDescription: String? {

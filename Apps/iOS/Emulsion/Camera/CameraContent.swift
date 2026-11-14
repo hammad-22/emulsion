@@ -3,8 +3,6 @@ import EmulsionKit
 import EmulsionUI
 import SwiftUI
 
-/// The recipe strip lies over the viewfinder on demand, so the viewfinder never changes size;
-/// on iPhone Duo unfolded it sits beneath it all the time.
 struct CameraContent: View {
     @Bindable var model: CameraModel
     @Binding var showsLibrary: Bool
@@ -80,6 +78,5 @@ struct CameraContent: View {
     }
 
     private var isWide: Bool { horizontalSizeClass == .regular || verticalSizeClass == .compact }
-    /// Room for the viewfinder plus the strip: iPhone Duo unfolded.
     private var alwaysShowsRecipes: Bool { horizontalSizeClass == .regular && verticalSizeClass == .regular }
 }

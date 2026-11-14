@@ -1,12 +1,11 @@
 import CoreImage
 import CoreVideo
 
-/// The 10-bit bi-planar Y′CbCr pixel formats Emulsion reads without conversion.
+/// The 10-bit bi-planar Y′CbCr formats read without conversion (docs/CONSTANTS.md).
 struct YCbCrLayout {
     let range: SignalRange
-    /// 4:2:0 halves chroma vertically as well as horizontally; 4:2:2 only horizontally.
     let chromaRowsHalved: Bool
-    /// Samples are 16-bit with the 10-bit code in the high bits (CoreVideo `x420` family).
+    /// 10-bit codes in the high bits of 16-bit samples (CoreVideo `x420` family).
     static let sampleUnitsPerCode = 64.0 / 65535
 
     init?(_ frame: CVPixelBuffer) {
@@ -20,10 +19,7 @@ struct YCbCrLayout {
         }
     }
 
-    /// Luma and chroma planes as images on the luma grid, sample values untouched. Chroma is
-    /// upsampled bilinearly, co-sited with even luma columns (BT.2020 / H.273 chroma location 0).
-    /// Each plane is wrapped without copying; Core Image uploads it when rendering (zero-copy
-    /// Metal textures belong with the frame source, MOV-39).
+    /// Planes on the luma grid; chroma co-sited with even luma columns (H.273 chroma location 0).
     func planes(of frame: CVPixelBuffer) -> (luma: CIImage, chroma: CIImage)? {
         guard let luma = Self.plane(0, of: frame, format: .L16), let chroma = Self.plane(1, of: frame, format: .RG16) else {
             return nil

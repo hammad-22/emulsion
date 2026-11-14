@@ -14,9 +14,7 @@ struct CameraControls: View {
 
     var body: some View {
         controls
-            // Like the system Camera, controls stop growing at the largest accessibility
-            // sizes so the viewfinder keeps its room; long-press shows each label large.
-            .dynamicTypeSize(...DynamicTypeSize.accessibility1)
+            .dynamicTypeSize(...FilmLabLayout.largestCameraTextSize)
     }
 
     @ViewBuilder private var controls: some View {
@@ -39,8 +37,6 @@ struct CameraControls: View {
 
     private var rail: some View {
         VStack(spacing: FilmLabLayout.gap) {
-            // Everything but the shutter lies across the rail, so it fits a phone's landscape
-            // height (about 350 pt inside the safe area and margins on iPhone 17 Pro).
             CaptureFormatBar(capabilities: model.capabilities)
             Spacer(minLength: 0)
             lenses

@@ -5,17 +5,14 @@ import simd
 
 @testable import EmulsionCore
 
-/// Helpers shared by the RAW develop, exposure anchor and white balance tests and `RAWDevelopProbe`.
 enum RAWDevelopSupport {
     static let samplesFolders = TestEnvironment.rawSamples.value
 
-    /// Long edge of the scaled real-file decode, to keep 48 MP files fast.
     static let previewLongEdge: CGFloat = 1024
 
-    /// A highlight that reaches 4.0 in scene light is two stops above the old ceiling of 1.0.
+    /// Two stops above the old ceiling of 1.0.
     static let headroomFloor = 4.0
 
-    /// Every .dng (any case) in the sample folders, sorted by name per folder.
     static func sampleURLs() throws -> [URL] {
         guard let samplesFolders else { return [] }
         return try samplesFolders.split(separator: ":").flatMap { path in
@@ -27,8 +24,7 @@ enum RAWDevelopSupport {
         }
     }
 
-    /// A CIRAWFilter for `data` with the DNG type hint the Developer uses (ImageIO types many
-    /// ProRAW files read from memory as plain TIFF).
+    /// With the Developer's DNG type hint: ImageIO types many ProRAW files in memory as TIFF.
     static func filter(_ data: Data) throws -> CIRAWFilter {
         guard let raw = CIRAWFilter(imageData: data, identifierHint: Developer.dngTypeIdentifier) else {
             throw EmulsionError.unsupportedPhoto
@@ -36,7 +32,6 @@ enum RAWDevelopSupport {
         return raw
     }
 
-    /// A synthetic chart developed by the shared renderer: its pixels (linear sRGB) and patch means.
     struct Developed {
         var negative: Negative
         var pixels: [SIMD3<Double>]
@@ -59,29 +54,24 @@ enum RAWDevelopSupport {
             try RAWDevelopTests.developer.develop(data, maxDimension: maxDimension, whiteBalance: whiteBalance, anchor: anchor))
     }
 
-    /// Largest channel difference between `a` and the reference `b`, relative to the larger of
-    /// `floor` and the reference value.
     static func worstRelativeDifference(
         _ a: some Sequence<SIMD3<Double>>, _ b: some Sequence<SIMD3<Double>>, floor: Double
     ) -> Double {
         zip(a, b).map { (abs($0 - $1) / max(abs($1), SIMD3(repeating: floor))).max() }.max() ?? .nan
     }
 
-    /// Rec. 709 luminance (Y) of linear sRGB.
     static func luminance(_ c: SIMD3<Double>) -> Double { (SyntheticDNG.xyzFromLinearSRGB * c).y }
 
-    /// How far a colour is from neutral: max(|R/G − 1|, |B/G − 1|).
+    /// max(|R/G − 1|, |B/G − 1|).
     static func neutralError(_ c: SIMD3<Double>) -> Double { max(abs(c.x / c.y - 1), abs(c.z / c.y - 1)) }
 
     static func maxValue(_ pixels: [SIMD3<Double>]) -> Double { pixels.map { $0.max() }.max() ?? .nan }
 
-    /// Highlight statistics of a developed frame (linear sRGB pixels).
     struct FrameStats {
         let maxValue: Double
         let medianLuminance: Double
-        /// 99.9th percentile of luminance.
         let p999: Double
-        /// Fraction of pixels whose brightest channel exceeds 1 (and 2, 4 below).
+        /// Fractions of pixels whose brightest channel exceeds 1, 2 and 4.
         let over1: Double
         let over2: Double
         let over4: Double
@@ -100,9 +90,7 @@ enum RAWDevelopSupport {
         }
     }
 
-    /// The Developer's RAW configuration before MOV-79, frozen here for before/after
-    /// comparisons: Apple's look processing off, gamut mapping, shadow bias and highlight
-    /// recovery at the file's defaults.
+    /// The Developer's RAW settings before MOV-79, frozen for before/after comparisons.
     static func applyPreMOV79Develop(_ raw: CIRAWFilter) {
         raw.boostAmount = 0
         raw.boostShadowAmount = 0
@@ -122,7 +110,6 @@ enum RAWDevelopSupport {
 }
 
 extension Double {
-    /// Four significant digits, for the probe and real-file tables.
     var fourDigits: String { String(format: "%.4g", self) }
 }
 

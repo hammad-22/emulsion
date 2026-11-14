@@ -2,7 +2,6 @@ import EmulsionCore
 import Foundation
 import Observation
 
-/// User preferences, persisted in UserDefaults.
 @MainActor @Observable
 public final class AppSettings {
     public enum Resolution: String, CaseIterable, Identifiable, Sendable {
@@ -22,10 +21,8 @@ public final class AppSettings {
 
     public var autoSave: Bool { didSet { defaults.set(autoSave, forKey: Key.autoSave) } }
     public var format: Renderer.ExportFormat { didSet { defaults.set(format.rawValue, forKey: Key.format) } }
-    /// The camera's capture resolution; lenses without 48 MP capture at 12 MP.
     public var resolution: Resolution { didSet { defaults.set(resolution.rawValue, forKey: Key.resolution) } }
-    /// The camera's recipe, kept as a snapshot so it survives the recipe being deleted from the
-    /// saved looks. Missing or unreadable reads as the first curated look.
+    /// A snapshot, so it survives the recipe being deleted from the saved looks.
     public var recipe: Recipe { didSet { defaults.set(try? recipe.encoded(), forKey: Key.recipe) } }
 
     private let defaults: UserDefaults
@@ -38,10 +35,8 @@ public final class AppSettings {
         recipe = defaults.data(forKey: Key.recipe).flatMap { try? Recipe.decode($0) } ?? Self.defaultRecipe
     }
 
-    /// The first curated look ("Everyday", the default adjustments).
     static var defaultRecipe: Recipe {
         guard let first = CuratedLooks.recipes.first else {
-            // CuratedLooks is a constant, non-empty list (EmulsionCore's RecipeTests).
             preconditionFailure("Emulsion ships curated looks")
         }
         return first

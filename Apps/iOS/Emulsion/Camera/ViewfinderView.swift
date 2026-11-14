@@ -2,7 +2,6 @@ import EmulsionKit
 import EmulsionUI
 import SwiftUI
 
-/// Frames go straight into a layer, so 30 frames a second never pass through SwiftUI.
 struct ViewfinderView<Accessory: View>: View {
     let model: CameraModel
     @ViewBuilder let accessory: Accessory
@@ -18,7 +17,7 @@ struct ViewfinderView<Accessory: View>: View {
 
     var body: some View {
         ViewfinderLayerView(display: display)
-            .aspectRatio(aspectRatio ?? defaultAspectRatio, contentMode: .fit)
+            .aspectRatio(aspectRatio ?? uprightAspectRatioBeforeFirstFrame, contentMode: .fit)
             .onGeometryChange(for: CGSize.self, of: \.size) { size = $0 }
             .overlay { FocusReticle(point: model.focusPoint) }
             .overlay(alignment: .topLeading) { timingOverlay }
@@ -55,8 +54,7 @@ struct ViewfinderView<Accessory: View>: View {
         #endif
     }
 
-    /// Frames are upright, so portrait 3:4 until the first one says otherwise.
-    private var defaultAspectRatio: CGFloat { verticalSizeClass == .compact ? 4 / 3 : 3 / 4 }
+    private var uprightAspectRatioBeforeFirstFrame: CGFloat { verticalSizeClass == .compact ? 4 / 3 : 3 / 4 }
 
     private var pixels: CGFloat { min(max(size.width, size.height) * displayScale, maxPixels).rounded() }
 

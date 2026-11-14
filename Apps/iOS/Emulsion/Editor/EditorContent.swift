@@ -2,7 +2,6 @@ import EmulsionKit
 import EmulsionUI
 import SwiftUI
 
-/// Owns edit and control selection above the layout branches, so folding keeps them.
 struct EditorContent: View {
     @Bindable var session: EditSession
 
@@ -12,7 +11,7 @@ struct EditorContent: View {
     @State private var selection: [AdjustmentGroup: String] = [:]
     @State private var isComparing = false
     @State private var isHolding = false
-    /// Nil until the user taps Adjust: the inspector then follows the canvas, shown when expanded.
+    /// Nil until the user taps Adjust; until then the canvas decides.
     @State private var adjustmentsPreference: Bool?
 
     private var showsOriginal: Bool { isComparing || isHolding }
@@ -29,7 +28,6 @@ struct EditorContent: View {
                 }
         }
         .background(.black)
-        // A neutral dark workspace keeps the photograph visually central.
         .preferredColorScheme(.dark)
         .tint(.white)
         .navigationTitle(showsOriginal ? Text("Original") : Text(""))
@@ -50,8 +48,7 @@ struct EditorContent: View {
                 .disabled(showsOriginal)
             }
         } else if #available(iOS 27.1, *) {
-            // Always wrapped, so an occlusion appearing doesn't rebuild the photo; the panel's
-            // height cap is measured in the unobscured rectangle.
+            // Always wrapped, so an occlusion appearing doesn't rebuild the photo.
             UnobscuredContent {
                 GeometryReader { unobscured in
                     compactLayout(height: unobscured.size.height, showsAdjustments: showsAdjustments)

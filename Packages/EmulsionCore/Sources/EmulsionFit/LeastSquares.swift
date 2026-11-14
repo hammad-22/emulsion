@@ -1,30 +1,19 @@
 import Foundation
 
-/// Bounded nonlinear least squares: minimizes Σ rᵢ(p)² over `lower ≤ p ≤ upper`. Deterministic: no randomness,
-/// no concurrency, so the same problem always gives bit-identical results.
-///
-/// Levenberg–Marquardt with Marquardt's diagonal damping and Nielsen's gain-ratio update; bounds hold by projecting
-/// each step into the box, and a parameter on a bound whose gradient points outward is frozen for that step. When
-/// it stops without converging (iteration or damping limit, singular system), a bounded Nelder–Mead search restarts
-/// from its best point and Levenberg–Marquardt polishes once more.
+/// Deterministic bounded Levenberg–Marquardt with a Nelder–Mead restart (docs/CONSTANTS.md).
 struct LeastSquares {
     typealias Residuals = ([Double]) -> [Double]
 
-    /// Central-difference step relative to max(|p|, 1): the cube root of machine epsilon (≈ 6e-6) balances
-    /// truncation against rounding error (Nocedal & Wright, Numerical Optimization, 2nd ed., §8.1).
+    /// Cube root of machine epsilon (Nocedal & Wright §8.1); MINPACK ftol, xtol and gtol.
     static let jacobianRelativeStep = cbrt(Double.ulpOfOne)
-    /// Converged when both the actual and the predicted relative cost reductions fall below this (MINPACK's ftol).
     static let costTolerance = 1e-12
-    /// Converged when a step is shorter than this relative to |p| (MINPACK's xtol).
     static let stepTolerance = 1e-12
-    /// Converged when every free Jacobian column is this close to orthogonal to the residuals (MINPACK's gtol, a cosine).
     static let gradientTolerance = 1e-12
     static let iterationLimit = 500
-    /// Marquardt damping λ at the start, relative to diag(JᵀJ).
+    /// Damping λ relative to diag(JᵀJ); past the limit the search has stalled.
     static let initialDamping = 1e-3
-    /// Past this the damped step is too short to matter: the search has stalled.
     static let dampingLimit = 1e16
-    /// Nelder–Mead's starting simplex spans this fraction of each parameter's box.
+    /// Starting simplex as a fraction of each parameter's box.
     static let simplexFraction = 0.1
     static let nelderMeadEvaluationsPerParameter = 2000
 
@@ -40,21 +29,17 @@ struct LeastSquares {
         case nelderMeadThenLevenbergMarquardt
     }
 
-    /// The solution and its fit statistics. Standard errors come from σ²·(JᵀJ)⁻¹ over the free parameters (those not on
-    /// a bound, which are held fixed), with σ² = SSR / (n − p_free): they describe the scatter of the residuals around
-    /// this model only, not the digitizing error of the data.
+    /// Standard errors are σ²·(JᵀJ)⁻¹ over free parameters: residual scatter, not digitizing error.
     struct Result: Sendable {
         let parameters: [Double]
         let residuals: [Double]
-        /// Levenberg–Marquardt iterations of the run that produced `parameters`.
         let iterations: Int
         let termination: Termination
         let path: Path
         let nelderMeadEvaluations: Int
-        /// nil for a parameter on a bound, or for all of them when JᵀJ is singular or n ≤ p.
+        /// nil on a bound, or for all when JᵀJ is singular or n ≤ p.
         let standardErrors: [Double?]
         let atBound: [Bool]
-        /// Why some standard errors are missing, when they are.
         let standardErrorNote: String?
 
         var rms: Double { residuals.rms }
@@ -74,8 +59,6 @@ struct LeastSquares {
         }
         return result(first, path: .levenbergMarquardt, evaluations: search.evaluations)
     }
-
-    // MARK: Levenberg–Marquardt
 
     private struct Run {
         let parameters: [Double]
@@ -143,7 +126,7 @@ struct LeastSquares {
         }
     }
 
-    /// The Jacobian at a point, with the normal matrix JᵀJ, the gradient Jᵀr and the parameters free to move.
+    /// The Jacobian at a point, with JᵀJ, Jᵀr and the parameters free to move.
     private struct Linearization {
         let jacobianColumns: [[Double]]
         let normal: [Double]

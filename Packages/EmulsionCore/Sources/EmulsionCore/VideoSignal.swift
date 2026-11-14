@@ -2,25 +2,23 @@ import CoreImage
 import CoreVideo
 import simd
 
-/// How video code values are coded (ITU-R BT.2100 Table 9), stated in 10-bit codes.
+/// How video code values are coded (ITU-R BT.2100 Table 9).
 public enum SignalRange: CaseIterable, Sendable {
-    /// Narrow ("video") range: Y′ 64…940, Cb/Cr 64…960 around 512.
+    /// Narrow ("video") range: Y′ 64…940, Cb/Cr 64…960.
     case legal
-    /// Full range: Y′ 0…1023, Cb/Cr 0…1023 around 512.
+    /// Full range: Y′, Cb and Cr 0…1023.
     case full
 
     var lumaBlack: Double { self == .legal ? 64 : 0 }
     var lumaSpan: Double { self == .legal ? 940 - 64 : 1023 }
     var chromaSpan: Double { self == .legal ? 960 - 64 : 1023 }
     static let chromaCenter = 512.0
-    /// Codes are normalized by the largest 10-bit code.
     static let largestCode = 1023.0
 }
 
-/// The Y′CbCr → R′G′B′ matrix, by its luma weights (ITU-R BT.709 Table 3, BT.2020 Table 4).
+/// The Y′CbCr → R′G′B′ matrix, by its luma weights (BT.709 Table 3, BT.2020 Table 4).
 public enum YCbCrMatrix: Sendable {
     case bt709
-    /// BT.2020 / BT.2100 non-constant luminance.
     case bt2020
 
     var weights: (kr: Double, kb: Double) {
@@ -30,7 +28,7 @@ public enum YCbCrMatrix: Sendable {
         }
     }
 
-    /// (Y′, Cb, Cr) → R′G′B′, with Cb and Cr centered on 0 (BT.2100 Table 6 inverted).
+    /// (Y′, Cb, Cr) → R′G′B′ with Cb and Cr centred on 0 (BT.2100 Table 6 inverted).
     var toRGB: simd_double3x3 {
         let (kr, kb) = weights
         let kg = 1 - kr - kb
@@ -62,8 +60,7 @@ public struct VideoSignal: Equatable, Sendable {
         self.matrix = matrix
     }
 
-    /// The range from the frame's pixel format and the matrix from its tag, or `fallbackMatrix`
-    /// when the tag is missing or not one Emulsion reads.
+    /// The matrix comes from the frame's tag, else `fallbackMatrix`.
     init(frame: CVPixelBuffer, layout: YCbCrLayout, fallbackMatrix: YCbCrMatrix) {
         let tag = CVBufferCopyAttachment(frame, kCVImageBufferYCbCrMatrixKey, nil) as? String
         self.init(range: layout.range, matrix: tag.flatMap(YCbCrMatrix.init(tag:)) ?? fallbackMatrix)

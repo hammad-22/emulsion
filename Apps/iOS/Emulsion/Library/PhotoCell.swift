@@ -10,7 +10,6 @@ struct PhotoCell: View {
     let activate: (PhotoRecord.ID) -> Void
 
     @Environment(PhotoStore.self) private var store
-    /// Lightens a picked thumbnail, as Photos does, without hiding the photograph.
     private let selectedWash = 0.3
 
     private var isSelected: Bool { selection.photos.contains(photo.id) }
@@ -31,7 +30,6 @@ struct PhotoCell: View {
                 }
         }
         .buttonStyle(.plain)
-        // The time tells apart photos taken the same day, as Photos does.
         .accessibilityLabel(Text("Photo from \(photo.created, format: .dateTime.day().month().year().hour().minute())"))
         .accessibilityValue(photo.isEdited ? Text("Edited") : Text(""))
         .accessibilityAddTraits(isSelected || (!selection.isActive && isPreviewed) ? .isSelected : [])

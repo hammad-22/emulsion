@@ -5,7 +5,6 @@ import UIKit
 struct CameraUnavailableView: View {
     enum Reason {
         case denied
-        /// Screen Time or a management profile blocks the camera; Emulsion's settings can't help.
         case restricted
         case unavailable(retry: () -> Void)
     }

@@ -1,10 +1,7 @@
 import Foundation
 import simd
 
-/// Camera and display encodings Emulsion can read, each decoded to linear light (0.18 =
-/// mid-gray) in the linear sRGB/D65 working space; `contract` says what that light means.
-/// Curves and primaries follow each manufacturer's published white paper (cross-checked
-/// against the colour-science library).
+/// Camera and display encodings Emulsion reads, decoded to linear sRGB (docs/CONSTANTS.md).
 public enum InputColorSpace: String, CaseIterable, Identifiable, Codable, Sendable {
     case appleLog, sLog3SGamut3Cine, arriLogC3, arriLogC4, vLog, davinciIntermediate, acescct
     case hlgRec2020, rec709, displayP3, linearP3
@@ -26,8 +23,7 @@ public enum InputColorSpace: String, CaseIterable, Identifiable, Codable, Sendab
         }
     }
 
-    /// Display-referred sources get a scene estimate and are printed relative to themselves;
-    /// everything else is decoded as scene light by its curve.
+    /// What the decoded light means.
     public var contract: InputContract {
         switch self {
         case .rec709, .displayP3: return .displayReferred
@@ -37,7 +33,6 @@ public enum InputColorSpace: String, CaseIterable, Identifiable, Codable, Sendab
         }
     }
 
-    /// Curve identifier understood by the `inputTransform` kernel.
     var curve: Int { transferCurve.rawValue }
 
     var transferCurve: TransferCurve {
@@ -56,10 +51,7 @@ public enum InputColorSpace: String, CaseIterable, Identifiable, Codable, Sendab
         }
     }
 
-    /// Whether the published formula takes 10-bit legal-range code values / 1023 rather than the
-    /// normalized signal E′. Sony (S-Log3 18% = code 420), ARRI LogC3 (400) and Panasonic (V-Log
-    /// 433) publish code values; BT.2100 HLG, Apple Log and ARRI LogC4 (its spec plots E′ over the
-    /// whole integer range) take E′.
+    /// Formula on 10-bit legal code values ÷ 1023 rather than E′. Sourced: each maker's white paper.
     var formulaTakesCodeValues: Bool {
         switch self {
         case .sLog3SGamut3Cine, .arriLogC3, .vLog: return true
@@ -67,9 +59,7 @@ public enum InputColorSpace: String, CaseIterable, Identifiable, Codable, Sendab
         }
     }
 
-    /// The Y′CbCr matrix assumed when a video frame isn't tagged with one. BT.2100 specifies
-    /// BT.2020 for HLG, and Apple Log is recorded in BT.2020; for the other inputs BT.709 is the
-    /// common tag, an assumption rather than a camera specification.
+    /// Y′CbCr matrix for an untagged frame: BT.2020 per BT.2100 and Apple Log, else BT.709 (assumed).
     var defaultYCbCrMatrix: YCbCrMatrix {
         switch self {
         case .appleLog, .hlgRec2020: return .bt2020
@@ -77,12 +67,8 @@ public enum InputColorSpace: String, CaseIterable, Identifiable, Codable, Sendab
         }
     }
 
-    /// The range in which a code value is its formula's own input: legal for code-value curves
-    /// (S-Log3 gray = 420 / 1023), full for the rest (HLG gray = 0.38).
     var formulaRange: SignalRange { formulaTakesCodeValues ? .legal : .full }
 
-    /// E′ → the formula's input: code / 1023 = (64 + 876·E′) / 1023 for code-value curves (BT.2100
-    /// narrow range), E′ itself otherwise.
     var curveInputFromSignal: (scale: Double, offset: Double) {
         let legal = SignalRange.legal
         return formulaTakesCodeValues ? (legal.lumaSpan / SignalRange.largestCode, legal.lumaBlack / SignalRange.largestCode) : (1, 0)
@@ -111,7 +97,7 @@ public enum InputColorSpace: String, CaseIterable, Identifiable, Codable, Sendab
         }
     }
 
-    /// Source RGB → linear sRGB (D65), with Bradford adaptation for non-D65 white points.
+    /// Source RGB → linear sRGB (D65), Bradford-adapted from other white points.
     var toWorking: simd_double3x3 {
         let p = primaries
         let toXYZ = ColorMath.rgbToXYZ(p.r, p.g, p.b, white: p.white)
@@ -120,23 +106,18 @@ public enum InputColorSpace: String, CaseIterable, Identifiable, Codable, Sendab
     }
 }
 
-/// Transfer curves of the input transforms; the raw value is the curve identifier the
-/// `inputTransform` kernel switches on (`decodeCurve`), so it must match the Metal source.
+/// Raw values are the `decodeCurve` identifiers in Emulsion.ci.metal; keep them in step.
 enum TransferCurve: Int {
     case linear = 0
     case appleLog = 1
     case sLog3 = 2
-    /// EI 800.
     case arriLogC3 = 3
     case arriLogC4 = 4
     case vLog = 5
     case davinciIntermediate = 6
     case acescct = 7
-    /// BT.2100 HLG inverse OETF.
     case hlg = 8
-    /// BT.1886 display, gamma 2.4.
     case bt1886 = 9
-    /// The sRGB piecewise transfer (IEC 61966-2-1).
     case sRGB = 10
 }
 
@@ -149,7 +130,6 @@ enum ColorMath {
         return simd_double3x3(columns: (m.columns.0 * s.x, m.columns.1 * s.y, m.columns.2 * s.z))
     }
 
-    /// Bradford chromatic adaptation between two white points (identity when equal).
     static func bradford(from source: SIMD2<Double>, to target: SIMD2<Double>) -> simd_double3x3 {
         let m = simd_double3x3(rows: [SIMD3(0.8951, 0.2664, -0.1614), SIMD3(-0.7502, 1.7135, 0.0367), SIMD3(0.0389, -0.0685, 1.0296)])
         let s = m * xyz(source)
@@ -158,8 +138,7 @@ enum ColorMath {
         return m.inverse * scale * m
     }
 
-    /// Reference decode in Swift (mirrors `decodeCurve`), from each curve's own domain: code
-    /// value / 1023 or signal E′ (see `InputColorSpace.formulaTakesCodeValues`).
+    /// Swift mirror of `decodeCurve`, from each curve's own domain (code value ÷ 1023 or E′).
     static func decode(_ v: Double, curve: Int) -> Double {
         decode(v, curve: TransferCurve(rawValue: curve) ?? .linear)
     }
@@ -176,7 +155,7 @@ enum ColorMath {
             let pt = sigma * (rt - r0) * (rt - r0)
             if v >= pt { return pow(2, (v - delta) / gamma) - beta }
             return v >= 0 ? (v / sigma).squareRoot() + r0 : r0
-        case .sLog3:  // 10-bit code value / 1023, reflection
+        case .sLog3:
             if v >= 171.2102946929 / 1023 { return pow(10, (1023 * v - 420) / 261.5) * 0.19 - 0.01 }
             return (1023 * v - 95) * 0.01125 / (171.2102946929 - 95)
         case .arriLogC3:
@@ -194,8 +173,7 @@ enum ColorMath {
         case .acescct:
             return v <= 0.155251141552511 ? (v - 0.0729055341958355) / 10.5402377416545 : min(pow(2, v * 17.52 - 9.72), 65504)
         case .hlg:
-            // Scaled so 38 % signal = 18 % gray (ITU-R BT.2408); sub-black signals mirror (odd
-            // extension) so the curve stays monotonic.
+            // Scaled so 38 % signal = 18 % gray (BT.2408); odd extension below 0 keeps it monotonic.
             let (a, b, c) = (HLG.a, HLG.b, HLG.c)
             let e = v <= 0.5 ? v * abs(v) / 3 : (exp((v - c) / a) + b) / 12
             return e * HLG.sceneScale
@@ -209,14 +187,12 @@ enum ColorMath {
         }
     }
 
-    /// The sRGB transfer function (IEC 61966-2-1), linear → encoded: the inverse of `decode(_:curve: .sRGB)`.
+    /// IEC 61966-2-1 sRGB encode, linear → encoded.
     static func encodeSRGB(_ linear: Double) -> Double {
         linear <= 0.0031308 ? 12.92 * linear : 1.055 * pow(linear, 1 / 2.4) - 0.055
     }
 
-    /// CIE 1931 xy of a Planckian radiator, from the cubic-spline approximation of Kim et al. 2002
-    /// (valid 1667–25000 K; clamped to it). EmulsionFixtures keeps its own copy (`SyntheticDNG`) as
-    /// an independent reference for the tests.
+    /// CIE 1931 xy of a Planckian radiator, Kim et al. 2002, clamped to 1667–25000 K.
     static func planckianChromaticity(kelvin: Double) -> SIMD2<Double> {
         let t = min(max(kelvin, 1667), 25000)
         let (t1, t2, t3) = (1e3 / t, 1e6 / (t * t), 1e9 / (t * t * t))
@@ -233,13 +209,11 @@ enum ColorMath {
         return SIMD2(x, y)
     }
 
-    /// CIE XYZ → linear sRGB, the working space (Rec. 709 primaries, D65).
     static let xyzToLinearSRGB: simd_double3x3 = {
         let p = InputColorSpace.rec709.primaries
         return rgbToXYZ(p.r, p.g, p.b, white: p.white).inverse
     }()
 
-    /// ITU-R BT.2100 HLG constants; `sceneScale` maps 38% signal to 18% gray (BT.2408).
     enum HLG { static let a = 0.17883277, b = 0.28466892, c = 0.55991073, sceneScale = 0.18 / (0.38 * 0.38 / 3) }
     /// ARRI LogC4 specification constants.
     enum LogC4 { static let a = (262144.0 - 16) / 117.45, b = (1023.0 - 95) / 1023, c = 95.0 / 1023 }

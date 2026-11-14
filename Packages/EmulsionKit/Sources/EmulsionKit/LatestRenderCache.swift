@@ -1,16 +1,13 @@
 import CoreGraphics
 import Foundation
 
-/// The latest editor-sized render of each photo, so a view rebuilt in a new layout (folding
-/// iPhone Duo, opening the editor) shows the photo at once while it renders again.
-///
-/// `@unchecked Sendable` is safe: the state is an `NSCache`, which Apple documents as
-/// thread-safe, and a dictionary only touched under `lock`, both holding immutable `CGImage`s.
+/// Latest editor-sized render per photo, shown at once after a relayout. See NOTES.md, "LatestRenderCache".
+/// `@unchecked Sendable` is safe: `NSCache` is thread-safe and `unpurged` is only touched under `lock`.
 final class LatestRenderCache: @unchecked Sendable {
-    /// The editor's photo plus the library preview: the large views that get rebuilt.
+    /// The editor's photo plus the library preview.
     static let countLimit = 2
     private let images = NSCache<NSString, CGImage>()
-    /// The tests' store: never purged, so whether a render was kept is checkable (MOV-130).
+    /// The tests' store: never purged, so caching is checkable (MOV-130).
     private var unpurged: [NSString: CGImage] = [:]
     private let lock = NSLock()
     private let purgesUnderMemoryPressure: Bool
@@ -24,8 +21,6 @@ final class LatestRenderCache: @unchecked Sendable {
         purgesUnderMemoryPressure ? images.object(forKey: key(url)) : lock.withLock { unpurged[key(url)] }
     }
 
-    /// Thumbnail-sized renders are skipped: the grid would otherwise push out the photo being
-    /// edited, and `ThumbnailCache` already keeps those.
     func keep(_ image: CGImage, _ url: URL, maxDimension: CGFloat) {
         guard maxDimension > ThumbnailCache.maxDimension else { return }
         if purgesUnderMemoryPressure {

@@ -1,6 +1,5 @@
 import XCTest
 
-/// The camera walkthrough, on the Simulator's stand-in camera (the sample photos as a live viewfinder).
 final class CameraUITests: XCTestCase {
     @MainActor
     func testCaptureAppearsInLibrary() throws {
@@ -65,14 +64,11 @@ final class CameraUITests: XCTestCase {
         XCTAssertTrue(app.buttons["Take Photo"].isEnabled, "the camera runs again")
         XCTAssertEqual(recipe.value as? String, "Warm Light", "the recipe is kept")
 
-        // Back to Everyday, so the next run starts where this one did.
         if !app.buttons["Everyday"].exists { recipe.tap() }
         app.buttons["Everyday"].tap()
         XCTAssertEqual(recipe.value as? String, "Everyday")
     }
 
-    /// The system pauses the camera (another app takes it): the frozen viewfinder says why and
-    /// the shutter and lenses stop working, without an alert (MOV-133).
     @MainActor
     func testInterruptionPausesTheCamera() {
         let app = XCUIApplication()
@@ -86,7 +82,6 @@ final class CameraUITests: XCTestCase {
         keepScreenshot(app, named: "Camera 6 Paused")
     }
 
-    /// A session that fails offers to try again, and trying again brings the viewfinder back.
     @MainActor
     func testFailedCameraCanBeRetried() {
         let app = XCUIApplication()
@@ -102,7 +97,6 @@ final class CameraUITests: XCTestCase {
         XCTAssertTrue(app.buttons["Take Photo"].isEnabled)
     }
 
-    /// Opens the library to count what's already there, then returns to the camera.
     @MainActor
     private func countPhotos(_ app: XCUIApplication, library: XCUIElement, photos: XCUIElementQuery) throws -> Int {
         XCTAssertTrue(library.waitForExistence(timeout: 5))

@@ -6,14 +6,10 @@ import simd
 
 @testable import EmulsionCore
 
-/// The exposure anchor (MOV-134) on real DNGs from EMULSION_RAW_SAMPLES: anchored develops land
-/// near Apple's default render in median luminance, whatever the file's megapixels.
 @Suite(.enabled(if: RAWDevelopSupport.samplesFolders != nil), .serialized)
 struct ExposureAnchorRealFileTests {
-    /// Measured worst |log2(anchored median ÷ Apple median)| 0.576 stops over 25 files (mean 0.168).
+    // Measured tolerances, about 2× the worst on macOS 27.2: docs/CONSTANTS.md, "Test tolerances".
     static let appleMedianTolerance = 1.15
-    /// Measured −0.017 stops: mean log2(anchored ÷ Apple) of files ≥ 40 MP minus files < 20 MP
-    /// (before the anchor the 48 MP ProRAW files sat 2–3 stops below Apple's render).
     static let megapixelGapTolerance = 0.5
     static let largeMegapixels = 40.0
     static let smallMegapixels = 20.0
@@ -24,7 +20,6 @@ struct ExposureAnchorRealFileTests {
         RAWDevelopSupport.FrameStats(Fixtures.linear(image)).medianLuminance
     }
 
-    /// Apple's default render (every CIRAWFilter default) at the preview size.
     static func appleDefault(_ data: Data, maxDimension: CGFloat) throws -> CIImage {
         let raw = try RAWDevelopSupport.filter(data)
         Developer.applyPreviewScale(raw, maxDimension: maxDimension, allowsDraftMode: false)

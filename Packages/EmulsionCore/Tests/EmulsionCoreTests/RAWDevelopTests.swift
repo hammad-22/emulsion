@@ -8,8 +8,7 @@ import simd
 
 @testable import EmulsionCore
 
-/// RAW develop on synthetic DNGs (MOV-79): linear scene light with highlight headroom, neutral
-/// clipped highlights and no gamut mapping, for Bayer and linear (ProRAW-container) files.
+/// RAW develop on synthetic DNGs (MOV-79), Bayer and linear (docs/CONSTANTS.md).
 struct RAWDevelopTests {
     static var renderer: Renderer { EmulsionTestCase.sharedRenderer }
     static var developer: Developer { renderer.developer }
@@ -23,34 +22,24 @@ struct RAWDevelopTests {
             RAWDevelopChart.dng(mosaic, chart: chart, baselineStops: baselineStops), chart: chart, maxDimension: maxDimension)
     }
 
-    /// Developed linear sRGB of a camera value, from the fixture's own maths: the sensor clips to
-    /// 0…1, the as-shot neutral maps to D65 white (the matrix's calibration illuminant), and
-    /// BaselineExposure scales the result.
+    /// From the fixture's own maths: sensor clip, D65 neutral, BaselineExposure.
     static func expected(camera: SIMD3<Double>, baselineStops: Double) -> SIMD3<Double> {
         let sensor = simd_clamp(camera, SIMD3(repeating: 0), SIMD3(repeating: 1))
         return SyntheticDNG.xyzFromLinearSRGB.inverse * RAWDevelopChart.camera.inverse * sensor * pow(2, baselineStops)
     }
 
-    /// Neutral patches whose camera channels all stay below 95 % of sensor white.
     static let unclippedNeutrals = RAWDevelopChart.neutralIndices.filter { cameraValues[$0].max() < 0.95 }
-    /// Neutral patches with at least one channel at or above sensor white.
     static let clippedNeutrals = RAWDevelopChart.neutralIndices.filter { cameraValues[$0].max() >= 1 }
 
-    // Tolerances are about 2× the worst value measured on macOS 27.2, Bayer and linear files.
+    // Measured tolerances, about 2× the worst on macOS 27.2: docs/CONSTANTS.md, "Test tolerances".
 
-    /// Measured worst 0.0024 (relative, any channel, BaselineExposure 0 and 2; headroom patch 0.0016).
     static let linearTolerance = 0.005
-    /// Measured worst 0.0021 (max |R/G − 1|, |B/G − 1|) on unclipped neutrals.
     static let neutralTolerance = 0.0045
-    /// Measured worst 0.0222 (+3 stop patch: green clipped, blue rebuilt 2 % high).
     static let clippedNeutralTolerance = 0.045
-    /// Measured worst 0.0016 (absolute, any channel, chromatic patches, linear sRGB).
     static let chromaticTolerance = 0.0035
-    /// Measured worst 0.0012 (relative to max(1, value), draft half size vs full).
     static let previewTolerance = 0.0025
 
-    /// The opposite case (a ProRAW file that ImageIO types as TIFF when read from memory must
-    /// still develop as RAW) needs real files: `RAWDevelopRealFileTests`.
+    /// The opposite case needs real files: `RAWDevelopRealFileTests`.
     @Test func plainTIFFIsNotRAW() throws {
         let image = try Self.renderer.cgImage(SceneFixtures.flat(0.18, width: 64, height: 64))
         let data = NSMutableData()
@@ -61,7 +50,7 @@ struct RAWDevelopTests {
         #expect(try Self.developer.develop(data as Data).contract == .displayReferred)
     }
 
-    /// Exposure that puts the brightest unclipped neutral (camera 0.72) at 5.76, above 4.0.
+    /// Puts the brightest unclipped neutral (camera 0.72) at 5.76, above 4.0.
     static let headroomBaselineStops = 3.0
 
     @Test(arguments: SyntheticDNG.Mosaic.allCases)
@@ -124,7 +113,7 @@ struct RAWDevelopTests {
     func previewDevelopMatchesFullDevelop(_ mosaic: SyntheticDNG.Mosaic) throws {
         let full = try Self.develop(mosaic, baselineStops: 2)
         let preview = try Self.develop(mosaic, baselineStops: 2, maxDimension: CGFloat(Self.chart.width / 2))
-        // A draft RAW decode may come back larger than asked, so only bound the size.
+        // A draft RAW decode may come back larger than asked.
         #expect((Self.chart.width / 2..<Self.chart.width).contains(Int(preview.negative.size.width)))
         #expect(full.means.contains { $0.max() > 1 })
         let worst = zip(preview.means, full.means).map { abs($0 - $1).max() / max(1, abs($1).max()) }.max() ?? .nan

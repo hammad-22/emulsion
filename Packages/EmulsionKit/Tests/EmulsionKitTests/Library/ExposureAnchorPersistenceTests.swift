@@ -5,8 +5,6 @@ import Testing
 
 @testable import EmulsionKit
 
-/// The RAW exposure anchor is kept on the photo record (MOV-141), so a relaunch develops with it
-/// instead of measuring the file again.
 @MainActor
 struct ExposureAnchorPersistenceTests {
     @Test func aRelaunchUsesTheStoredAnchorWithoutMeasuringAgain() async throws {
@@ -26,7 +24,6 @@ struct ExposureAnchorPersistenceTests {
         #expect(TestPixels.rgba(again) == TestPixels.rgba(first))
     }
 
-    /// MOV-10: the anchor is measured as shot, so a new white balance after a relaunch reuses it.
     @Test func aNewWhiteBalanceAfterARelaunchReusesTheStoredAnchor() async throws {
         let library = TestLibrary()
         let photo = try await library.store.add(TestPhoto.anchoredRAW, fileExtension: "dng")
@@ -44,7 +41,6 @@ struct ExposureAnchorPersistenceTests {
         #expect(TestPixels.rgba(reused) == TestPixels.rgba(measured))
     }
 
-    /// Records from before MOV-141 have no anchor: the first develop measures it once and saves it.
     @Test func aRecordWithoutAnAnchorIsMeasuredOnceAndSaved() async throws {
         let library = TestLibrary()
         let photo = try await library.store.add(TestPhoto.anchoredRAW, fileExtension: "dng")
@@ -60,7 +56,6 @@ struct ExposureAnchorPersistenceTests {
         #expect(library.reopened().photo(photo.id)?.exposureAnchor == stored)
     }
 
-    /// A stored anchor belongs to the file it was measured from; a replaced file is measured again.
     @Test func aChangedOriginalIsMeasuredAgain() async throws {
         let library = TestLibrary()
         let photo = try await library.store.add(TestPhoto.anchoredRAW, fileExtension: "dng")
@@ -77,7 +72,6 @@ struct ExposureAnchorPersistenceTests {
         #expect(fresh.source != stale.source)
     }
 
-    /// Within a session too: the service checks the file at each develop.
     @Test func anOriginalChangedDuringASessionIsMeasuredAgain() async throws {
         let library = TestLibrary()
         let photo = try await library.store.add(TestPhoto.anchoredRAW, fileExtension: "dng")
@@ -91,7 +85,6 @@ struct ExposureAnchorPersistenceTests {
         #expect(await service.exposureAnchorMeasurements == 2)
     }
 
-    /// The first anchor is saved at once; the rest of a burst follows in a batch.
     @Test func everyAnchorOfABurstIsSaved() async throws {
         let library = TestLibrary()
         let photos = [
@@ -130,7 +123,6 @@ struct ExposureAnchorPersistenceTests {
         #expect(library.store.photo(photo.id)?.exposureAnchor == nil)
     }
 
-    /// Records from before `isRAW` was saved read as not RAW; their anchors are still kept.
     @Test func aRAWRecordWithoutItsKindStillKeepsItsAnchor() async throws {
         let library = TestLibrary()
         let photo = try await library.store.add(TestPhoto.anchoredRAW, fileExtension: "dng")
@@ -143,12 +135,10 @@ struct ExposureAnchorPersistenceTests {
         _ = try await Self.storedAnchor(of: photo.id, in: migrated)
     }
 
-    /// The anchor fixture with a stronger gain table: a different file at the same path.
+    /// A different file at the same path: the anchor fixture with a stronger gain table.
     private static let brighterRAW = RAWDevelopChart.dng(
         .bayerRGGB, chart: RAWDevelopChart.chart(), baselineStops: 0.5, profile: SyntheticDNG.Profile(gainTableGain: 8))
 
-    /// The anchor reaches the record once the store saves it, on the main actor after the develop
-    /// that measured it.
     private static func storedAnchor(
         of id: UUID, in store: PhotoStore, where accepted: (StoredExposureAnchor) -> Bool = { _ in true }
     ) async throws -> StoredExposureAnchor {

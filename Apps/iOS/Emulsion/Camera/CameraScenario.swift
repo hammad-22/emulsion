@@ -2,8 +2,7 @@ import EmulsionKit
 import Foundation
 
 #if DEBUG && targetEnvironment(simulator)
-    /// A camera state the Simulator can't produce on its own, for checking how the screen shows
-    /// it. Launch with `-camera-scenario <name>`, e.g. `-camera-scenario in-use`.
+    /// A camera state the Simulator can't produce, shown with `-camera-scenario <name>`.
     enum CameraScenario: String {
         case denied, restricted, failed
         case inUse = "in-use"
@@ -13,7 +12,6 @@ import Foundation
             UserDefaults.standard.string(forKey: LaunchArgument.cameraScenario).flatMap(CameraScenario.init)
         }
 
-        /// Lets the viewfinder show frames before the scenario's event arrives.
         private static let eventDelay = Duration.seconds(2)
 
         func makeSource() -> MockCameraSource {

@@ -1,19 +1,17 @@
-/// One traced curve of a datasheet chart: only the rows where the chart draws it, x ascending.
+/// One traced curve: only the rows where the chart draws it, x ascending.
 struct DigitizedCurve: Sendable, Equatable {
     let name: String
     let x: [Double]
     let y: [Double]
 
-    /// What a curve is taken to be outside its samples.
     enum Edge: Sendable, Equatable {
-        /// The end sample's value.
         case hold
         case zero
-        /// Straight on from the end samples with these slopes (y per unit x).
+        /// Slopes in y per unit x.
         case slopes(below: Double, above: Double)
     }
 
-    /// Linear interpolation between samples (across untraced gaps too), `edge` outside them.
+    /// Linear between samples, across untraced gaps too.
     func value(at position: Double, edge: Edge) -> Double {
         guard let first = x.first, let last = x.last else { return 0 }
         if position < first || position > last {

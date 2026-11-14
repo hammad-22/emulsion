@@ -2,16 +2,14 @@ import EmulsionCore
 import EmulsionKit
 import SwiftUI
 
-/// Toggles the recipe strip; where the strip is always visible (`toggle` is nil) it only names the recipe.
 struct RecipeButton: View {
     let recipe: Recipe
     let isShowingRecipes: Bool
     let toggle: (() -> Void)?
 
     @Environment(\.dynamicTypeSize) private var dynamicTypeSize
-    /// Matches the glass button style's own horizontal padding.
+    /// Match the glass button's padding and, with it, the library button's height.
     private static let labelPadding: CGFloat = 12
-    /// With the glass button's vertical padding, about the library button's height.
     private static let labelHeight: CGFloat = 44
     private static let symbol = "camera.filters"
     private static let symbolToNameSpacing: CGFloat = 2
@@ -40,7 +38,6 @@ struct RecipeButton: View {
             Image(systemName: Self.symbol)
                 .font(.body.weight(.semibold))
                 .symbolVariant(isShowingRecipes ? .fill : .none)
-            // Doesn't fit the fixed width at accessibility sizes; the large content viewer shows it.
             if !dynamicTypeSize.isAccessibilitySize {
                 Text(recipe.name)
                     .font(.caption2.weight(.semibold))
@@ -48,7 +45,6 @@ struct RecipeButton: View {
                     .minimumScaleFactor(Self.nameMinimumScale)
             }
         }
-        // A fixed width, so switching recipes never moves the button.
         .frame(width: LibraryButton.size, height: Self.labelHeight)
     }
 }

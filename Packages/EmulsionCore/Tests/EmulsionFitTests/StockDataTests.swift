@@ -3,8 +3,7 @@ import Testing
 
 @testable import EmulsionFit
 
-/// Manifest checks always run. Checks on the traced curves, which are not in the repository (docs/DECISIONS.md,
-/// 12 Nov 2026), run only when the local reference-data folder exists (`EMULSION_REFERENCE_DATA`, else the default).
+/// Traced-curve checks run only when the local reference data exists (docs/DECISIONS.md, 12 Nov 2026).
 struct StockDataTests {
     static let expectedStocks = ["kodak-vision-2383", "kodak-vision3-250d-5207", "kodak-vision3-500t-5219"]
     static let manifestsDirectory = DigitizedStock.bundledManifestsDirectory
@@ -12,14 +11,13 @@ struct StockDataTests {
     static let referenceDataAvailable = referenceDataDirectory.isExistingDirectory
     static let presentStocks = manifestsDirectory.map(DigitizedStock.availableIDs(in:)) ?? []
 
-    /// Datasheet PDFs as recorded in docs/STOCK-DATA.md: stock id → (document, SHA-256).
+    /// Sourced: docs/STOCK-DATA.md.
     static let sheets: [String: (document: String, sha256: String)] = [
         "kodak-vision3-250d-5207": ("H-1-5207", "70adb298a7aabb285d986b720e07c87c27eb2361f0925aea2b15903c08282e16"),
         "kodak-vision3-500t-5219": ("H-1-5219", "6d037d8090373ee50d10bedfff3df14777a575dd107c50edcafc7ec5862d0972"),
         "kodak-vision-2383": ("H-1-2383", "a72fa4482ebd891a9ac4a823cafe740e3587c56470f27e4dfd4391f5c3e5a207"),
     ]
 
-    /// Present stocks of one film type, as their manifests declare it.
     static func stocks(_ filmType: StockManifest.FilmType) -> [String] {
         presentStocks.filter { id in manifestsDirectory.flatMap { try? StockManifest.load(id: id, from: $0) }?.filmType == filmType }
     }
@@ -31,8 +29,6 @@ struct StockDataTests {
     static func load(_ id: String) throws -> DigitizedStock {
         try DigitizedStock.load(id: id, from: #require(manifestsDirectory), referenceData: referenceDataDirectory)
     }
-
-    // MARK: Committed manifests
 
     @Test func everyDigitizedStockIsBundled() {
         #expect(Self.presentStocks == Self.expectedStocks)
@@ -67,8 +63,6 @@ struct StockDataTests {
         #expect((characteristic.cameraStops != nil) == (manifest.filmType == .cameraNegative))
     }
 
-    // MARK: Local reference data
-
     @Test(.enabled(if: referenceDataAvailable), arguments: presentStocks)
     func allChartsLoad(_ id: String) throws {
         let stock = try Self.load(id)
@@ -96,8 +90,6 @@ struct StockDataTests {
         for chart in try Self.load(id).charts { #expect(StockDataAudit.outsideTracedRange(chart) == []) }
     }
 
-    // MARK: Dye sum (MOV-17)
-
     @Test(.enabled(if: referenceDataAvailable), arguments: presentStocks)
     func dyesSumToTheNeutral(_ id: String) throws {
         let stock = try Self.load(id)
@@ -117,7 +109,7 @@ struct StockDataTests {
             415,1,1,1,1.5
             """)
         let check = try #require(DyeSumCheck.compared(chart, .init()))
-        // With cyan clamped at 0, yellow and magenta solve their own normal equations: [[2,1],[1,2]]·a = [2, 3.5].
+        // Cyan clamped at 0: yellow and magenta solve [[2,1],[1,2]]·a = [2, 3.5].
         #expect(abs(check.scales[0] - 1.0 / 6) < 1e-12)
         #expect(abs(check.scales[1] - 5.0 / 3) < 1e-12)
         #expect(check.scales[2] == 0)
@@ -157,8 +149,6 @@ struct StockDataTests {
         #expect(zip(check.scales, [1.0, 1, 1]).allSatisfy { abs($0 - $1) < 1e-12 })
         #expect(DyeSumCheck.diagnostics(chart, filmType: .cameraNegative).map(\.label) == ["neutral, Dmin kept"])
     }
-
-    // MARK: CSV parser
 
     @Test func emptyCellsDropOnlyThatCurvesRow() throws {
         let curves = try DigitizedChart.parse(

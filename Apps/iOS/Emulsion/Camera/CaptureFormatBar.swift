@@ -6,7 +6,6 @@ struct CaptureFormatBar: View {
     let capabilities: CameraCapabilities?
 
     @Environment(AppSettings.self) private var settings
-    /// About the height of the glass resolution button beside it.
     private let formatLabelMinimumHeight: CGFloat = 34
 
     var body: some View {
@@ -24,7 +23,7 @@ struct CaptureFormatBar: View {
             }
         }
         .frame(minHeight: FilmLabLayout.minimumControlHeight)
-        .dynamicTypeSize(...DynamicTypeSize.accessibility1)
+        .dynamicTypeSize(...FilmLabLayout.largestCameraTextSize)
         .accessibilityShowsLargeContentViewer()
     }
 

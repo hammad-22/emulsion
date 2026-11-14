@@ -3,15 +3,12 @@ import CoreVideo
 import Foundation
 import ImageIO
 
-/// A stand-in camera for the Simulator and tests: one panning sample photo per lens. Capture
-/// returns the sample's JPEG, since the samples are synthetic renders, not DNGs. Frames are drawn
-/// on the CPU, so the renderer's GPU context stays the only one (MOV-127).
+/// A stand-in camera for the Simulator and tests. See NOTES.md, "MockCameraSource".
 public actor MockCameraSource: CameraSource {
-    /// Portrait 3:4, like a phone camera's viewfinder held upright.
     static let frameSize = CGSize(width: 768, height: 1024)
-    /// About 30 frames per second, the camera's viewfinder rate.
+    /// About 30 fps, the camera's viewfinder rate.
     private static let frameInterval: Duration = .milliseconds(33)
-    /// Artistic: how far the crop pans across a sample, and how long one sweep takes.
+    /// Artistic: the fraction of a sample the crop pans across, and one sweep in seconds.
     private static let drift = (pan: 0.25, period: 8.0)
 
     private let startError: CameraError?
@@ -22,7 +19,6 @@ public actor MockCameraSource: CameraSource {
     private nonisolated let eventStream = SourceStream.events()
     private var lens = CameraLens.wide
     private var delivery: Task<Void, Never>?
-    /// Paused by an emitted interruption: a real session delivers no frames then.
     private var isInterrupted = false
     private var samples: [CGImage] = []
 
@@ -39,7 +35,6 @@ public actor MockCameraSource: CameraSource {
         self.init(startError: nil)
     }
 
-    /// A camera that never starts, as when access is denied or restricted.
     public init(failingStartWith error: CameraError) {
         self.init(startError: error)
     }
@@ -54,7 +49,6 @@ public actor MockCameraSource: CameraSource {
         self.captureGate = captureGate
     }
 
-    /// Lets a test act while the shutter is in flight.
     struct CaptureGate {
         let started: AsyncStream<Void>.Continuation
         let release: AsyncStream<Void>
@@ -64,7 +58,6 @@ public actor MockCameraSource: CameraSource {
 
     public nonisolated func events() -> AsyncStream<CameraEvent> { eventStream.makeStream() }
 
-    /// Reports `event` as if the system caused it; frames pause while interrupted, as a session's do.
     public func emit(_ event: CameraEvent) {
         switch event {
         case .interrupted: isInterrupted = true
@@ -136,7 +129,6 @@ public actor MockCameraSource: CameraSource {
         let sample = samples[sampleIndex % samples.count]
         let room = CGSize(width: CGFloat(sample.width) - Self.frameSize.width, height: CGFloat(sample.height) - Self.frameSize.height)
         let travel = room.width * (0.5 + 0.5 * sin(seconds * 2 * .pi / Self.drift.period))
-        // Whole pixels, inside the sample, so every frame is exactly `frameSize`.
         let origin = CGPoint(x: min(max(travel.rounded(), 0), room.width), y: min(max((room.height / 2).rounded(), 0), room.height))
         let crop = CGRect(origin: origin, size: Self.frameSize)
         return sample.cropping(to: crop).flatMap(CameraFrame.init(drawing:))

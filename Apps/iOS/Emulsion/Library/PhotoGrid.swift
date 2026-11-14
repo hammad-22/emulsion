@@ -2,15 +2,12 @@ import EmulsionKit
 import EmulsionUI
 import SwiftUI
 
-/// Square thumbnails edge to edge, like a contact sheet.
 struct PhotoGrid: View {
     @Binding var selection: LibrarySelection
     let transition: Namespace.ID
-    /// A fixed number of columns, or nil for as many cells as fit.
     var columnCount: Int? = nil
     var previewID: PhotoRecord.ID? = nil
     let edit: (PhotoRecord.ID) -> Void
-    /// A tap outside Select: opens the editor on iPhone, previews in the expanded library.
     let activate: (PhotoRecord.ID) -> Void
 
     @Environment(PhotoStore.self) private var store

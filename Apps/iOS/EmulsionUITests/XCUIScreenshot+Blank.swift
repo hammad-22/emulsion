@@ -1,7 +1,6 @@
 import XCTest
 
 extension XCUIScreenshot {
-    /// Every pixel black, judged on an 8×8 reduction.
     var isBlank: Bool {
         let side = 8
         var pixels = [UInt8](repeating: 0, count: side * side * 4)

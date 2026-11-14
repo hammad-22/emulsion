@@ -1,7 +1,6 @@
 import SwiftUI
 
-/// The corner mark on a thumbnail while selecting photos: a ring, filled with a checkmark
-/// once selected. Plain symbols rather than glass, which belongs to controls, not content.
+/// The corner mark on a thumbnail while selecting photos.
 public struct SelectionBadge: View {
     private let isSelected: Bool
 
@@ -19,7 +18,6 @@ public struct SelectionBadge: View {
             .accessibilityHidden(true)
     }
 
-    /// Enough to keep the white ring visible on a bright photo.
     private let shadowOpacity = 0.35
     private let shadowRadius: CGFloat = 2
 }

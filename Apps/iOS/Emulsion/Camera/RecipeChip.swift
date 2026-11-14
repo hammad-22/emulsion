@@ -2,7 +2,6 @@ import EmulsionCore
 import EmulsionUI
 import SwiftUI
 
-/// The selected chip is filled, bold and checked, so the choice doesn't rely on color.
 struct RecipeChip: View {
     let recipe: Recipe
     let isSelected: Bool
@@ -27,7 +26,6 @@ struct RecipeChip: View {
         .glassEffect(.regular.interactive(), in: .capsule)
         .accessibilityLabel(recipe.name)
         .accessibilityAddTraits(isSelected ? .isSelected : [])
-        // The strip stops growing at the first accessibility size; a long press shows the name large.
         .accessibilityShowsLargeContentViewer { Text(recipe.name) }
     }
 }

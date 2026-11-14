@@ -2,14 +2,12 @@ import AVFoundation
 import CoreVideo
 import VideoToolbox
 
-/// Synthetic 10-bit Y′CbCr movies: flat patches of chosen code values, written with
-/// AVAssetWriter and read back without conversion. Both codecs round-trip flat patches
-/// exactly in their native layout (checked by `VideoSignalTests`).
+/// Synthetic 10-bit Y′CbCr movies of flat patches, written and read back without conversion.
 public enum VideoFixtures {
     public enum Codec: Sendable, CaseIterable {
-        /// HEVC Main10, 4:2:0; carries legal or full range.
+        /// HEVC Main10, 4:2:0, legal or full range.
         case hevcMain10
-        /// ProRes 422 HQ, 4:2:2; legal range only (the writer converts full range).
+        /// ProRes 422 HQ, 4:2:2, legal range only (the writer converts full range).
         case proRes422HQ
 
         var codecType: AVVideoCodecType { self == .hevcMain10 ? .hevc : .proRes422HQ }
@@ -24,15 +22,12 @@ public enum VideoFixtures {
         }
     }
 
-    /// Patch edge in pixels: a multiple of the codecs' block sizes, so each patch's center is flat.
+    /// A multiple of the codecs' block sizes, so each patch's centre is flat.
     public static let patchSize = 64
 
-    /// The center pixel of patch `index`, in Core Image coordinates.
     public static func center(ofPatch index: Int) -> (x: Int, y: Int) { (index * patchSize + patchSize / 2, patchSize / 2) }
 
-    /// Writes one frame of side-by-side patches (10-bit Y′, Cb, Cr codes) and reads it back.
-    /// `matrixTag` is an `AVVideoYCbCrMatrix_*` value; it is written to the file and comes back
-    /// as the frame's `kCVImageBufferYCbCrMatrixKey`.
+    /// Writes one frame of patches (10-bit Y′, Cb, Cr) and reads it back; `matrixTag` round-trips.
     public static func roundTrip(
         _ patches: [SIMD3<UInt16>], codec: Codec, fullRange: Bool, matrixTag: String
     ) async throws -> CVPixelBuffer {

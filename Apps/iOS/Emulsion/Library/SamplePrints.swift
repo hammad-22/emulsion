@@ -3,7 +3,6 @@ import EmulsionKit
 import EmulsionUI
 import SwiftUI
 
-/// The bundled samples fanned out like prints on a table; decorative, so hidden from VoiceOver.
 struct SamplePrints: View {
     /// Artistic: a 4:5 print, and how far each one leans and sits from the middle.
     private let printSize = CGSize(width: 120, height: 150)

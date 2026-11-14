@@ -1,5 +1,4 @@
 extension NegativeDyeSetReport {
-    /// The neutral scale's straight-line gammas (`NegativeFit.straightLineGamma`), red/cyan, green/magenta, blue/yellow.
     struct Gammas: Sendable, Equatable {
         enum Quantity: CaseIterable, Sendable {
             case statusM, dyeAmounts, academyPrintingDensity, rp180PrintingDensity, academyADX

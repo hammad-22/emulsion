@@ -1,7 +1,5 @@
 import Foundation
 
-/// One of the back cameras. Physical cameras only: a virtual camera fuses or switches
-/// between them, which RAW capture doesn't allow (see `AVCameraSource`).
 public enum CameraLens: String, CaseIterable, Sendable, Identifiable {
     case ultraWide, wide, telephoto
     public var id: String { rawValue }
@@ -15,10 +13,9 @@ public enum CameraLens: String, CaseIterable, Sendable, Identifiable {
     }
 }
 
-/// A lens the device has, and how much it magnifies relative to the wide lens.
 public struct LensOption: Sendable, Equatable, Identifiable {
     public let lens: CameraLens
-    /// Relative to the wide lens: 0.5 for an ultra wide, 4 for a 4× telephoto.
+    /// Relative to the wide lens: 0.5 for an ultra wide.
     public let magnification: Double
     public var id: CameraLens { lens }
 
@@ -27,22 +24,18 @@ public struct LensOption: Sendable, Equatable, Identifiable {
         self.magnification = magnification
     }
 
-    /// The magnification as the system Camera shows it: "0.5", "1", "4", with "×" on the
-    /// selected lens.
     public func title(isSelected: Bool) -> String {
         let number = formattedMagnification
         return isSelected ? String(localized: "\(number)×", bundle: .module, comment: "Selected lens magnification") : number
     }
 
-    /// For VoiceOver: "Ultra Wide, 0.5×".
     public var accessibilityLabel: String {
         String(localized: "\(lens.title), \(formattedMagnification)×", bundle: .module, comment: "Lens name and magnification")
     }
 
     private var formattedMagnification: String { displayedMagnification.formatted(.number.precision(.fractionLength(0...1))) }
 
-    /// Lenses below 1× read in tenths (0.5); longer ones in halves, so a 100 mm lens on a
-    /// 24 mm wide reads 4, not 4.2, like the system Camera's labels.
+    /// Rounded like the system Camera's labels: tenths below 1×, halves above (4, not 4.2).
     var displayedMagnification: Double {
         magnification < 1 ? (magnification * 10).rounded() / 10 : (magnification * 2).rounded() / 2
     }

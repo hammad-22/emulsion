@@ -6,7 +6,6 @@ import simd
 
 @testable import EmulsionCore
 
-/// Real DNGs from EMULSION_RAW_SAMPLES (never checked in): the pre-MOV-79 develop against today's.
 @Suite(.enabled(if: RAWDevelopSupport.samplesFolders != nil), .serialized)
 struct RAWDevelopRealFileTests {
     static let minimumFilesForHeadroomCheck = 20

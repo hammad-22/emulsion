@@ -13,8 +13,7 @@ struct LibraryEmptyState: View {
     var body: some View {
         ScrollView {
             VStack(spacing: FilmLabLayout.generous) {
-                // At accessibility text sizes the decorative prints give way, so the two
-                // actions aren't pushed off screen (MOV-140).
+                // Decorative prints give way at accessibility sizes, keeping the actions on screen (MOV-140).
                 if !dynamicTypeSize.isAccessibilitySize { SamplePrints() }
                 VStack(spacing: FilmLabLayout.gap) {
                     Text("Make room for light")
@@ -26,9 +25,7 @@ struct LibraryEmptyState: View {
                     VStack(spacing: FilmLabLayout.gap) {
                         PhotoImportButton(fillsWidth: true) { error = $0.localizedDescription }
                             .buttonStyle(.glassProminent)
-                            // Neutral, like the editor's Save: white on the system blue failed the
-                            // contrast audit (MOV-59); this inverts with the appearance at ~19:1.
-                            // `.background` as the label style renders invisible in dark mode.
+                            // Neutral and inverting with the appearance: see Apps/iOS/AGENTS.md (MOV-59).
                             .tint(.primary)
                             .foregroundStyle(colorScheme == .dark ? .black : .white)
                         Button(action: addSamples) {

@@ -1,9 +1,7 @@
 import Foundation
 import simd
 
-/// A deterministic synthetic DNG (TIFF/EP, little-endian, uncompressed, one strip, 16-bit) that
-/// Apple's RAW decoder accepts. Camera values are linear, 1 = sensor white; values outside 0…1
-/// clip, as a sensor does. Nothing here models a real camera: the colour matrices are synthetic.
+/// A deterministic synthetic DNG Apple's RAW decoder accepts; camera value 1 = sensor white (docs).
 public struct SyntheticDNG: Sendable {
     public enum Mosaic: Sendable, CaseIterable {
         /// One sample per pixel behind an RGGB colour filter array.
@@ -11,31 +9,27 @@ public struct SyntheticDNG: Sendable {
         /// Three demosaiced samples per pixel, the container ProRAW uses.
         case linearRGB
 
-        /// TIFF/EP PhotometricInterpretation: CFA (32803) or DNG LinearRaw (34892).
+        /// TIFF/EP CFA (32803) or DNG LinearRaw (34892).
         var photometricInterpretation: UInt16 { self == .bayerRGGB ? 32803 : 34892 }
         var samplesPerPixel: Int { self == .bayerRGGB ? 1 : 3 }
-        /// DNGBackwardVersion: LinearRaw needs DNG 1.3.
         var backwardVersion: [UInt8] { self == .bayerRGGB ? [1, 1, 0, 0] : [1, 3, 0, 0] }
     }
 
     public let mosaic: Mosaic
-    /// Pixels; even, so the RGGB pattern tiles the image.
     public let width: Int
     public let height: Int
     public let baselineExposureStops: Double
     /// Camera-space neutral (green = 1), DNG AsShotNeutral.
     public let asShotNeutral: SIMD3<Double>
-    /// XYZ → camera, DNG ColorMatrix1 for CalibrationIlluminant1 = D65.
+    /// XYZ → camera, DNG ColorMatrix1 for D65.
     public let cameraFromXYZ: simd_double3x3
-    /// Rendering hints of the file's DNG profile; nil writes none.
     public let profile: Profile?
 
-    /// A DNG profile's rendering hints, the tags Apple's 48 MP ProRAW uses to brighten its image.
+    /// The DNG profile tags Apple's 48 MP ProRAW uses to brighten its image.
     public struct Profile: Sendable {
-        /// ProfileGainTableMap (DNG 1.6) holding one gain everywhere: every pixel, whatever its level.
+        /// ProfileGainTableMap (DNG 1.6) holding one gain everywhere.
         public let gainTableGain: Float
-        /// ProfileToneCurve: (input, output) pairs from (0, 0) to (1, 1), linear in and out;
-        /// identity by default.
+        /// ProfileToneCurve (input, output) pairs from (0, 0) to (1, 1), linear; identity by default.
         public let toneCurve: [SIMD2<Float>]
 
         public init(gainTableGain: Float, toneCurve: [SIMD2<Float>] = [SIMD2(0, 0), SIMD2(1, 1)]) {
@@ -44,7 +38,6 @@ public struct SyntheticDNG: Sendable {
         }
     }
 
-    /// 16-bit codes with no black offset: code 0 is no light, 65535 sensor white.
     private static let blackLevel = 0
     private static let whiteLevel = Int(UInt16.max)
 
@@ -62,8 +55,7 @@ public struct SyntheticDNG: Sendable {
         self.profile = profile
     }
 
-    /// The file, padded with trailing zeros to `minimumFileSize`. `camera(x, y)` gives the
-    /// camera-space linear value of a pixel, y = 0 the top row.
+    /// The file; `camera(x, y)` is the camera-space value of a pixel, y = 0 the top row.
     public func data(_ camera: (Int, Int) -> SIMD3<Double>) -> Data {
         var pixels = [UInt8]()
         pixels.reserveCapacity(width * height * mosaic.samplesPerPixel * MemoryLayout<UInt16>.size)
@@ -85,15 +77,12 @@ public struct SyntheticDNG: Sendable {
         return TIFFWriter.file(entries: entries(stripByteCount: pixels.count), pixels: pixels, minimumSize: Self.minimumFileSize)
     }
 
-    /// ImageIO identifies a TIFF with DNGVersion as DNG only from about 100 KiB (macOS 27.2:
-    /// 101,862 bytes read as TIFF, 102,886 as DNG), so tests of Apple's decoder pad to this size.
+    /// Measured: ImageIO reads DNGs under about 100 KiB as TIFF (macOS 27.2).
     private static let minimumFileSize = 128 * 1024
 
-    /// Row-major RGGB: red at even/even, blue at odd/odd.
     private static func rggbChannel(x: Int, y: Int) -> Int { (x % 2) + (y % 2) }
 
-    /// CIRAWFilter needs NewSubFileType, PhotometricInterpretation, StripByteCounts, DNGVersion,
-    /// ColorMatrix1, SamplesPerPixel, AsShotNeutral, BaselineExposure and the CFA pattern (macOS 27.2).
+    /// The tags CIRAWFilter needs (macOS 27.2; docs/CONSTANTS.md, "SyntheticDNG").
     private func entries(stripByteCount: Int) -> [TIFFEntry] {
         let samples = mosaic.samplesPerPixel
         var entries: [TIFFEntry] = [
@@ -137,16 +126,12 @@ public struct SyntheticDNG: Sendable {
 
     private static let uncompressed: UInt16 = 1
     private static let dngVersion: [UInt8] = [1, 4, 0, 0]
-    /// ProfileGainTableMap is DNG 1.6.
     private static let gainTableDNGVersion: [UInt8] = [1, 6, 0, 0]
-    /// CFAPattern colour indices (0 red, 1 green, 2 blue), row-major.
     private static let rggbPattern: [UInt8] = [0, 1, 1, 2]
     /// DefaultBlackRender 1: no automatic black subtraction, as in iPhone ProRAW.
     private static let defaultBlackRenderNone: UInt32 = 1
 
-    /// ProfileGainTableMap stream in the file's byte order (DNG SDK `dng_gain_table_map::GetStream`):
-    /// MapPointsV, MapPointsH (u32); MapSpacingV, MapSpacingH, MapOriginV, MapOriginH (f64);
-    /// MapPointsN (u32); five MapInputWeights (f32); then the gains (f32), N innermost.
+    /// Stream layout of DNG SDK `dng_gain_table_map::GetStream`, in the file's byte order.
     private static func gainTableMap(gain: Float) -> [UInt8] {
         let points = 2
         let tablePoints = 2
@@ -162,6 +147,5 @@ public struct SyntheticDNG: Sendable {
         return bytes
     }
 
-    /// EXIF LightSource code for D65.
     private static let d65LightSource: UInt16 = 21
 }

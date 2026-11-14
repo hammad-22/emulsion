@@ -26,8 +26,7 @@
             session.beginConfiguration()
             defer { session.commitConfiguration() }
             session.sessionPreset = .photo
-            // The camera's native full-range YCbCr, which Core Image reads directly with its
-            // color attachments; BGRA only if a device lacks it.
+            // Native full-range YCbCr, which Core Image reads directly; BGRA only if a device lacks it.
             let yCbCr = kCVPixelFormatType_420YpCbCr8BiPlanarFullRange
             let format = videoOutput.availableVideoPixelFormatTypes.contains(yCbCr) ? yCbCr : kCVPixelFormatType_32BGRA
             videoOutput.videoSettings = [kCVPixelBufferPixelFormatTypeKey as String: format]
@@ -40,10 +39,6 @@
             isConfigured = true
         }
 
-        /// Swaps the input to `lens` (or the wide lens), then re-applies the RAW formats and
-        /// photo sizes, which belong to the device's active format. If the new lens has no RAW
-        /// format, the previous input goes back (or none stays, so `start` retries), so `input`,
-        /// `lens` and the RAW state always describe what the session runs.
         func use(_ requested: CameraLens) throws(CameraError) {
             let lens = devices[requested] == nil ? .wide : requested
             guard let device = devices[lens] else { throw .unavailable }
@@ -62,8 +57,6 @@
             follow(device)
         }
 
-        /// After a failed switch: the previous input back with its RAW state, or no input at all
-        /// (`rawPixelFormat` stays nil), so a later `start` sets the camera up again.
         private func restore(_ previous: AVCaptureDeviceInput?, replacing failed: AVCaptureDeviceInput) {
             if let previous, swapInput(from: failed, to: previous), (try? configureRAW(for: previous.device)) != nil {
                 follow(previous.device)
@@ -75,7 +68,6 @@
             input = nil
         }
 
-        /// On failure the session keeps `old`; `input` is set to whichever the session runs.
         private func swapInput(from old: AVCaptureDeviceInput?, to new: AVCaptureDeviceInput) -> Bool {
             session.beginConfiguration()
             defer { session.commitConfiguration() }
@@ -86,8 +78,7 @@
                 return false
             }
             session.addInput(new)
-            // Frames stay in sensor orientation; each carries the rotation that turns it
-            // upright (CameraFrame), so rotating the interface never rebuilds the pipeline.
+            // Frames stay in sensor orientation and carry their rotation (`CameraFrame`).
             if let connection = videoOutput.connection(with: .video), connection.isVideoRotationAngleSupported(0) {
                 connection.videoRotationAngle = 0
             }
@@ -95,8 +86,7 @@
             return true
         }
 
-        /// ProRAW when supported, else Bayer RAW, at the largest size. ProRAW must be enabled
-        /// after the input is added, since RAW formats only exist with a video source.
+        /// ProRAW must be enabled after the input is added: RAW formats need a video source.
         private func configureRAW(for device: AVCaptureDevice) throws(CameraError) {
             if photoOutput.isAppleProRAWSupported { photoOutput.isAppleProRAWEnabled = true }
             let formats = photoOutput.availableRawPhotoPixelFormatTypes

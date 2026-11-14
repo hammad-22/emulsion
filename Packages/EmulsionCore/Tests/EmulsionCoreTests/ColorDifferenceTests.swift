@@ -2,8 +2,6 @@ import EmulsionFixtures
 import Testing
 import simd
 
-/// The regression suite's colour difference against colour-science and the published
-/// CIEDE2000 test data, so the metric that guards every golden is itself checked.
 struct ColorDifferenceTests {
     @Test func deltaE2000MatchesPublishedPairs() throws {
         for pair in try ColorReferences.deltaE().labPairs {

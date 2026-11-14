@@ -1,8 +1,6 @@
 import XCTest
 
-/// The RAW white balance rulers (MOV-137). The bundled samples aren't RAW, so this needs a RAW
-/// photo already in the library of the isolated proof app (a synthetic DNG from
-/// `RAWDevelopChart`, copied into its library folder); it's skipped without one.
+/// Needs a RAW photo in the proof app's library (MOV-137); see Apps/iOS/AGENTS.md.
 final class WhiteBalanceUITests: XCTestCase {
     @MainActor
     func testRAWPhotoWhiteBalanceRulers() throws {
@@ -58,8 +56,6 @@ final class WhiteBalanceUITests: XCTestCase {
         XCTAssertFalse(reset.isEnabled)
     }
 
-    /// The inspector (every group at once, as on an unfolded iPhone Duo) in the debug component
-    /// gallery, which stands in a RAW photo's as-shot white balance.
     @MainActor
     func testInspectorShowsWhiteBalanceRulers() throws {
         let app = XCUIApplication()

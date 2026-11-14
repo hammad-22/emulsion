@@ -2,7 +2,6 @@ import EmulsionKit
 import EmulsionUI
 import SwiftUI
 
-/// The root screen: a live RAW viewfinder, running only while in front and active.
 struct CameraScreen: View {
     @Environment(PhotoStore.self) private var store
     @Environment(AppSettings.self) private var settings
@@ -18,13 +17,10 @@ struct CameraScreen: View {
                 CameraContent(model: model, showsLibrary: $showsLibrary, transition: libraryTransition)
             }
         }
-        // Library errors show on whichever screen is in front: an alert presented from here
-        // while the library covers the camera would dismiss the cover instead.
+        // Presenting from here while the library covers the camera would dismiss the cover.
         .background {
             if !showsLibrary { Color.clear.libraryErrorAlert(store) }
         }
-        // A neutral dark surround keeps the picture central, as in the editor. Set on this
-        // screen only, so the library above it keeps the system appearance.
         .environment(\.colorScheme, .dark)
         .tint(.white)
         .task {

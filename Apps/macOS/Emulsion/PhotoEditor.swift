@@ -9,7 +9,6 @@ struct PhotoEditor: View {
     @State private var selection: [AdjustmentGroup: String] = [:]
     @Environment(\.scenePhase) private var scenePhase
 
-    /// Fits the same labels and controls as the iPhone panel, with room to resize.
     private let minimumPanelWidth: CGFloat = 340
     private let maximumPanelWidth: CGFloat = 400
     private let minimumPhotoSize: CGFloat = 320

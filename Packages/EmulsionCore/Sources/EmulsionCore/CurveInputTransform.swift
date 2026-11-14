@@ -1,20 +1,16 @@
 import CoreImage
 import simd
 
-/// Samples → each curve's formula input, as three affine rows fixed for a whole clip: the signal
-/// range, the Y′CbCr matrix and the curve's code-value re-coding folded together, so the kernels
-/// do three dot products per pixel. Applied by `samplesToWorking` in the kernel and by `apply`.
+/// Samples → formula input as three affine rows per clip (docs/CONSTANTS.md, "CurveInputTransform").
 struct CurveInputTransform {
     let linear: simd_double3x3
     let offset: SIMD3<Double>
 
-    /// R′G′B′ samples where sample = code × `sampleUnitsPerCode`, coded in `range`.
     init(rgbIn range: SignalRange, sampleUnitsPerCode k: Double, for space: InputColorSpace) {
         let toSignal = simd_double3x3(diagonal: SIMD3(repeating: 1 / (range.lumaSpan * k)))
         self.init(toSignal: toSignal, signalOffset: SIMD3(repeating: -range.lumaBlack / range.lumaSpan), for: space)
     }
 
-    /// (Y′, Cb, Cr) samples where sample = code × `sampleUnitsPerCode`.
     init(ycbcrIn signal: VideoSignal, sampleUnitsPerCode k: Double, for space: InputColorSpace) {
         let r = signal.range
         let scale = simd_double3x3(diagonal: SIMD3(r.lumaSpan * k, r.chromaSpan * k, r.chromaSpan * k)).inverse

@@ -7,11 +7,9 @@ struct FrameGeometryTests {
     private static let corners = [CGPoint(x: 0, y: 0), CGPoint(x: 1, y: 0), CGPoint(x: 0, y: 1), CGPoint(x: 1, y: 1)]
     private static let center = CGPoint(x: 0.5, y: 0.5)
 
-    /// The upright frame's top-left, top-right, bottom-left and bottom-right corners, and
-    /// where each lies on the sensor.
+    /// Where the upright frame's corners (top-left, top-right, bottom-left, bottom-right) lie on the sensor.
     private static let sensorCorners: [(Double, [CGPoint])] = [
         (0, corners),
-        // Portrait: the sensor's top-left is the upright frame's top-right.
         (90, [CGPoint(x: 0, y: 1), CGPoint(x: 0, y: 0), CGPoint(x: 1, y: 1), CGPoint(x: 1, y: 0)]),
         (180, [CGPoint(x: 1, y: 1), CGPoint(x: 0, y: 1), CGPoint(x: 1, y: 0), CGPoint(x: 0, y: 0)]),
         (270, [CGPoint(x: 1, y: 0), CGPoint(x: 1, y: 1), CGPoint(x: 0, y: 0), CGPoint(x: 0, y: 1)]),
@@ -23,8 +21,7 @@ struct FrameGeometryTests {
         #expect(FrameGeometry.devicePoint(forFramePoint: Self.center, rotationAngle: angle) == Self.center)
     }
 
-    @Test func offCentrePointInPortrait() {
-        // A tap near the top of a portrait frame is near the sensor's left edge.
+    @Test func aTapNearThePortraitTopIsNearTheSensorsLeftEdge() {
         let point = FrameGeometry.devicePoint(forFramePoint: CGPoint(x: 0.5, y: 0.1), rotationAngle: 90)
         #expect(point == CGPoint(x: 0.1, y: 0.5))
     }

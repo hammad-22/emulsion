@@ -2,7 +2,6 @@ import EmulsionKit
 import EmulsionUI
 import SwiftUI
 
-/// The selected lens is filled, bolder and reads "1×", so the choice doesn't rely on color.
 struct LensPicker: View {
     let capabilities: CameraCapabilities
     let select: (CameraLens) -> Void

@@ -2,7 +2,6 @@
     import AVFoundation
     import Synchronization
 
-    /// Turns one photo capture's delegate callbacks into a single result.
     final class PhotoCaptureDelegate: NSObject, AVCapturePhotoCaptureDelegate, Sendable {
         private struct State {
             var continuation: CheckedContinuation<Result<Data, CameraError>, Never>?

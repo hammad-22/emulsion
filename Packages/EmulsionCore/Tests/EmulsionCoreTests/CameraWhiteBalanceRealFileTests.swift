@@ -6,17 +6,13 @@ import simd
 
 @testable import EmulsionCore
 
-/// RAW white balance on real DNGs from EMULSION_RAW_SAMPLES (never checked in). Re-saved files
-/// whose AsShotNeutral is [1, 1, 1] only test the mechanism, not the camera's white balance.
 @Suite(.enabled(if: RAWDevelopSupport.samplesFolders != nil), .serialized)
 struct CameraWhiteBalanceRealFileTests {
-    /// Measured worst 1.6e-4 (any channel and pixel, relative to max(1, value), 1024 px; absolute
-    /// 0.0024 on a file anchored +2.95 stops) setting the as-shot values back.
+    // Measured tolerances, about 2× the worst on macOS 27.2: docs/CONSTANTS.md, "Test tolerances".
     static let asShotRepeatTolerance = 4e-4
     static let cool = 3200.0
     static let daylight = 6500.0
 
-    /// Mean R/G and B/G over the frame.
     static func ratios(_ pixels: [SIMD3<Double>]) -> SIMD2<Double> {
         let mean = pixels.reduce(SIMD3<Double>.zero, +) / Double(pixels.count)
         return SIMD2(mean.x / mean.y, mean.z / mean.y)

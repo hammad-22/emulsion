@@ -2,7 +2,7 @@ import EmulsionCore
 import Foundation
 import Observation
 
-/// Saved looks are separate from the photo library. A failed read never enables an overwrite.
+/// Saved looks. See NOTES.md, "RecipeStore and RecipeTransfer".
 @MainActor @Observable
 public final class RecipeStore {
     public private(set) var recipes: [Recipe] = []
@@ -26,7 +26,6 @@ public final class RecipeStore {
             }
             recipes = loaded
         } catch let error as CocoaError where error.code == .fileReadNoSuchFile || error.code == .fileNoSuchFile {
-            // A new collection, not an unreadable one.
         } catch {
             loadError = .recipesUnreadable
         }
@@ -39,7 +38,7 @@ public final class RecipeStore {
         return recipe
     }
 
-    /// Imported identity never overwrites a saved or curated look. Importing does not apply it.
+    /// A new identity, so it never overwrites a saved or curated look; importing doesn't apply it.
     @discardableResult
     public func importRecipe(_ data: Data) throws -> Recipe {
         let imported = try Recipe.decode(data)
@@ -71,7 +70,6 @@ public final class RecipeStore {
         recipes = updated
     }
 
-    /// Bounded reads also cover providers that don't report a reliable file size.
     private static func read(_ url: URL, limit: Int) throws -> Data {
         let file = try FileHandle(forReadingFrom: url)
         defer { try? file.close() }

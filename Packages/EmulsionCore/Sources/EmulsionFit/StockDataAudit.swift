@@ -1,10 +1,8 @@
-/// Checks on digitized data beyond what loading enforces: samples on the digitizer's grid, inside the traced
-/// extent, and characteristic curves that never fall. Each finding is a readable sentence; none means the data passed.
+/// Checks on digitized data beyond loading; each finding is a readable sentence.
 enum StockDataAudit {
-    /// How far x may sit from a grid point, in grid steps (parsing `-3.70` gives `-74.000000001 × 0.05`).
+    /// Grid steps: parsing `-3.70` gives `-74.000000001 × 0.05`.
     static let gridTolerance = 1e-6
-    /// A traced characteristic curve may dip below its running maximum by this many chart pixels of density:
-    /// a tracing can't resolve less than a pixel (0.006 D on the 250D chart, 0.016 D on the 2383 chart).
+    /// A tracing can't resolve less than a chart pixel (0.006 D on 250D, 0.016 D on 2383).
     static let tracingTolerancePixels = 1.0
     /// The manifest rounds `xRange` to three decimals.
     static let rangeRounding = 0.0005
@@ -20,7 +18,7 @@ enum StockDataAudit {
             .map { "\(chart.file): x = \($0) is off the \(step) grid." }
     }
 
-    /// The digitizer resamples onto grid points up to half a pixel beyond the traced ends.
+    /// The digitizer resamples up to half a pixel beyond the traced ends.
     static func outsideTracedRange(_ chart: DigitizedChart) -> [String] {
         let slack = 0.5 / chart.entry.xAxis.pixelsPerUnit + rangeRounding
         return chart.curves.compactMap { curve in

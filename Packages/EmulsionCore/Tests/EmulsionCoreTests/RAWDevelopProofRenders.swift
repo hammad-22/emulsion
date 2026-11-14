@@ -6,11 +6,9 @@ import simd
 
 @testable import EmulsionCore
 
-/// Before/after PNGs through the neutral film look for the PRs (MOV-79, MOV-134). EMULSION_PROOF_DIR
-/// names the output folder. Real files: only the CC0 samples (names ending in `_CC0.dng`) are rendered.
+/// Before/after PNGs of the CC0 samples for PRs (MOV-79, MOV-134, MOV-10).
 @Suite(.enabled(if: TestEnvironment.proofDirectory.isSet), .serialized)
 struct RAWDevelopProofRenders {
-    /// Small enough to keep each PNG to a few hundred KB.
     static let longEdge: CGFloat = 640
     static let wedgeBaselineStops = 2.0
 
@@ -50,7 +48,6 @@ struct RAWDevelopProofRenders {
         }
     }
 
-    /// MOV-134: before is the develop without the exposure anchor, after is with it.
     @Test func writesExposureAnchorRenders() throws {
         let folder = try Self.outputFolder()
         let developer = RAWDevelopTests.developer
@@ -66,8 +63,6 @@ struct RAWDevelopProofRenders {
         }
     }
 
-    /// MOV-10: the tungsten chart tagged as daylight, as shot and at 2856 K, with the correctly
-    /// tagged file as the reference; the CC0 real files as shot, cooler and warmer.
     @Test func writesWhiteBalanceRenders() throws {
         let folder = try Self.outputFolder()
         let developer = RAWDevelopTests.developer

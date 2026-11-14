@@ -24,9 +24,7 @@
             }
         }
 
-        /// 20 fps from `serious`, as Apple's AVCam sample throttled (AVCaptureSystemPressure.h
-        /// advises throttling there); half that from `critical`, a judgement to roughly halve the
-        /// film render's cost again. Nil: the format's default rate.
+        /// 20 fps from `serious` (AVCam sample), 10 from `critical` (artistic). See NOTES.md.
         var throttledFrameRate: Int32? {
             switch self {
             case .nominal, .fair: nil
@@ -48,8 +46,7 @@
     }
 
     extension LensOption {
-        /// Each lens's magnification relative to the wide lens, from the 35 mm equivalent
-        /// focal lengths (AVCaptureDevice.h, iOS 26), or the field of view if one is unknown.
+        /// From 35 mm equivalent focal lengths, else the field of view (AVCaptureDevice.h).
         static func options(for devices: [CameraLens: AVCaptureDevice]) -> [LensOption] {
             guard let reference = devices[.wide] ?? devices.values.first else { return [] }
             return CameraLens.allCases.compactMap { lens in

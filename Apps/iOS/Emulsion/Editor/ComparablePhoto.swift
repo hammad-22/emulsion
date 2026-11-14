@@ -2,7 +2,6 @@ import EmulsionCore
 import EmulsionUI
 import SwiftUI
 
-/// Touch and hold to see the original.
 struct ComparablePhoto: View {
     let url: URL
     let adjustments: Adjustments

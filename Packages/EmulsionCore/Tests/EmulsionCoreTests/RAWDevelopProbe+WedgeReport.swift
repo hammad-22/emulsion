@@ -7,12 +7,10 @@ import simd
 @testable import EmulsionCore
 
 extension RAWDevelopProbe {
-    /// Probe labels only: a clipped patch within 2 % of neutral prints as "neutral", and a patch
-    /// counts as still rising when it is over 1 % brighter than the one below it.
+    /// Report labels only: "neutral" within 2 %, "still rising" over 1 % brighter.
     static let neutralLabelLimit = 0.02
     static let risingRatio = 1.01
 
-    /// SUMMARY lines for a developed wedge; `rows` adds a line per patch.
     static func report(_ out: Readout, chart: PatchChart, cameras: [SIMD3<Double>], scale: Double, rows: Bool) {
         let means = Self.means(out, chart: chart)
         print(

@@ -7,7 +7,7 @@ import Testing
 @testable import EmulsionKit
 
 enum TestFrames {
-    /// A frame filled with a mid grey, tagged sRGB like the mock camera's.
+    /// A mid grey frame, tagged sRGB like the mock camera's.
     static func grey(width: Int, height: Int) throws -> CameraFrame {
         let context = try #require(
             CGContext(
@@ -18,7 +18,7 @@ enum TestFrames {
         return try #require(context.makeImage().flatMap(CameraFrame.init(drawing:)))
     }
 
-    /// The first bundled sample at its own size (1800 × 1200), as an sRGB BGRA camera frame.
+    /// The first bundled sample at its own size (1800 × 1200).
     static func sample() throws -> CameraFrame {
         let url = try #require(PhotoStore.sampleURLs.first)
         let source = try #require(CGImageSourceCreateWithURL(url as CFURL, nil))
@@ -38,14 +38,12 @@ extension TestPixels {
 }
 
 extension RenderService {
-    /// Occupies the actor, as a long library render would, until `hold` is released. It blocks
-    /// rather than awaits, because an actor is free to run other work at every suspension.
+    /// Blocks rather than awaits: an actor runs other work at every suspension.
     func occupy(until hold: ActorHold) {
         hold.occupy()
     }
 }
 
-/// Keeps an actor occupied from `occupy()` until `release()`.
 final class ActorHold: Sendable {
     private let released = DispatchSemaphore(value: 0)
     private let occupying = Mutex(false)

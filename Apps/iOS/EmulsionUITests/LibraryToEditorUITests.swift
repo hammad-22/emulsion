@@ -1,9 +1,6 @@
 import XCTest
 
-/// The library and editor walkthrough. Run on a fresh install with an isolated test bundle
-/// identifier so the owner's library stays untouched.
 final class LibraryToEditorUITests: XCTestCase {
-    /// Every text on the empty library, the Import label included, passes the contrast audit.
     @MainActor
     func testEmptyLibraryContrast() throws {
         let app = try XCUIApplication.launchEmptyLibrary()

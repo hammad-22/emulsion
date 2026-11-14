@@ -3,10 +3,8 @@ import EmulsionKit
 import EmulsionUI
 import SwiftUI
 
-/// The recipes as a row of glass chips, scrolling the selection into view when they don't all fit.
 struct RecipeStrip: View {
     let recipes: [Recipe]
-    /// A snapshot: a recipe since deleted from the saved looks simply has no chip selected.
     let selection: Recipe
     let select: (Recipe) -> Void
 
@@ -25,7 +23,7 @@ struct RecipeStrip: View {
             }
         }
         .sensoryFeedback(.selection, trigger: selection.id)
-        .dynamicTypeSize(...DynamicTypeSize.accessibility1)
+        .dynamicTypeSize(...FilmLabLayout.largestCameraTextSize)
         .accessibilityElement(children: .contain)
         .accessibilityLabel("Recipes")
     }

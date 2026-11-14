@@ -89,7 +89,6 @@ struct LibraryScreen: View {
 
     private func openEditor(_ id: PhotoRecord.ID) { path.append(id) }
 
-    /// The photo picked for preview while it still exists, otherwise the newest.
     private var shownPreviewID: PhotoRecord.ID? {
         if let previewID, store.photo(previewID) != nil { return previewID }
         return store.photos.first?.id
