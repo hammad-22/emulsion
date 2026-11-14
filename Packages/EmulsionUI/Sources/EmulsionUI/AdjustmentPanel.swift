@@ -53,6 +53,8 @@ public struct AdjustmentPanel: View {
                     .frame(minWidth: FilmLabLayout.minimumControlHeight, minHeight: FilmLabLayout.minimumControlHeight)
                     .contentShape(.rect)
             }
+            // What iOS draws here anyway; on macOS it keeps the larger label out of a push-button bezel.
+            .buttonStyle(.borderless)
             .disabled(adjustments[keyPath: selectedControl.keyPath] == Adjustments()[keyPath: selectedControl.keyPath])
         }
     }
