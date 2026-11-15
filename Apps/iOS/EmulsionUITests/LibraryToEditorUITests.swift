@@ -202,15 +202,31 @@ final class LibraryToEditorUITests: XCTestCase {
 
     @MainActor
     func testLooksSaveApplyAndDelete() throws {
+        try saveApplyAndDeleteLook()
+    }
+
+    @MainActor
+    func testLooksSaveApplyAndDeleteAtLargestTextSize() throws {
+        try saveApplyAndDeleteLook(XCUIApplication.Presentation.largestText)
+    }
+
+    @MainActor
+    private func saveApplyAndDeleteLook(_ presentation: [String] = []) throws {
         XCUIDevice.shared.orientation = .portrait
-        let app = try launchSampleLibrary()
+        let app = try XCUIApplication.launchSampleLibrary(presentation)
         defer { removeSamples(app) }
         app.openFirstPhoto()
         app.buttons["Looks"].tap()
         let warm = app.buttons.matching(NSPredicate(format: "label BEGINSWITH 'Warm Light'")).firstMatch
         XCTAssertTrue(warm.waitForExistence(timeout: 5))
-        warm.tap()
+        let collection = app.collectionViews["looks-collection"]
+        let warmTitle = app.staticTexts["Warm Light"]
+        for _ in 0..<5 where warmTitle.exists && !collection.frame.contains(warmTitle.frame) { collection.swipeUp() }
+        XCTAssertTrue(warmTitle.isHittable)
+        warmTitle.tap()
+        XCTAssertTrue(app.navigationBars["Looks"].waitForNonExistence(timeout: 5))
         app.buttons["Looks"].tap()
+        XCTAssertTrue(app.navigationBars["Looks"].waitForExistence(timeout: 5))
         XCTAssertTrue(warm.waitForExistence(timeout: 5))
         XCTAssertTrue(warm.isSelected)
         app.buttons["Save Look"].tap()
@@ -223,8 +239,8 @@ final class LibraryToEditorUITests: XCTestCase {
         XCTAssertTrue(saved.waitForExistence(timeout: 5))
         XCTAssertTrue(saved.isHittable, "Saving scrolls to the new look")
         keepScreenshot(app, named: "Saved look")
-        saved.tap()
-        XCTAssertFalse(app.navigationBars["Looks"].exists)
+        app.staticTexts["Readability Test"].tap()
+        XCTAssertTrue(app.navigationBars["Looks"].waitForNonExistence(timeout: 5))
         app.buttons["Looks"].tap()
         for _ in 0..<5 where !saved.isHittable { app.collectionViews["looks-collection"].swipeUp() }
         XCTAssertTrue(saved.isSelected)

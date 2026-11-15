@@ -3,6 +3,7 @@ import EmulsionKit
 import SwiftUI
 
 struct RecipeRow: View {
+    @Environment(\.dynamicTypeSize) private var dynamicTypeSize
     let recipe: Recipe
     let isApplied: Bool
     let canDelete: Bool
@@ -10,7 +11,7 @@ struct RecipeRow: View {
     let delete: () -> Void
 
     var body: some View {
-        HStack {
+        rowLayout {
             Button(action: apply) {
                 HStack(spacing: FilmLabLayout.gap) {
                     VStack(alignment: .leading, spacing: FilmLabLayout.hairline) {
@@ -34,7 +35,14 @@ struct RecipeRow: View {
                     .frame(minWidth: FilmLabLayout.minimumControlHeight, minHeight: FilmLabLayout.minimumControlHeight)
             }
             .accessibilityLabel(Text("Options for \(recipe.name)"))
+            .frame(maxWidth: dynamicTypeSize.isAccessibilitySize ? .infinity : nil, alignment: .trailing)
         }
         .padding(.vertical, FilmLabLayout.hairline)
+    }
+
+    private var rowLayout: AnyLayout {
+        dynamicTypeSize.isAccessibilitySize
+            ? AnyLayout(VStackLayout(alignment: .leading))
+            : AnyLayout(HStackLayout())
     }
 }
