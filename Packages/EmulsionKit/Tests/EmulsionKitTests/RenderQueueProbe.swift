@@ -17,16 +17,24 @@ struct RenderQueueProbe {
     /// 12 MP (4032 × 3024) and 48 MP (8064 × 6048) charts.
     private static let raw12 = RAWDevelopChart.dng(.bayerRGGB, chart: RAWDevelopChart.chart(cell: 504))
     private static let clock = ContinuousClock()
+    private static let sliderStep = {
+        var step = Adjustments()
+        step.warmth = 0.3
+        return step
+    }()
+
+    private static func addRAWs(to library: TestLibrary) async throws -> [URL] {
+        var urls: [URL] = []
+        for _ in 0..<queuedThumbnails { urls.append(library.store.url(for: try await library.store.add(raw12, fileExtension: "dng"))) }
+        return urls
+    }
 
     /// Thumbnails at the editor's priority, then at the library's lower one (`RenderedPhoto`).
     @Test(arguments: [TaskPriority.userInitiated, .utility])
     func sliderStepBehindQueuedThumbnails(priority: TaskPriority) async throws {
         let library = TestLibrary()
         let service = library.renderService
-        var thumbnails: [URL] = []
-        for _ in 0..<Self.queuedThumbnails {
-            thumbnails.append(library.store.url(for: try await library.store.add(Self.raw12, fileExtension: "dng")))
-        }
+        let thumbnails = try await Self.addRAWs(to: library)
         let edited = library.store.url(for: try await library.store.add(TestPhoto.detailedJPEG, fileExtension: "jpg"))
         _ = try await service.image(edited, .init(), maxDimension: Self.previewPixels)
 
@@ -34,9 +42,9 @@ struct RenderQueueProbe {
             Task(priority: priority) { _ = try? await service.image(url, .init(), maxDimension: Self.thumbnailPixels) }
         }
         try await Task.sleep(for: .milliseconds(20))
-        var step = Adjustments()
-        step.warmth = 0.3
-        let latency = try await Self.clock.measure { _ = try await service.image(edited, step, maxDimension: Self.previewPixels) }
+        let latency = try await Self.clock.measure {
+            _ = try await service.image(edited, Self.sliderStep, maxDimension: Self.previewPixels)
+        }
         let all = await Self.clock.measure { for task in queued { await task.value } }
         print(
             String(
@@ -55,9 +63,7 @@ struct RenderQueueProbe {
         let peak = Footprint.Peak()
         let export = Task(priority: .utility) { try await service.export(url, .init(), format: .jpeg) }
         try await Task.sleep(for: .milliseconds(50))
-        var step = Adjustments()
-        step.warmth = 0.3
-        let latency = try await Self.clock.measure { _ = try await service.image(url, step, maxDimension: Self.previewPixels) }
+        let latency = try await Self.clock.measure { _ = try await service.image(url, Self.sliderStep, maxDimension: Self.previewPixels) }
         let exportTime = try await Self.clock.measure { _ = try await export.value }
         let peakBytes = await peak.stop()
         print(
@@ -68,10 +74,7 @@ struct RenderQueueProbe {
 
     @Test func relaunchedLibraryDevelops() async throws {
         let library = TestLibrary()
-        var urls: [URL] = []
-        for _ in 0..<Self.queuedThumbnails {
-            urls.append(library.store.url(for: try await library.store.add(Self.raw12, fileExtension: "dng")))
-        }
+        let urls = try await Self.addRAWs(to: library)
         for url in urls { _ = try await library.renderService.image(url, .init(), maxDimension: Self.thumbnailPixels) }
 
         let relaunched = library.reopened().renderService
@@ -87,15 +90,10 @@ struct RenderQueueProbe {
     @Test func previewCacheAtA5KWindow() async throws {
         let library = TestLibrary()
         let service = library.renderService
-        var bytes = 0
-        for _ in 0..<4 {
-            let url = library.store.url(for: try await library.store.add(Self.raw12, fileExtension: "dng"))
-            for pixels in [5120, 4608, 4096] as [CGFloat] {
-                let image = try await service.image(url, .init(), maxDimension: pixels)
-                bytes += image.width * image.height * 8
-            }
+        for url in try await Self.addRAWs(to: library).prefix(4) {
+            for pixels in [5120, 4608, 4096] as [CGFloat] { _ = try await service.image(url, .init(), maxDimension: pixels) }
         }
-        print(String(format: "Preview cache after 12 editor sizes at a 5K window: about %.0f MB", Double(bytes) / 1e6))
+        print(String(format: "Preview cache after 12 editor sizes at a 5K window: %.0f MB", Double(await service.cachedPreviewBytes) / 1e6))
     }
 }
 

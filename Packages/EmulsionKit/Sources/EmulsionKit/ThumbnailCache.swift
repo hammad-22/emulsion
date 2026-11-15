@@ -17,9 +17,9 @@ final class ThumbnailCache: @unchecked Sendable {
     private var unpurged: [Key: CGImage] = [:]
     private let lock = NSLock()
     private let purgesUnderMemoryPressure: Bool
-    private let files: ThumbnailFiles?
+    private let files: ThumbnailFiles
 
-    init(purgesUnderMemoryPressure: Bool = true, files: ThumbnailFiles? = ThumbnailFiles()) {
+    init(purgesUnderMemoryPressure: Bool = true, files: ThumbnailFiles = ThumbnailFiles()) {
         self.purgesUnderMemoryPressure = purgesUnderMemoryPressure
         self.files = files
         images.totalCostLimit = 64 << 20  // bytes; about 60 thumbnails at 512 px
@@ -48,29 +48,30 @@ final class ThumbnailCache: @unchecked Sendable {
     /// A thumbnail stored on disk by an earlier launch, kept in memory once read. Reads a file:
     /// never call it on the main actor.
     func storedImage(_ key: Key) -> CGImage? {
-        guard let image = files?.image(key) else { return nil }
-        keepInMemory(image, key)
+        guard let image = files.image(key) else { return nil }
+        keep(image, key)
         return image
     }
 
+    /// Keeps a thumbnail in memory; `store` writes it to disk.
     func keep(_ image: CGImage, _ key: Key) {
-        keepInMemory(image, key)
-        files?.keep(image, key)
+        if purgesUnderMemoryPressure {
+            images.setObject(image, forKey: KeyObject(key), cost: image.bytesPerRow * image.height)
+        } else {
+            lock.withLock { unpurged[key] = image }
+        }
+    }
+
+    /// Writes a thumbnail to disk: encodes and writes a file, so never on the render actor's hot path.
+    func store(_ image: CGImage, _ key: Key) {
+        files.keep(image, key)
     }
 
     /// Forgets every thumbnail in memory and the photo's on disk.
     func remove(_ url: URL) {
         images.removeAllObjects()
         lock.withLock { unpurged.removeAll() }
-        files?.remove(url)
-    }
-
-    private func keepInMemory(_ image: CGImage, _ key: Key) {
-        if purgesUnderMemoryPressure {
-            images.setObject(image, forKey: KeyObject(key), cost: image.bytesPerRow * image.height)
-        } else {
-            lock.withLock { unpurged[key] = image }
-        }
+        files.remove(url)
     }
 
     /// `NSCache` needs object keys.

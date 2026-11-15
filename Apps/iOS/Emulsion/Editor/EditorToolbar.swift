@@ -30,8 +30,7 @@ struct EditorToolbar: ToolbarContent {
         ToolbarSpacer(.fixed, placement: .topBarTrailing)
         ToolbarItem(placement: .topBarTrailing) {
             Button("Save to Photos", systemImage: "square.and.arrow.down") {
-                // Below the editor's previews, so slider steps asked for meanwhile go first.
-                Task(priority: .utility) { await export() }
+                Task { await export() }
             }
             .buttonStyle(.glassProminent)
             .tint(.white)

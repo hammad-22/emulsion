@@ -72,7 +72,7 @@ public actor RenderService {
     }
 
     private func negative(_ url: URL, maxDimension requested: CGFloat, whiteBalance: CameraWhiteBalance?) throws -> Negative {
-        let maxDimension = (requested / previewSizeStep).rounded(.up) * previewSizeStep
+        let maxDimension = (min(requested, Self.maxPreviewDimension) / previewSizeStep).rounded(.up) * previewSizeStep
         let key = "\(url.absoluteString)@\(Int(maxDimension))"
         if let cached = previews[key], cached.negative.asShotWhiteBalance == nil || cached.whiteBalance == whiteBalance {
             markUsed(key)
@@ -109,7 +109,15 @@ public actor RenderService {
     @concurrent public nonisolated func image(_ url: URL, _ adjustments: Adjustments, maxDimension: CGFloat) async throws -> CGImage {
         let thumbnail = ThumbnailCache.Key(url, adjustments, maxDimension: maxDimension)
         if let thumbnail, let cached = thumbnails.image(thumbnail) ?? thumbnails.storedImage(thumbnail) { return cached }
-        return try await render(url, adjustments, maxDimension: min(maxDimension, Self.maxPreviewDimension), thumbnail: thumbnail)
+        let image = try await render(url, adjustments, maxDimension: maxDimension, thumbnail: thumbnail)
+        if let thumbnail { thumbnails.store(image, thumbnail) }
+        return image
+    }
+
+    /// The priority to ask for a render of this size at: thumbnails below the editor, so the
+    /// actor takes a slider step ahead of queued thumbnails. See NOTES.md, "RenderService".
+    public nonisolated static func priority(forMaxDimension maxDimension: CGFloat) -> TaskPriority {
+        maxDimension <= ThumbnailCache.maxDimension ? .utility : .userInitiated
     }
 
     private func render(_ url: URL, _ adjustments: Adjustments, maxDimension: CGFloat, thumbnail: ThumbnailCache.Key?) throws -> CGImage {
@@ -145,7 +153,7 @@ public actor RenderService {
         let options: [CFString: Any] = [
             kCGImageSourceCreateThumbnailFromImageAlways: true,
             kCGImageSourceCreateThumbnailWithTransform: true,
-            kCGImageSourceThumbnailMaxPixelSize: Int(maxDimension.rounded(.up)),
+            kCGImageSourceThumbnailMaxPixelSize: Int(min(maxDimension, Self.maxPreviewDimension).rounded(.up)),
         ]
         guard let source = CGImageSourceCreateWithURL(url as CFURL, nil),
             let image = CGImageSourceCreateThumbnailAtIndex(source, 0, options as CFDictionary)
@@ -242,13 +250,13 @@ public actor RenderService {
 
     /// The anchor known for the file as it is now (restored or measured), or nil to measure it.
     private func knownExposureAnchor(_ url: URL) -> Double? {
-        let source = StoredExposureAnchor.Source(url)
+        let source = FileIdentity(url)
         return exposureAnchors.withLock { $0[url] }.flatMap { $0.source == source ? $0.stops : nil }
     }
 
     /// Remembers a measured anchor and reports it for the photo store to save (MOV-141).
     private func remember(_ stops: Double, for url: URL) {
-        guard let source = StoredExposureAnchor.Source(url) else { return }
+        guard let source = FileIdentity(url) else { return }
         exposureAnchorMeasurements += 1
         let anchor = StoredExposureAnchor(stops: stops, source: source)
         exposureAnchors.withLock { $0[url] = anchor }

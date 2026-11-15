@@ -19,7 +19,7 @@ final class ThumbnailFiles: Sendable {
     /// This build's folder: a new build may render differently, so it never reads another's.
     let folder: URL
     private let byteLimit: Int
-    /// Bytes stored in `folder`, counted on the first write.
+    /// Bytes stored in `folder`; nil until the first write prepares the folder and counts them.
     private let storedBytes = Mutex<Int?>(nil)
 
     init(parent: URL = StoredFileName.thumbnailsFolderURL, byteLimit: Int = ThumbnailFiles.byteLimit) {
@@ -46,16 +46,17 @@ final class ThumbnailFiles: Sendable {
             return
         }
         let total = storedBytes.withLock { bytes in
-            bytes = (bytes ?? 0) + data.count
-            return bytes ?? 0
+            let total = (bytes ?? 0) + data.count
+            bytes = total
+            return total
         }
         if total > byteLimit { trim() }
     }
 
     /// Removes every stored thumbnail of a photo (deleted, or its file changed).
     func remove(_ url: URL) {
-        let prefix = Self.digest(url.absoluteString, length: Self.photoDigestLength)
-        for (file, size) in storedFiles() where file.lastPathComponent.hasPrefix(prefix) {
+        let prefix = Self.digest(Data(url.absoluteString.utf8), length: Self.photoDigestLength)
+        for (file, size, _) in storedFiles() where file.lastPathComponent.hasPrefix(prefix) {
             if (try? FileManager.default.removeItem(at: file)) != nil { storedBytes.withLock { $0 = $0.map { $0 - size } } }
         }
     }
@@ -63,9 +64,10 @@ final class ThumbnailFiles: Sendable {
     /// `<photo>-<edit>.jpg`: the photo part lets `remove` find a photo's files; the edit part covers
     /// the file's size and date, the edit and the size, so any change misses instead of serving a stale image.
     private func file(for key: ThumbnailCache.Key) -> URL? {
-        guard let source = StoredExposureAnchor.Source(key.url), let edit = try? Self.encoder.encode(key.adjustments) else { return nil }
+        guard let source = FileIdentity(key.url), let edit = try? Self.encoder.encode(key.adjustments) else { return nil }
         let identity = "\(source.byteCount)|\(source.modified.timeIntervalSinceReferenceDate)|\(key.pixels)|"
-        let name = Self.digest(key.url.absoluteString, length: Self.photoDigestLength) + "-" + Self.digest(identity, edit)
+        let photo = Self.digest(Data(key.url.absoluteString.utf8), length: Self.photoDigestLength)
+        let name = photo + "-" + Self.digest(Data(identity.utf8) + edit)
         return folder.appending(path: name).appendingPathExtension(StoredFileName.thumbnailExtension)
     }
 
@@ -82,23 +84,22 @@ final class ThumbnailFiles: Sendable {
     /// Deletes the least recently shown thumbnails until the folder is back under its limit,
     /// always keeping the newest.
     private func trim() {
-        let files = storedFiles(sortedByDate: true)
+        let files = storedFiles().sorted { $0.modified < $1.modified }
         var total = files.reduce(0) { $0 + $1.size }
         let target = Int(Double(byteLimit) * Self.trimmedShare)
-        for (file, size) in files.dropLast() where total > target {
+        for (file, size, _) in files.dropLast() where total > target {
             if (try? FileManager.default.removeItem(at: file)) != nil { total -= size }
         }
         storedBytes.withLock { $0 = total }
     }
 
-    private func storedFiles(sortedByDate: Bool = false) -> [(url: URL, size: Int)] {
+    func storedFiles() -> [(url: URL, size: Int, modified: Date)] {
         let keys: [URLResourceKey] = [.fileSizeKey, .contentModificationDateKey]
         let urls = (try? FileManager.default.contentsOfDirectory(at: folder, includingPropertiesForKeys: keys)) ?? []
-        let files = urls.compactMap { url -> (url: URL, size: Int, modified: Date)? in
+        return urls.compactMap { url in
             guard let values = try? url.resourceValues(forKeys: Set(keys)) else { return nil }
             return (url, values.fileSize ?? 0, values.contentModificationDate ?? .distantPast)
         }
-        return (sortedByDate ? files.sorted { $0.modified < $1.modified } : files).map { ($0.url, $0.size) }
     }
 
     private static func jpeg(_ image: CGImage) -> Data? {
@@ -117,18 +118,15 @@ final class ThumbnailFiles: Sendable {
     /// Hex digits of the photo's digest in a file name; 64 bits, so photos never collide in practice.
     private static let photoDigestLength = 16
 
-    private static func digest(_ text: String, _ data: Data = Data(), length: Int = SHA256.byteCount * 2) -> String {
-        var hash = SHA256()
-        hash.update(data: Data(text.utf8))
-        hash.update(data: data)
-        return String(hash.finalize().map { String(format: "%02x", $0) }.joined().prefix(length))
+    private static func digest(_ data: Data, length: Int = SHA256.byteCount * 2) -> String {
+        String(SHA256.hash(data: data).map { String(format: "%02x", $0) }.joined().prefix(length))
     }
 
     /// The app's version and its executable's size and date: any rebuild changes it.
     private static let buildIdentity: String = {
         let version = Bundle.main.object(forInfoDictionaryKey: "CFBundleVersion") as? String ?? ""
-        let executable = Bundle.main.executableURL.flatMap { StoredExposureAnchor.Source($0) }
+        let executable = Bundle.main.executableURL.flatMap(FileIdentity.init)
         let identity = "\(version)|\(executable?.byteCount ?? 0)|\(executable?.modified.timeIntervalSinceReferenceDate ?? 0)"
-        return digest(identity, length: photoDigestLength)
+        return digest(Data(identity.utf8), length: photoDigestLength)
     }()
 }

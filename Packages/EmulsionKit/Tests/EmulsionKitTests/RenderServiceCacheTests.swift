@@ -1,4 +1,3 @@
-import CoreImage
 import EmulsionCore
 import Foundation
 import Testing
@@ -69,15 +68,15 @@ struct RenderServiceCacheTests {
             files.keep(image, try #require(ThumbnailCache.Key(url, edit, maxDimension: 300)))
         }
 
-        let stored = try FileManager.default.contentsOfDirectory(at: files.folder, includingPropertiesForKeys: [.fileSizeKey])
-        let bytes = try stored.reduce(0) { $0 + (try $1.resourceValues(forKeys: [.fileSizeKey]).fileSize ?? 0) }
+        let stored = files.storedFiles()
+        let bytes = stored.reduce(0) { $0 + $1.size }
         #expect(bytes <= Self.trimLimit)
         #expect(!stored.isEmpty, "trimming keeps the most recent")
     }
 
     @Test func editorPreviewsAreCappedInSize() async throws {
         let library = TestLibrary()
-        let url = library.store.url(for: try await library.store.add(Self.largeJPEG, fileExtension: "jpg"))
+        let url = library.store.url(for: try await library.store.add(TestPhoto.large, fileExtension: "jpg"))
 
         let preview = try await library.renderService.image(url, .init(), maxDimension: 5120)
 
@@ -88,7 +87,7 @@ struct RenderServiceCacheTests {
         let library = TestLibrary()
         let service = library.renderService
         for _ in 0..<3 {
-            let url = library.store.url(for: try await library.store.add(Self.largeJPEG, fileExtension: "jpg"))
+            let url = library.store.url(for: try await library.store.add(TestPhoto.large, fileExtension: "jpg"))
             for pixels in [2560, 2304, 2048] as [CGFloat] { _ = try await service.image(url, .init(), maxDimension: pixels) }
         }
 
@@ -97,11 +96,4 @@ struct RenderServiceCacheTests {
     }
 
     private static let trimLimit = 256 << 10
-
-    /// 4000 × 3000 gray, larger than the preview cap; encoded on the CPU (MOV-127).
-    private static let largeJPEG: Data = {
-        let space = CGColorSpace(name: CGColorSpace.sRGB)!
-        let image = CIImage(color: CIColor(red: 0.4, green: 0.45, blue: 0.5)).cropped(to: CGRect(x: 0, y: 0, width: 4000, height: 3000))
-        return CIContext(options: [.useSoftwareRenderer: true]).jpegRepresentation(of: image, colorSpace: space)!
-    }()
 }

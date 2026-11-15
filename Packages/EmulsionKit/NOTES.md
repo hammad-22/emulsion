@@ -175,14 +175,16 @@ warmer, the way Warmth does.
   cached develops at a 5K window held about 585 MB. Exports are always full size.
 - **Preview cache:** develops are kept within `previewCacheBytes` (half-float RGBA, 8 bytes a pixel),
   least recently used first, instead of 12 by count; the newest is always kept.
-- **Order:** library work runs on this actor one job at a time. Thumbnails ask at `.utility` and the
-  editor at `.userInitiated`, and the actor runs higher-priority jobs first, so a slider step jumps
-  ahead of queued thumbnails (measured in `RenderQueueProbe`). A thumbnail stored on disk is read
+- **Order:** library work runs on this actor one job at a time. Thumbnails ask at `.utility`
+  (`priority(forMaxDimension:)`) and the editor at `.userInitiated`, and the actor's default executor
+  runs higher-priority jobs first, so a slider step jumps queued thumbnails: 343–383 ms → 10–23 ms
+  behind eight 12 MP thumbnails (`RenderQueueProbe`, Mac). That is runtime behaviour, not a documented
+  guarantee; the probe shows if it changes. A thumbnail stored on disk is read
   before the actor is asked, so it never waits behind a render. A render checks for cancellation
   again after its develop, so a superseded slider step skips its look render.
-- **Exports stay on the actor** (MOV-163). The editor asks for them at `.utility`, so an export waits
-  for queued previews, but once running it holds the actor until it's done, and a slider step asked
-  for meanwhile waits for the rest of it. Running exports beside previews would mean a full-size
+- **Exports stay on the actor** (MOV-163), at the editor's priority: once running, an export holds
+  the actor until it's done, and a slider step asked for meanwhile waits for the rest of it. A
+  `.utility` export was tried and dropped: it also runs on slower threads, so saving took longer. Running exports beside previews would mean a full-size
   RAW decode at the same time as a preview's decode of the same file, which MOV-147 found unsafe in
   some decoder states, and both peaks at once (2.2–2.3 GB for a 48 MP export). Revisit after
   MOV-147's owned-buffer develop lands, with peak memory measured on a device.

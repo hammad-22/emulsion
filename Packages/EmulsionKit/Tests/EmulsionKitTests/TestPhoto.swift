@@ -27,6 +27,13 @@ enum TestPhoto {
         return CIContext(options: [.useSoftwareRenderer: true]).jpegRepresentation(of: image, colorSpace: space)!
     }()
 
+    /// 4000 × 3000 gray, larger than the editor's preview cap.
+    static let large: Data = {
+        let space = CGColorSpace(name: CGColorSpace.sRGB)!
+        let gray = CIImage(color: CIColor(red: 0.4, green: 0.45, blue: 0.5)).cropped(to: CGRect(x: 0, y: 0, width: 4000, height: 3000))
+        return CIContext(options: [.useSoftwareRenderer: true]).jpegRepresentation(of: gray, colorSpace: space)!
+    }()
+
     /// A synthetic DNG (384 × 144) whose profile brightens through a gain table, as 48 MP ProRAW
     /// does, so its develop measures an exposure anchor (about 2 stops).
     static let anchoredRAW = RAWDevelopChart.dng(
