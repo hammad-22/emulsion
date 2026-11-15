@@ -54,6 +54,33 @@ struct GrainSizeAndColorTests {
         #expect(GrainMeasurement.lagCorrelation(red, width: width, height: height, dx: 1, dy: 0) > 0.1)
     }
 
+    /// The one-pass clump kernel equals the normalised Gaussian sum of the CPU noise copy over its taps
+    /// (what the two-pass blur computed), negative coordinates included. Measured: worst 3.8e-7.
+    @Test(arguments: [0.49, 0.85, 1.7])
+    func clumpKernelIsTheGaussianSumOfTheNoise(sigma: Double) throws {
+        let (seed, side) = (5.0, 48)
+        let extent = CGRect(x: -16, y: -8, width: side, height: side)
+        let kernels = EmulsionTestCase.kernels
+        let gpu = Fixtures.linear(try kernels.run(kernels.grainClumpNoise, extent, [seed, sigma]))
+        let w = Self.taps(sigma: sigma)
+        let radius = w.count / 2
+        var worst = 0.0
+        for row in 0..<side {
+            for column in 0..<side {
+                var sum = SIMD3<Double>.zero
+                for dy in -radius...radius {
+                    for dx in -radius...radius {
+                        let n = GrainMeasurement.referenceNoise(x: Int32(column - 16 + dx), y: Int32(row - 8 + dy), seed: Float(seed))
+                        sum += SIMD3<Double>(n) * (w[dx + radius] * w[dy + radius])
+                    }
+                }
+                worst = max(worst, simd_reduce_max(simd_abs(sum - gpu[row * side + column])))
+            }
+        }
+        print(String(format: "GRAIN clump kernel vs CPU Gaussian sum, σ %.2f px: worst %.3g", sigma, worst))
+        #expect(worst <= 1e-5)
+    }
+
     /// Where a clump is narrower than `Grain.minimumClumpSigmaPixels` the noise is the white field itself.
     @Test func previewSizedClumpsAreTheWhiteNoise() throws {
         let extent = CGRect(x: 0, y: 0, width: 1600, height: 1200)

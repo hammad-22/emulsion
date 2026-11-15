@@ -85,34 +85,12 @@ struct GrainTests {
         var worst = 0.0
         for row in 0..<256 {
             for column in 0..<256 {
-                let cpu = Self.referenceNoise(x: Int32(column) - 128, y: Int32(row) - 64, seed: Float(seed))
+                let cpu = GrainMeasurement.referenceNoise(x: Int32(column) - 128, y: Int32(row) - 64, seed: Float(seed))
                 worst = max(worst, simd_reduce_max(simd_abs(SIMD3<Double>(cpu) - gpu[row * 256 + column])))
             }
         }
         print(String(format: "GRAIN noise GPU vs integer reference, seed %.0f: worst %.3g", seed, worst))
         #expect(worst <= 1e-6)
-    }
-
-    /// The kernel `grainNoise` at pixel (x, y), computed on the CPU.
-    private static func referenceNoise(x: Int32, y: Int32, seed: Float) -> SIMD3<Float> {
-        func pcg4d(_ input: SIMD4<UInt32>) -> SIMD4<UInt32> {
-            var v = input &* 1_664_525 &+ 1_013_904_223
-            func mix() {
-                v.x &+= v.y &* v.w
-                v.y &+= v.z &* v.x
-                v.z &+= v.x &* v.y
-                v.w &+= v.y &* v.z
-            }
-            mix()
-            v ^= v &>> 16
-            mix()
-            return v
-        }
-        return SIMD3(
-            (0..<3).map { c in
-                let a = pcg4d(SIMD4(UInt32(bitPattern: x), UInt32(bitPattern: y), seed.bitPattern, UInt32(c))) &>> 10
-                return (Float(2 * (a.x + a.y + a.z + a.w) + 4) / 4_194_304 - 4) * (3 / Float(4)).squareRoot()
-            })
     }
 
     /// White at the pixel scale: the radially averaged periodogram (10 bands to 0.5 cycles/pixel) is

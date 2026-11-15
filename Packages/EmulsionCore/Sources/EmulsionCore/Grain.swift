@@ -84,11 +84,10 @@ extension Kernels {
         try run(grainNoise, extent, [seed])
     }
 
-    /// `grainNoise` blurred into clumps for grain `size` (`Grain.clumpSigmaPixels`), sized to the extent's long edge.
+    /// `grainNoise` blurred into clumps for grain `size` (`Grain.clumpSigmaPixels`) in one pass (kernel `grainClumpNoise`).
     func grainNoise(_ extent: CGRect, seed: Double, size: Double) throws -> CIImage {
         let sigma = Grain.clumpSigmaPixels(size: size, longEdge: max(extent.width, extent.height))
         guard sigma >= Grain.minimumClumpSigmaPixels else { return try grainNoise(extent, seed: seed) }
-        let margin = Kernels.gaussianRadius(sigma: sigma)
-        return try gaussianBlur(grainNoise(extent.insetBy(dx: -margin, dy: -margin), seed: seed), sigma: sigma).cropped(to: extent)
+        return try run(grainClumpNoise, extent, [seed, sigma])
     }
 }

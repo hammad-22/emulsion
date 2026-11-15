@@ -75,7 +75,7 @@ float3 fitP3(float3 rgb) {
 // filmSystemRelative adds ends and then baseLights = the calibrated printer lights alone.
 // Halation and grain (filmSystem, filmSystemRelative): the scene sampler is followed by `glow`
 // (halationMix: rgb = the glow G per layer R, G, B, before the exposure control) and `noise`
-// (grainNoise, unit-variance noise per layer, blurred into clumps for grain size > 1). After the film arguments (for
+// (grainNoise, unit-variance noise per layer; grainClumpNoise for grain size > 1). After the film arguments (for
 // filmSystemRelative, after ends and baseLights) come k = returned light per layer (red, green,
 // blue) and i0..i2 = rows of the inverse sensitivity (both packed by Halation.swift), then
 // g0..g7 = one grain table knot each (packed by Grain.swift): (σ red, σ green, σ blue, log10
@@ -395,8 +395,8 @@ constant float grainUniformStep=1.0/4194304.0; // 2^-22
 // Generator: rgb = three independent, zero-mean, unit-variance values per integer pixel (red,
 // green and blue layer), deterministic for `seed` (its bits enter the hash); opaque. White: no
 // correlation between pixels. Every step is exact in float up to the last multiply.
-extern "C" float4 grainNoise(float seed, coreimage::destination dest) {
-    uint2 pixel=as_type<uint2>(int2(floor(dest.coord())));
+float3 whiteGrain(int2 p, float seed) {
+    uint2 pixel=as_type<uint2>(p);
     float3 n;
     for(uint c=0;c<3;c++) {
         uint4 a=pcg4d(uint4(pixel,as_type<uint>(seed),c))>>grainUniformShift;
@@ -404,7 +404,27 @@ extern "C" float4 grainNoise(float seed, coreimage::destination dest) {
         n[c]=float(2u*(a.x+a.y+a.z+a.w)+4u)*grainUniformStep-4.0;
     }
     // A uniform on [−1, 1) has variance 1/3.
-    return float4(n*sqrt(3.0/4.0),1.0);
+    return n*sqrt(3.0/4.0);
+}
+extern "C" float4 grainNoise(float seed, coreimage::destination dest) {
+    return float4(whiteGrain(int2(floor(dest.coord())),seed),1.0);
+}
+// Generator: grainNoise blurred into clumps by a Gaussian of `sigma` pixels in one pass (Grain.swift,
+// grain size): taps exp(−i²/2σ²), |i| ≤ ⌈4σ⌉, normalised as in gaussianPass, over re-hashed neighbours,
+// so a full-size render keeps no noise intermediates. Opaque.
+extern "C" float4 grainClumpNoise(float seed, float sigma, coreimage::destination dest) {
+    int2 p=int2(floor(dest.coord()));
+    int radius=int(ceil(4.0*sigma));
+    float k=-1.0/(2.0*sigma*sigma);
+    float total=0.0;
+    for(int i=-radius;i<=radius;i++) total+=exp(float(i*i)*k);
+    float3 sum=float3(0.0);
+    for(int dy=-radius;dy<=radius;dy++) {
+        float3 row=float3(0.0);
+        for(int dx=-radius;dx<=radius;dx++) row+=exp(float(dx*dx)*k)*whiteGrain(p+int2(dx,dy),seed);
+        sum+=exp(float(dy*dy)*k)*row;
+    }
+    return float4(sum/(total*total),1.0);
 }
 
 // ---- Local tone (Highlights / Shadows), carried over from the GradingCore study ----
