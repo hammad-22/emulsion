@@ -36,10 +36,10 @@ struct RAWDecoderTests {
         let reference = Developer.normalized(try #require(untouched.outputImage))
         let decoder = try #require(Self.developer.rawDecoder(data, maxDimension: nil, anchor: .none))
 
-        #expect(Self.worstDifference(try decoder.negative().image, reference) == 0)
-        let moved = try decoder.negative(whiteBalance: Self.tungsten)
+        #expect(Self.worstDifference(try decoder.decode(whiteBalance: nil).image, reference) == 0)
+        let moved = try decoder.decode(whiteBalance: Self.tungsten)
         #expect(Self.worstDifference(moved.image, reference) > 0.1, "the white balance changes the develop")
-        let back = Self.worstDifference(try decoder.negative().image, reference)
+        let back = Self.worstDifference(try decoder.decode(whiteBalance: nil).image, reference)
         #expect(back <= Self.backToAsShotTolerance, "back at as shot: \(back)")
     }
 

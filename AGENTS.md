@@ -109,6 +109,7 @@ Stock-data checks and `emulsion-fit` read the local reference data (traced curve
 - Don't call anything "physical", "accurate" or "like stock X" without a measurement or a primary source. Label artistic choices as artistic.
 - No third-party copyleft code or data (GPL, AGPL, LGPL, CC BY-SA) in the engine or apps: the project is AGPL-3.0-only and the owner must hold every right (MOV-94). No film brand names in the product (MOV-92).
 - Don't add per-pixel iterative solves to the live preview path without profiling on device.
+- Never set `CIRAWFilter.contrastAmount` to 0, and never let a look or export render read Apple's lazy RAW decode: only `RAWDecoder.negative` renders it (and the exposure anchor's 256 px thumbnails). It corrupts whole tiles (MOV-147, `docs/ENGINE.md`).
 - **Looks are judged against real references, first.** Before building or changing anything that affects how a photo looks (grain, halation, colour, tone, light leaks, a new look):
   1. Use references that match the look: real scans of that film stock, or real photos from that kind of camera for non-film looks. Never judge one stock against another stock's scans. References are local, look-only and never committed.
   2. If no matching references exist, say so and label the result "not yet checked against real film". Datasheet values and what was learned from other stocks are a starting point, not proof.

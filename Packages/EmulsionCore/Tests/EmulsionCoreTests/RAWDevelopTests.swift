@@ -18,7 +18,7 @@ struct RAWDevelopTests {
     static func develop(
         _ mosaic: SyntheticDNG.Mosaic, baselineStops: Double, maxDimension: CGFloat? = nil
     ) throws -> RAWDevelopSupport.Developed {
-        try RAWDevelopSupport.develop(
+        try RAWDevelopSupport.decoded(
             RAWDevelopChart.dng(mosaic, chart: chart, baselineStops: baselineStops), chart: chart, maxDimension: maxDimension)
     }
 

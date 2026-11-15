@@ -30,7 +30,7 @@ struct CameraWhiteBalanceTests {
     static func develop(
         _ data: Data, _ whiteBalance: CameraWhiteBalance? = nil, chart: PatchChart = chart, maxDimension: CGFloat? = nil
     ) throws -> RAWDevelopSupport.Developed {
-        try RAWDevelopSupport.develop(data, chart: chart, maxDimension: maxDimension, whiteBalance: whiteBalance)
+        try RAWDevelopSupport.decoded(data, chart: chart, maxDimension: maxDimension, whiteBalance: whiteBalance)
     }
 
     static func worstNeutralError(_ means: [SIMD3<Double>]) -> Double {

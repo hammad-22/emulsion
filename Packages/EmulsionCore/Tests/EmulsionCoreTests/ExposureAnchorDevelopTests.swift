@@ -28,7 +28,7 @@ struct ExposureAnchorDevelopTests {
         _ mosaic: SyntheticDNG.Mosaic, baselineStops: Double, profile: SyntheticDNG.Profile?, maxDimension: CGFloat? = nil,
         anchor: ExposureAnchor.Choice = .measured
     ) throws -> RAWDevelopSupport.Developed {
-        try RAWDevelopSupport.develop(
+        try RAWDevelopSupport.decoded(
             RAWDevelopChart.dng(mosaic, chart: chart, baselineStops: baselineStops, profile: profile), chart: chart,
             maxDimension: maxDimension, anchor: anchor)
     }
@@ -160,9 +160,9 @@ struct ExposureAnchorDevelopTests {
     func givenAnchorIsAppliedAsGiven(_ mosaic: SyntheticDNG.Mosaic) throws {
         let data = RAWDevelopChart.dng(
             mosaic, chart: Self.chart, baselineStops: Self.fortyEightBaselineStops, profile: Self.fortyEight)
-        let measured = RAWDevelopSupport.Developed(chart: Self.chart, try Self.developer.develop(data))
+        let measured = RAWDevelopSupport.Developed(chart: Self.chart, try RAWDevelopSupport.decode(data))
         let brighter = measured.negative.exposureAnchorStops + 1
-        let given = RAWDevelopSupport.Developed(chart: Self.chart, try Self.developer.develop(data, exposureAnchorStops: brighter))
+        let given = RAWDevelopSupport.Developed(chart: Self.chart, try RAWDevelopSupport.decode(data, anchor: .known(stops: brighter)))
         #expect(given.negative.exposureAnchorStops == brighter)
         #expect(given.pixels == measured.pixels.map { $0 * 2 })
     }

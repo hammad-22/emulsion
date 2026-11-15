@@ -45,13 +45,32 @@ enum RAWDevelopSupport {
         }
     }
 
-    static func develop(
+    /// Apple's decode as the develop configures it, before the develop's half-float buffer: the decoder measured at
+    /// float precision (`developIsTheDecodeInHalfFloat` bounds the buffer's rounding).
+    static func decoded(
         _ data: Data, chart: PatchChart, maxDimension: CGFloat? = nil, whiteBalance: CameraWhiteBalance? = nil,
         anchor: ExposureAnchor.Choice = .measured
     ) throws -> Developed {
-        Developed(
-            chart: chart,
-            try RAWDevelopTests.developer.develop(data, maxDimension: maxDimension, whiteBalance: whiteBalance, anchor: anchor))
+        Developed(chart: chart, try decode(data, maxDimension: maxDimension, whiteBalance: whiteBalance, anchor: anchor))
+    }
+
+    /// Measured worst 9.5e-4 (relative to the larger of the value and `halfFloatFloor`); a half-float step is 2^-10.
+    static let halfFloatTolerance = 0.002
+    static let halfFloatFloor = 0.01
+    static let rendererLikeContext = CIContext(options: Renderer.contextOptions)
+
+    /// Linear values read through a context with the renderer's options (half-float working format), bottom row first.
+    static func linearThroughRendererContext(_ image: CIImage) -> [SIMD3<Double>] {
+        RAWDevelopProbe.rgba(image, context: rendererLikeContext).map { SIMD3(Double($0.x), Double($0.y), Double($0.z)) }
+    }
+
+    static func decode(
+        _ data: Data, maxDimension: CGFloat? = nil, whiteBalance: CameraWhiteBalance? = nil, anchor: ExposureAnchor.Choice = .measured
+    ) throws -> Negative {
+        guard let decoder = RAWDevelopTests.developer.rawDecoder(data, maxDimension: maxDimension, anchor: anchor) else {
+            throw EmulsionError.unsupportedPhoto
+        }
+        return try decoder.decode(whiteBalance: whiteBalance)
     }
 
     static func worstRelativeDifference(
