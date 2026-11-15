@@ -27,6 +27,13 @@ enum TestPhoto {
         return CIContext(options: [.useSoftwareRenderer: true]).jpegRepresentation(of: image, colorSpace: space)!
     }()
 
+    /// 4000 × 3000 gray, larger than the editor's preview cap.
+    static let large: Data = {
+        let space = CGColorSpace(name: CGColorSpace.sRGB)!
+        let gray = CIImage(color: CIColor(red: 0.4, green: 0.45, blue: 0.5)).cropped(to: CGRect(x: 0, y: 0, width: 4000, height: 3000))
+        return CIContext(options: [.useSoftwareRenderer: true]).jpegRepresentation(of: gray, colorSpace: space)!
+    }()
+
     /// A synthetic DNG (384 × 144) whose profile brightens through a gain table, as 48 MP ProRAW
     /// does, so its develop measures an exposure anchor (about 2 stops).
     static let anchoredRAW = RAWDevelopChart.dng(
@@ -44,9 +51,10 @@ final class TestLibrary {
     static let renderer = try? Renderer()
 
     let folder = URL.temporaryDirectory.appending(path: "EmulsionKitTests-\(UUID().uuidString)", directoryHint: .isDirectory)
-    let renderService = RenderService(
-        renderer: TestLibrary.renderer, thumbnails: ThumbnailCache(purgesUnderMemoryPressure: false),
-        latestRenders: LatestRenderCache(purgesUnderMemoryPressure: false))
+    /// Where this library's services keep thumbnails on disk, as the app's Caches folder.
+    let thumbnailsFolder = URL.temporaryDirectory.appending(
+        path: "EmulsionKitTests-Thumbnails-\(UUID().uuidString)", directoryHint: .isDirectory)
+    lazy var renderService = makeRenderService()
     lazy var store = PhotoStore(folder: folder, renderService: renderService)
     /// Settings in their own defaults suite, removed with the library.
     private let settingsSuite = "EmulsionKitTests-\(UUID().uuidString)"
@@ -58,11 +66,15 @@ final class TestLibrary {
 
     /// The same folder opened again, as on the next launch.
     func reopened() -> PhotoStore {
-        PhotoStore(
-            folder: folder,
-            renderService: RenderService(
-                renderer: TestLibrary.renderer, thumbnails: ThumbnailCache(purgesUnderMemoryPressure: false),
-                latestRenders: LatestRenderCache(purgesUnderMemoryPressure: false)))
+        PhotoStore(folder: folder, renderService: makeRenderService())
+    }
+
+    /// A service as the app makes one, sharing this library's thumbnails on disk, as a relaunch does.
+    func makeRenderService() -> RenderService {
+        RenderService(
+            renderer: TestLibrary.renderer,
+            thumbnails: ThumbnailCache(purgesUnderMemoryPressure: false, files: ThumbnailFiles(parent: thumbnailsFolder)),
+            latestRenders: LatestRenderCache(purgesUnderMemoryPressure: false))
     }
 
     /// A camera on the stand-in source with this library's store and settings.
@@ -72,6 +84,7 @@ final class TestLibrary {
 
     isolated deinit {
         try? FileManager.default.removeItem(at: folder)
+        try? FileManager.default.removeItem(at: thumbnailsFolder)
         UserDefaults().removePersistentDomain(forName: settingsSuite)
     }
 }

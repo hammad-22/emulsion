@@ -7,7 +7,7 @@ import Foundation
 /// lights), Color is saturation, Grain is sensor noise and Halation is the in-camera processing
 /// (purple fringing, corner softness, vignette, sharpening halos and, in exports, JPEG
 /// compression; 0 is clean).
-public struct Adjustments: Codable, Equatable, Sendable {
+public struct Adjustments: Codable, Hashable, Sendable {
     /// Scene exposure in stops (−3…3).
     public var exposure: Double = 0
     /// Printer-light warmth (−1 cool … 1 warm) and tint (−1 green … 1 magenta).

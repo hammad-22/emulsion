@@ -9,7 +9,7 @@ import SwiftUI
 /// a fold doesn't flash); failing those, a filled frame (a thumbnail) waits as a quiet placeholder and a fitted one
 /// shows progress.
 /// Re-renders when the edit or size changes, keeping the last image so slider drags don't flash
-/// and showing each render that finishes during a drag (`RenderOrder`).
+/// and showing each render that finishes during a drag (`RenderOrder`), at the service's priority for its size.
 public struct RenderedPhoto: View {
     private let url: URL
     private let adjustments: Adjustments
@@ -34,7 +34,7 @@ public struct RenderedPhoto: View {
             let request = Request(url: url, adjustments: adjustments, showsOriginal: showsOriginal, pixels: pixels(for: proxy.size))
             content(request)
                 .frame(width: proxy.size.width, height: proxy.size.height)
-                .task(id: request) { await render(request) }
+                .task(id: request, priority: RenderService.priority(forMaxDimension: request.pixels)) { await render(request) }
         }
         .clipped()
     }
