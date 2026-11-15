@@ -167,6 +167,41 @@ equal visible steps at any temperature, where equal steps in kelvin are coarse a
 imperceptible at shade. It is negated so the ruler increases with the kelvin setting, which renders
 warmer, the way Warmth does.
 
+## RenderService
+
+- **Preview size:** editor previews are developed and rendered no larger than
+  `maxPreviewDimension` (2560 px). A phone screen's long edge is about that (2622 px on iPhone 17
+  Pro), and a larger window, such as a 5K Mac display, only scales the preview up: before the cap, 12
+  cached develops at a 5K window held about 585 MB. Exports are always full size.
+- **Preview cache:** develops are kept within `previewCacheBytes` (half-float RGBA, 8 bytes a pixel),
+  least recently used first, instead of 12 by count; the newest is always kept.
+- **Order:** library work runs on this actor one job at a time. Thumbnails ask at `.utility` and the
+  editor at `.userInitiated`, and the actor runs higher-priority jobs first, so a slider step jumps
+  ahead of queued thumbnails (measured in `RenderQueueProbe`). A thumbnail stored on disk is read
+  before the actor is asked, so it never waits behind a render. A render checks for cancellation
+  again after its develop, so a superseded slider step skips its look render.
+- **Exports stay on the actor** (MOV-163). The editor asks for them at `.utility`, so an export waits
+  for queued previews, but once running it holds the actor until it's done, and a slider step asked
+  for meanwhile waits for the rest of it. Running exports beside previews would mean a full-size
+  RAW decode at the same time as a preview's decode of the same file, which MOV-147 found unsafe in
+  some decoder states, and both peaks at once (2.2–2.3 GB for a 48 MP export). Revisit after
+  MOV-147's owned-buffer develop lands, with peak memory measured on a device.
+
+## ThumbnailFiles
+
+- Rendered thumbnails (up to 512 px) are kept as JPEG files in Caches/Emulsion/Thumbnails, so a
+  relaunched library shows them without developing every visible photo again; the system may
+  delete the folder when space is short.
+- A file's name covers the photo (its URL) and, hashed, its file's size and modification date, the
+  whole edit and the size, so any change misses instead of showing a stale thumbnail. A folder per
+  build (app version and executable), so a new engine never shows an old build's renders; other
+  builds' folders are removed on the first write.
+- Bounded at `byteLimit`: past it, the least recently shown files (by modification date, touched on
+  every read) are deleted down to three quarters of it.
+- JPEG at quality 0.9 is a deliberate, artistic trade: a stored thumbnail is not bit-identical to a
+  fresh render, which only the library grid shows. Reading happens off the main actor; `cachedThumbnail`
+  only looks in memory.
+
 ## LatestRenderCache
 
 Keeps the latest editor-sized render of each photo, so a photo view rebuilt in a new layout (folding

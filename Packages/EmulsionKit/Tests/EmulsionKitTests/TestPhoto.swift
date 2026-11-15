@@ -44,9 +44,10 @@ final class TestLibrary {
     static let renderer = try? Renderer()
 
     let folder = URL.temporaryDirectory.appending(path: "EmulsionKitTests-\(UUID().uuidString)", directoryHint: .isDirectory)
-    let renderService = RenderService(
-        renderer: TestLibrary.renderer, thumbnails: ThumbnailCache(purgesUnderMemoryPressure: false),
-        latestRenders: LatestRenderCache(purgesUnderMemoryPressure: false))
+    /// Where this library's services keep thumbnails on disk, as the app's Caches folder.
+    let thumbnailsFolder = URL.temporaryDirectory.appending(
+        path: "EmulsionKitTests-Thumbnails-\(UUID().uuidString)", directoryHint: .isDirectory)
+    lazy var renderService = makeRenderService()
     lazy var store = PhotoStore(folder: folder, renderService: renderService)
     /// Settings in their own defaults suite, removed with the library.
     private let settingsSuite = "EmulsionKitTests-\(UUID().uuidString)"
@@ -58,11 +59,15 @@ final class TestLibrary {
 
     /// The same folder opened again, as on the next launch.
     func reopened() -> PhotoStore {
-        PhotoStore(
-            folder: folder,
-            renderService: RenderService(
-                renderer: TestLibrary.renderer, thumbnails: ThumbnailCache(purgesUnderMemoryPressure: false),
-                latestRenders: LatestRenderCache(purgesUnderMemoryPressure: false)))
+        PhotoStore(folder: folder, renderService: makeRenderService())
+    }
+
+    /// A service as the app makes one, sharing this library's thumbnails on disk, as a relaunch does.
+    func makeRenderService() -> RenderService {
+        RenderService(
+            renderer: TestLibrary.renderer,
+            thumbnails: ThumbnailCache(purgesUnderMemoryPressure: false, files: ThumbnailFiles(parent: thumbnailsFolder)),
+            latestRenders: LatestRenderCache(purgesUnderMemoryPressure: false))
     }
 
     /// A camera on the stand-in source with this library's store and settings.
@@ -72,6 +77,7 @@ final class TestLibrary {
 
     isolated deinit {
         try? FileManager.default.removeItem(at: folder)
+        try? FileManager.default.removeItem(at: thumbnailsFolder)
         UserDefaults().removePersistentDomain(forName: settingsSuite)
     }
 }

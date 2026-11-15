@@ -20,9 +20,13 @@ public actor RenderService {
     /// isn't RAW (no `asShotWhiteBalance`) is never developed again for a white balance. The open
     /// photo develops again from its kept decoder (`openDecoder`); any other reads its file again.
     private var previews: [String: (negative: Negative, whiteBalance: CameraWhiteBalance?)] = [:]
-    /// Least recently used first; the oldest preview is dropped past `maxCachedPreviews`.
+    /// Least recently used first; the oldest previews are dropped past `previewCacheBytes`.
     private var lruKeys: [String] = []
-    private let maxCachedPreviews = 12
+    /// Three editor develops at the cap (2560 × 1920 half-float RGBA is 39 MB) plus the library's thumbnails.
+    static let previewCacheBytes = 128 << 20
+    /// Editor previews are developed no larger than this: above a phone screen's long edge
+    /// (2622 px on iPhone 17 Pro) a larger window only scales it up. 10 × `previewSizeStep`.
+    static let maxPreviewDimension: CGFloat = 2560
     /// Preview sizes are rounded up to this step, so resizes (iPhone Duo fold/unfold, Mac
     /// windows) reuse a cached develop instead of decoding the RAW again for every size.
     private let previewSizeStep: CGFloat = 256
@@ -85,8 +89,13 @@ public actor RenderService {
         let fitted = try renderer.materialize(renderer.resized(developed, longestEdge: maxDimension))
         previews[key] = (fitted, whiteBalance)
         markUsed(key)
-        if lruKeys.count > maxCachedPreviews { previews[lruKeys.removeFirst()] = nil }
+        while lruKeys.count > 1, cachedPreviewBytes > Self.previewCacheBytes { previews[lruKeys.removeFirst()] = nil }
         return fitted
+    }
+
+    /// Bytes held by the cached develops: half-float RGBA, 8 bytes a pixel.
+    var cachedPreviewBytes: Int {
+        previews.values.reduce(0) { $0 + Int($1.negative.size.width * $1.negative.size.height) * 8 }
     }
 
     private func markUsed(_ key: String) {
@@ -94,15 +103,23 @@ public actor RenderService {
         lruKeys.append(key)
     }
 
-    /// A rendered preview. Throws `CancellationError` if the caller moved on while it waited
-    /// its turn, so slider drags don't queue up stale renders.
-    public func image(_ url: URL, _ adjustments: Adjustments, maxDimension: CGFloat) throws -> CGImage {
-        if let cached = cachedThumbnail(url, adjustments, maxDimension: maxDimension) { return cached }
+    /// A rendered preview, no larger than `maxPreviewDimension`. A thumbnail kept in memory or
+    /// on disk returns without waiting for this actor. Throws `CancellationError` if the caller
+    /// moved on while it waited its turn or its develop ran, so slider drags don't queue up stale renders.
+    @concurrent public nonisolated func image(_ url: URL, _ adjustments: Adjustments, maxDimension: CGFloat) async throws -> CGImage {
+        let thumbnail = ThumbnailCache.Key(url, adjustments, maxDimension: maxDimension)
+        if let thumbnail, let cached = thumbnails.image(thumbnail) ?? thumbnails.storedImage(thumbnail) { return cached }
+        return try await render(url, adjustments, maxDimension: min(maxDimension, Self.maxPreviewDimension), thumbnail: thumbnail)
+    }
+
+    private func render(_ url: URL, _ adjustments: Adjustments, maxDimension: CGFloat, thumbnail: ThumbnailCache.Key?) throws -> CGImage {
+        if let thumbnail, let cached = thumbnails.image(thumbnail) { return cached }
         try Task.checkCancellation()
         let renderer = try engine()
-        let image = try renderer.cgImage(
-            renderer.render(negative(url, maxDimension: maxDimension, whiteBalance: adjustments.whiteBalance), adjustments))
-        thumbnails.keep(image, url, adjustments, maxDimension: maxDimension)
+        let negative = try negative(url, maxDimension: maxDimension, whiteBalance: adjustments.whiteBalance)
+        try Task.checkCancellation()
+        let image = try renderer.cgImage(renderer.render(negative, adjustments))
+        if let thumbnail { thumbnails.keep(image, thumbnail) }
         latestRenders.keep(image, url, maxDimension: maxDimension)
         return image
     }
@@ -113,10 +130,10 @@ public actor RenderService {
         latestRenders.image(url)
     }
 
-    /// A thumbnail already rendered with exactly this edit, if it's still cached. Safe to
-    /// call from the main actor: it encodes the edit key and looks the image up.
+    /// A thumbnail already rendered with exactly this edit, if it's still in memory. Safe to
+    /// call from the main actor: it hashes the edit and looks the image up, never reading a file.
     public nonisolated func cachedThumbnail(_ url: URL, _ adjustments: Adjustments, maxDimension: CGFloat) -> CGImage? {
-        thumbnails.image(url, adjustments, maxDimension: maxDimension)
+        ThumbnailCache.Key(url, adjustments, maxDimension: maxDimension).flatMap(thumbnails.image)
     }
 
     /// The original photo as the camera or app delivered it, without the film process: the
@@ -182,13 +199,16 @@ public actor RenderService {
         return fitted.cropped(to: CGRect(origin: .zero, size: size))
     }
 
-    /// Full-resolution develop and encode, look baked in.
+    /// Full-resolution develop and encode, look baked in. Runs on this actor, so its full-size RAW
+    /// decode never overlaps a preview's; see Packages/EmulsionKit/NOTES.md, "RenderService".
     public func export(_ url: URL, _ adjustments: Adjustments, format: Renderer.ExportFormat) throws -> Data {
+        try Task.checkCancellation()
         let renderer = try engine()
         // The full-size decode isn't held beside the editor's own: the next preview develop
         // makes that decoder again.
         if openDecoder?.url == url { openDecoder = nil }
         let full = try develop(url, maxDimension: nil, whiteBalance: adjustments.whiteBalance)
+        try Task.checkCancellation()
         return try renderer.export(renderer.render(full, adjustments, intent: .export), format: format)
     }
 
@@ -278,7 +298,7 @@ public actor RenderService {
         let prefix = url.absoluteString + "@"
         for key in previews.keys where key.hasPrefix(prefix) { previews[key] = nil }
         lruKeys.removeAll { $0.hasPrefix(prefix) }
-        thumbnails.removeAll()
+        thumbnails.remove(url)
         latestRenders.remove(url)
     }
 

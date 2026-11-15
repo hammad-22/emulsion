@@ -11,14 +11,15 @@ struct ExposureAnchorPersistenceTests {
         let library = TestLibrary()
         let photo = try await library.store.add(TestPhoto.anchoredRAW, fileExtension: "dng")
         let url = library.store.url(for: photo)
-        let first = try await library.renderService.image(url, .init(), maxDimension: 512)
+        // Larger than a thumbnail, so the relaunch develops again instead of reading a stored one.
+        let first = try await library.renderService.image(url, .init(), maxDimension: 600)
         let stored = try await Self.storedAnchor(of: photo.id, in: library.store)
         #expect(stored.stops != 0)
         #expect(stored.stops == library.renderService.exposureAnchor(url))
 
         let reopened = library.reopened()
         #expect(reopened.photo(photo.id)?.exposureAnchor == stored)
-        let again = try await reopened.renderService.image(url, .init(), maxDimension: 512)
+        let again = try await reopened.renderService.image(url, .init(), maxDimension: 600)
 
         #expect(await reopened.renderService.exposureAnchorMeasurements == 0)
         #expect(TestPixels.rgba(again) == TestPixels.rgba(first))
