@@ -20,9 +20,11 @@ public enum SceneFixtures {
         }
         return (image, stops)
     }
-    /// Flat scene patch of one value, any size (grain statistics, preview/export).
-    public static func flat(_ value: Float, width: Int = 256, height: Int = 256) -> CIImage {
-        Fixtures.image(width: width, height: height, space: linear) { _, _ in SIMD3(repeating: value) }
+    /// Flat neutral scene patch of one value, any size (grain statistics, preview/export).
+    public static func flat(_ value: Double, width: Int = 256, height: Int = 256) -> CIImage {
+        // Non-nil: the initializer fails only for a colour space that is not RGB, and `linear` is RGB.
+        let color = CIColor(red: value, green: value, blue: value, alpha: 1, colorSpace: linear)!
+        return CIImage(color: color).cropped(to: CGRect(x: 0, y: 0, width: width, height: height))
     }
     /// A small, very bright source on a dark scene (halation).
     public static func highlightPoint(size: Int = 400, radius: Float = 6, level: Float = 40) -> CIImage {

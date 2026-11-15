@@ -19,8 +19,9 @@ struct AdjustmentRuler: View {
     private let indicatorSize = CGSize(width: 2, height: 36)
     private var scaleHeight: CGFloat { isCompact ? FilmLabLayout.minimumControlHeight : 56 }
     private var value: Double { adjustments[keyPath: control.keyPath] }
-    private var neutral: Double { Adjustments()[keyPath: control.keyPath] }
-    private var tickCount: Int { Int(((control.range.upperBound - control.range.lowerBound) / control.increment).rounded()) }
+    private var neutral: Double { Adjustments.defaults(for: adjustments.process)[keyPath: control.keyPath] }
+    private var range: ClosedRange<Double> { control.range(for: adjustments.process) }
+    private var tickCount: Int { Int(((range.upperBound - range.lowerBound) / control.increment).rounded()) }
     private var side: Int { value < neutral ? -1 : value > neutral ? 1 : 0 }
 
     var body: some View {
@@ -71,7 +72,7 @@ struct AdjustmentRuler: View {
             .horizontalScrub { translation in
                 let next = drag.update(
                     value: value, translation: translation.width, verticalTranslation: translation.height,
-                    pointsPerUnit: tickSpacing / control.increment, range: control.range,
+                    pointsPerUnit: tickSpacing / control.increment, range: range,
                     neutral: neutral, detent: control.increment * 0.3
                 )
                 set(next)
@@ -88,7 +89,7 @@ struct AdjustmentRuler: View {
     /// environment, keeping light/dark and Increase Contrast. The fixed indicator is drawn
     /// last and a level brighter than any tick, so it reads first.
     private var ticks: some View {
-        let position = (value - control.range.lowerBound) / control.increment
+        let position = (value - range.lowerBound) / control.increment
         let tickCount = self.tickCount
         let tickSpacing = self.tickSpacing
         let (major, minor, tickWidth, indicatorSize) = (majorTickHeight, minorTickHeight, self.tickWidth, self.indicatorSize)
@@ -112,6 +113,6 @@ struct AdjustmentRuler: View {
     }
 
     private func set(_ value: Double) {
-        adjustments[keyPath: control.keyPath] = min(control.range.upperBound, max(control.range.lowerBound, value))
+        adjustments[keyPath: control.keyPath] = min(range.upperBound, max(range.lowerBound, value))
     }
 }

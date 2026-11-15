@@ -44,12 +44,14 @@ enum VisualRegression {
     static let photoLocalToneThresholds = Thresholds(
         mean: thresholds.mean, p95: thresholds.p95, max: thresholds.max, allowsIsolatedOutliers: true,
         minimumStructuralSimilarity: 0.999)
-    /// Real photographs: the ΔE00 limits plus structure (MOV-146). ΔE00 misses grain: removing the
-    /// default look's grain (0.35) from a frozen photo moves it by mean 0.075, p95 0.19, max 0.40,
-    /// inside every limit, but drops SSIM to 0.99952 (iPhone 12 Pro) and 0.99970 (Pixel 8 Pro); a
-    /// new grain seed drops it to 0.99906 and 0.99941. Blur of σ 0.3 px gives 0.994–0.997. Rendered
-    /// twice, SSIM is 1. The local-tone cases above take 0.999 instead: CI's isolated outliers
-    /// (16 pixels moved ≈ 4 ΔE00, simulated) cost them up to 0.00034, and they have no grain.
+    /// Real photographs: the ΔE00 limits plus structure (MOV-146). Removing the default look's grain
+    /// (MOV-30: amount 1, size 1.75, color 0.3) from a frozen photo moves it by mean 0.38–0.39, p95
+    /// 0.77–0.79, max 1.56–1.85, SSIM 0.99694–0.99818; a new seed by mean 0.54–0.55, p95 1.08–1.11,
+    /// max 2.49–2.79, SSIM 0.99397–0.99639. Each fails both the per-pixel ΔE00 limit and the
+    /// structural floor (`grainChangesFailThePhotoThresholds`). Blur of σ 0.3 px gives SSIM
+    /// 0.994–0.997, and rendered twice SSIM is 1. The local-tone cases above take 0.999 instead: CI's
+    /// isolated outliers (16 pixels moved ≈ 4 ΔE00, simulated) cost them up to 0.00034, and they
+    /// have no grain.
     static let photoThresholds = Thresholds(
         mean: thresholds.mean, p95: thresholds.p95, max: thresholds.max, minimumStructuralSimilarity: 0.9998)
     /// ΔE00 shown as white in diff heat maps: twice the per-pixel limit.

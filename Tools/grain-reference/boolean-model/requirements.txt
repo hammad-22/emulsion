@@ -1,0 +1,2 @@
+# Offline test-reference tooling only; never shipped. NumPy is BSD-3-Clause.
+numpy==2.5.4

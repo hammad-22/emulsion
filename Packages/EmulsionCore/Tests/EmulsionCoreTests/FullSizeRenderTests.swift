@@ -27,11 +27,15 @@ struct FullSizeRenderTests {
             let export = try renderer.export(renderer.render(first, .neutral), format: .jpeg)
             let negative = SceneFile.halfImage(rendering: try renderer.materialize(first).image)
             let display = try Self.pixels(renderer.cgImage(renderer.render(first, .neutral)))
+            // The default look adds halation (a mirrored pyramid of the lazy decode) and grain.
+            let look = try renderer.export(renderer.render(first, Adjustments()), format: .jpeg)
             for run in 1..<Self.repeats {
                 let developed = try renderer.developer.develop(data, maxDimension: nil, exposureAnchorStops: anchor)
                 #expect(try renderer.export(renderer.render(developed, .neutral), format: .jpeg) == export, "\(name): export \(run)")
                 #expect(SceneFile.halfImage(rendering: try renderer.materialize(developed).image) == negative, "\(name): negative \(run)")
                 #expect(try Self.pixels(renderer.cgImage(renderer.render(developed, .neutral))) == display, "\(name): cgImage \(run)")
+                #expect(
+                    try renderer.export(renderer.render(developed, Adjustments()), format: .jpeg) == look, "\(name): default look \(run)")
             }
         }
     }

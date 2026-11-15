@@ -3,7 +3,7 @@
 /// (`docs/FILM-THEORY.md` §6.1).
 public enum AntihalationBacking: String, Codable, CaseIterable, Sendable {
     /// No backing (e.g. rem-jet removed): the full single-bounce return, the strongest red glow.
-    case none
+    case unbacked = "none"
     /// An absorbing anti-halation undercoat between the emulsion and the base, as on current
     /// motion-picture negatives.
     case undercoat
@@ -15,7 +15,7 @@ public enum AntihalationBacking: String, Codable, CaseIterable, Sendable {
     /// (VISION3 AHU talking points, May 2025).
     var returnFraction: Double {
         switch self {
-        case .none: 1
+        case .unbacked: 1
         case .undercoat, .remJet: 0.05
         }
     }

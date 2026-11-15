@@ -5,6 +5,8 @@ enum DigicamLook {
     // Default Grain (noise) and Halation (processing) amounts. Owner direction.
     static let defaultNoise = 0.75
     static let defaultProcessing = 0.7
+    /// Top of the Noise control. Owner direction (14 Nov 2026): film grain reaches 2, digicam noise stays capped at 1.
+    static let maximumNoise = 1.0
 
     // 4:3 sensor of 2592 × 1944 px. Measured: period file headers.
     static let aspectRatio = 4.0 / 3.0

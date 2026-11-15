@@ -65,7 +65,7 @@ struct RecipeStoreTests {
         let recipe = try #require(CuratedLooks.recipes.first)
         let valid = try JSONEncoder().encode([recipe])
         let future = Data(
-            String(decoding: valid, as: UTF8.self).replacingOccurrences(of: "\"formatVersion\":1", with: "\"formatVersion\":2").utf8)
+            String(decoding: valid, as: UTF8.self).replacingOccurrences(of: "\"formatVersion\":2", with: "\"formatVersion\":3").utf8)
         #expect(future != valid)
         let duplicates = try JSONEncoder().encode([recipe, recipe])
         let index = library.folder.appending(path: "recipes.json")

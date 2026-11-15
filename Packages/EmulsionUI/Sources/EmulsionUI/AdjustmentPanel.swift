@@ -43,7 +43,8 @@ public struct AdjustmentPanel: View {
     }
 
     private func header(_ group: AdjustmentGroup, _ selectedControl: AdjustmentControl) -> some View {
-        HStack {
+        let selectedDefault = Adjustments.defaults(for: adjustments.process)[keyPath: selectedControl.keyPath]
+        return HStack {
             Menu {
                 Picker("Adjustments", selection: $selectedGroup) {
                     ForEach(groups) { Text($0.title).tag($0) }
@@ -57,7 +58,7 @@ public struct AdjustmentPanel: View {
             .accessibilityValue(group.title)
             Spacer()
             Button {
-                adjustments[keyPath: selectedControl.keyPath] = Adjustments()[keyPath: selectedControl.keyPath]
+                adjustments[keyPath: selectedControl.keyPath] = selectedDefault
             } label: {
                 // Sized inside the label, so the whole minimum touch area is the button.
                 Label("Reset Adjustment", systemImage: "arrow.counterclockwise")
@@ -67,7 +68,7 @@ public struct AdjustmentPanel: View {
             }
             // What iOS draws here anyway; on macOS it keeps the larger label out of a push-button bezel.
             .buttonStyle(.borderless)
-            .disabled(adjustments[keyPath: selectedControl.keyPath] == Adjustments()[keyPath: selectedControl.keyPath])
+            .disabled(adjustments[keyPath: selectedControl.keyPath] == selectedDefault)
         }
     }
 

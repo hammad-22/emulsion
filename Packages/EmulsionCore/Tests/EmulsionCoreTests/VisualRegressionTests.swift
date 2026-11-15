@@ -42,10 +42,10 @@ struct VisualRegressionTests {
         #expect(!VisualRegression.thresholds.accepts(summary), "\(name) with \(edit) passes: \(summary)")
     }
 
-    /// ΔE00 misses grain: on a photo, losing the grain or changing its seed stays inside every
-    /// ΔE00 limit and only the structural check fails (numbers on `VisualRegression.photoThresholds`).
+    /// Losing the grain or changing its seed on a photo fails the ΔE00 limits and the photo thresholds
+    /// (numbers on `VisualRegression.photoThresholds`).
     @Test(arguments: ["iphone12pro-proraw.default-look", "pixel8pro-dng.default-look"])
-    func grainChangesFailOnlyTheStructuralCheck(name: String) throws {
+    func grainChangesFailThePhotoThresholds(name: String) throws {
         let regressionCase = try RegressionCase.named(name)
         let negative = Negative(image: try regressionCase.scene(), contract: .sceneReferred)
         let reference = RegressionImage(rendering: try VisualRegression.renderer.render(negative, regressionCase.adjustments))
@@ -55,9 +55,10 @@ struct VisualRegressionTests {
             let edited = RegressionImage(rendering: try VisualRegression.renderer.render(negative, adjustments))
             let comparison = try #require(VisualRegression.compare(reference, edited, structure: true))
             let ssim = try #require(comparison.structuralSimilarity)
-            print(String(format: "structure %@ %@: SSIM %.5f, ΔE00 max %.3f", name, edit, ssim, comparison.summary.max))
-            #expect(VisualRegression.thresholds.accepts(comparison.summary), "\(name) \(edit): ΔE00 alone already fails")
-            #expect(!VisualRegression.photoThresholds.accepts(comparison.summary, structuralSimilarity: ssim), "\(name) \(edit) passes")
+            let s = comparison.summary
+            print(String(format: "structure %@ %@: SSIM %.5f, ΔE00 mean %.3f p95 %.3f max %.3f", name, edit, ssim, s.mean, s.p95, s.max))
+            #expect(!VisualRegression.thresholds.accepts(s), "\(name) \(edit): ΔE00 no longer catches a grain change")
+            #expect(!VisualRegression.photoThresholds.accepts(s, structuralSimilarity: ssim), "\(name) \(edit) passes")
         }
     }
 

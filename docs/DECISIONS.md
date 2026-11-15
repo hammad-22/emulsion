@@ -1,5 +1,14 @@
 # Decisions
 
+## 14 November 2026: film grain amount 1, size ×1.75, color 30% (owner, MOV-30)
+
+Judged on 2400 px whole-photo renders at grain 1.0: the measured, fine, full-color grain was too plain ("fine feels like it's whatever"), size ×2 at 30% color too much ("medium feels a little too much"), and strongly colored grain looks bad. From ×1.25, ×1.5 and ×1.75 the owner picked ×1.75 ("slightly bigger"). Defaults: grain amount 1 (the datasheet granularity), size ×1.75 and color 30% (`FilmLook.grainAmount`, `grainSize`, `grainColor`; size and color are artistic). Size s gives the granularity of a frame s times narrower (Selwyn) at apertures wider than a clump; the clump width is artistic. Color keeps the grain's P3-luminance part and scales the rest.
+
+- The film Grain control now spans 0…2 (`FilmLook.maximumGrainAmount`) so the default has headroom; the digicam process's Noise keeps 0…1 and its default 0.75 (owner: its top end stays capped).
+- Curated film looks keep their relation to the default: their grain was scaled ÷0.35 (0.25 → 0.71, 0.15 → 0.43, 0.45 → 1.29).
+- No migration: saved edits and recipes keep their stored grain amount (a recipe saved at 0.35 still prints at 0.35, now with size ×1.75 and color 30%).
+- Recipes store size and color from format 2, with the film's backing (MOV-32); the digicam process still adds no fields of its own. Editor sliders for size and color are MOV-157.
+
 ## 14 November 2026: the digicam process reuses Grain and Halation (MOV-149)
 
 The digicam process (Digicam 2004) stores its sensor noise in `Adjustments.grain` (shown as "Noise") and its in-camera processing in `Adjustments.halation` (shown as "Processing"), so recipe files keep format version 1; only the engine model (`emulsion-digicam-v1`) tells the processes apart. Renaming these fields later needs a recipe format bump. The look is owner-directed to be stronger and more washed out than the period measurements in places; `DigicamLook` and `docs/ENGINE.md` say where.

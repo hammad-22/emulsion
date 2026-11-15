@@ -75,7 +75,7 @@ public enum AdjustmentGroup: String, CaseIterable, Identifiable, Sendable {
             return [
                 .init(
                     title: String(localized: "Grain", bundle: .module), digicamTitle: String(localized: "Noise", bundle: .module),
-                    keyPath: \.grain, range: Self.amountRange),
+                    keyPath: \.grain, range: Adjustments.grainRange(for: .film), digicamRange: Adjustments.grainRange(for: .digicam)),
                 .init(
                     title: String(localized: "Halation", bundle: .module), digicamTitle: String(localized: "Processing", bundle: .module),
                     keyPath: \.halation, range: Self.amountRange),
@@ -96,7 +96,9 @@ public struct AdjustmentControl: Identifiable {
     /// in-camera processing: fringing, lens, sharpening and JPEG).
     private let digicamTitle: String?
     public let keyPath: WritableKeyPath<Adjustments, Double>
-    public let range: ClosedRange<Double>
+    private let filmRange: ClosedRange<Double>
+    /// The range in the digicam process when it differs (its Noise stops at 1, film grain at 2).
+    private let digicamRange: ClosedRange<Double>?
     let unit: Unit
 
     /// Unique across groups, which the title isn't (both tints are titled "Tint"), and the same in
@@ -105,13 +107,14 @@ public struct AdjustmentControl: Identifiable {
 
     init(
         title: String, accessibilityLabel: String? = nil, digicamTitle: String? = nil, keyPath: WritableKeyPath<Adjustments, Double>,
-        range: ClosedRange<Double>, unit: Unit = .amount
+        range: ClosedRange<Double>, digicamRange: ClosedRange<Double>? = nil, unit: Unit = .amount
     ) {
         self.filmTitle = title
         self.filmAccessibilityLabel = accessibilityLabel ?? title
         self.digicamTitle = digicamTitle
         self.keyPath = keyPath
-        self.range = range
+        self.filmRange = range
+        self.digicamRange = digicamRange
         self.unit = unit
     }
 
@@ -120,6 +123,14 @@ public struct AdjustmentControl: Identifiable {
         switch process {
         case .film: filmTitle
         case .digicam: digicamTitle ?? filmTitle
+        }
+    }
+
+    /// The values the control spans in `process`, which `Adjustments.clamped()` enforces.
+    public func range(for process: RenderProcess) -> ClosedRange<Double> {
+        switch process {
+        case .film: filmRange
+        case .digicam: digicamRange ?? filmRange
         }
     }
 

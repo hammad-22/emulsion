@@ -15,19 +15,13 @@ struct ReviewRenders {
             ?? URL.homeDirectory.appending(path: "Documents/Emulsion Research/samples/proraw-misc")
     }
 
-    /// A fixed grain seed, so a pair differs only by the engine.
-    static let defaultLook: Adjustments = {
-        var a = Adjustments()
-        a.seed = 7
-        return a
-    }()
     static func digicam(noise: Double, processing: Double) -> Adjustments {
-        var a = defaultLook
+        var a = Adjustments()
         (a.process, a.grain, a.halation) = (.digicam, noise, processing)
         return a
     }
     static let looks: [(name: String, adjustments: Adjustments)] = [
-        ("neutral", .neutral), ("default", defaultLook),
+        ("neutral", .neutral), ("default", Adjustments()),
         ("digicam", digicam(noise: DigicamLook.defaultNoise, processing: DigicamLook.defaultProcessing)),
         ("digicam-strong", digicam(noise: 1, processing: 1)),
     ]
@@ -35,6 +29,16 @@ struct ReviewRenders {
         environment["EMULSION_REVIEW_LOOK"].map { name in looks.filter { $0.name == name } } ?? looks
     }
     static var includesLocalSamples: Bool { environment["EMULSION_REVIEW_INCLUDE_LOCAL"] == "1" }
+
+    /// Seeds the app can give a photo (EmulsionKit's `Adjustments.grainSeedCount`).
+    static let seedCount: UInt32 = 1024
+
+    /// A grain seed per file, as the app gives each photo its own: the same file gets the same seed in both renders of a
+    /// pair, so a pair differs only by the engine, while different files show different grain (FNV-1a of the name).
+    static func seed(for name: String) -> Double {
+        let hash = name.utf8.reduce(UInt32(2_166_136_261)) { ($0 ^ UInt32($1)) &* 16_777_619 }
+        return Double(hash % seedCount)
+    }
 
     static func isCC0(_ url: URL) -> Bool { url.lastPathComponent.lowercased().hasSuffix("_cc0.dng") }
 
@@ -57,7 +61,9 @@ struct ReviewRenders {
             let name = url.deletingPathExtension().lastPathComponent
             let negative = try renderer.developer.develop(Data(contentsOf: url))
             for look in Self.selectedLooks {
-                let rendered = try renderer.render(negative, look.adjustments, intent: .export)
+                var adjustments = look.adjustments
+                adjustments.seed = Self.seed(for: name)
+                let rendered = try renderer.render(negative, adjustments, intent: .export)
                 let file = output.appending(path: "\(name).\(look.name).\(Self.label).jpg")
                 try renderer.export(rendered, format: .jpeg, quality: 0.95).write(to: file)
                 print("\(file.lastPathComponent): \(Int(rendered.extent.width))×\(Int(rendered.extent.height))")

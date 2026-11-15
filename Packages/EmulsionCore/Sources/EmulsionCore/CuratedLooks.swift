@@ -3,6 +3,7 @@ import Foundation
 /// Descriptive artistic choices using the built-in processes, not measured matches to named film stocks or cameras.
 public enum CuratedLooks {
     // Amounts are artistic defaults chosen to express each description, not fitted stock data.
+    // Film grain amounts keep their ratio to the default grain, scaled ÷0.35 when it rose from 0.35 to 1 (owner, 14 Nov 2026).
     public static let recipes: [Recipe] = [
         make(
             "00000000-0000-0000-0000-000000000001", String(localized: "Everyday", bundle: .module),
@@ -15,7 +16,7 @@ public enum CuratedLooks {
             $0.warmth = 0.25
             $0.shadows = 0.2
             $0.highlights = 0.15
-            $0.grain = 0.25
+            $0.grain = 0.71
         },
         make(
             "00000000-0000-0000-0000-000000000003", String(localized: "Quiet Color", bundle: .module),
@@ -23,7 +24,7 @@ public enum CuratedLooks {
         ) {
             $0.color = -0.3
             $0.warmth = -0.12
-            $0.grain = 0.15
+            $0.grain = 0.43
             $0.halation = 0.15
         },
         make(
@@ -34,8 +35,8 @@ public enum CuratedLooks {
             $0.shadows = 0.3
             $0.highlights = 0.25
             $0.halation = 0.65
-            $0.backing = .none
-            $0.grain = 0.45
+            $0.backing = .unbacked
+            $0.grain = 1.29
         },
         make(
             "00000000-0000-0000-0000-000000000005", String(localized: "Digicam 2004", bundle: .module),

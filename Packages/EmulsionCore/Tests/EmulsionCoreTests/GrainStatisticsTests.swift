@@ -74,7 +74,7 @@ struct GrainStatisticsTests {
     /// Patches at `stops` of scene exposure, before the adjustments' own exposure edit.
     private static func measure(_ adjustments: Adjustments, at stops: [Double] = exposures) throws -> [GrainStatistics.Patch] {
         try stops.map { stops in
-            let scene = SceneFixtures.flat(Float(0.18 * pow(2, stops)), width: patchWidth, height: patchHeight)
+            let scene = SceneFixtures.flat(0.18 * pow(2, stops), width: patchWidth, height: patchHeight)
             let rendered = try VisualRegression.renderer.render(Negative(image: scene, contract: .sceneReferred), adjustments)
             return GrainStatistics.patch(RegressionImage(rendering: rendered))
         }

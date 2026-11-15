@@ -29,10 +29,6 @@ struct DigicamTests {
 
     static func codes(_ image: CIImage) -> [SIMD3<Double>] { Fixtures.encodedFloats(image, space: srgb).map { $0 * 255 } }
 
-    static func flat(_ value: Double, width: Int, height: Int) -> CIImage {
-        SceneFixtures.flat(Float(value), width: width, height: height)
-    }
-
     static func mean(_ values: [Double]) -> Double { values.reduce(0, +) / Double(values.count) }
 
     static let sensorWidth = 2592, sensorHeight = 1944
@@ -117,7 +113,7 @@ struct DigicamTests {
         (1600, 1200, 1600, 1200), (1600, 900, 1200, 900), (900, 1600, 900, 1200), (2592, 1944, 2592, 1944),
     ])
     func outputIsTheSensorFrame(_ size: (Int, Int, Int, Int)) throws {
-        let scene = Self.flat(0.18, width: size.0, height: size.1)
+        let scene = SceneFixtures.flat(0.18, width: size.0, height: size.1)
         let rendered = try Self.render(scene, Self.adjust { ($0.grain, $0.halation) = (0.35, 0.5) })
         #expect(rendered.extent == CGRect(x: 0, y: 0, width: size.2, height: size.3))
         let moved = scene.transformed(by: CGAffineTransform(translationX: 37, y: -11))
@@ -132,13 +128,13 @@ struct DigicamTests {
         #expect(image.extent.size == CGSize(width: 240, height: 180))
         let pixels = Self.codes(image)
         #expect(pixels.allSatisfy { $0.y < 125 }, "no band left after the crop")
-        let large = try Self.render(Self.flat(0.18, width: 3200, height: 2400), Self.clean)
+        let large = try Self.render(SceneFixtures.flat(0.18, width: 3200, height: 2400), Self.clean)
         let edge = Self.codes(large.cropped(to: CGRect(x: 0, y: 972, width: 2, height: 1)))
         #expect(abs(edge[0].y - edge[1].y) < 1, "\(edge)")
     }
 
     @Test func noiseIsDeterministicSeededAndZeroMean() throws {
-        let scene = Self.flat(0.09, width: 1200, height: 900)
+        let scene = SceneFixtures.flat(0.09, width: 1200, height: 900)
         func lumas(_ seed: Double, grain: Double = 1) throws -> [Double] {
             let pixels = Self.codes(try Self.render(scene, Self.adjust { ($0.grain, $0.seed) = (grain, seed) }))
             return Self.centre(pixels, width: 1200, height: 900, size: 200).map(DigicamModel.luma)
@@ -159,7 +155,7 @@ struct DigicamTests {
     @Test func defaultNoiseIsFiveCodesTwoStopsUnderMidGray() throws {
         let a = Self.adjust { ($0.grain, $0.halation, $0.seed) = (DigicamLook.defaultNoise, DigicamLook.defaultProcessing, 5) }
         let (w, h) = (Self.sensorWidth, Self.sensorHeight)
-        let image = try Self.render(Self.flat(0.18 / 4, width: w, height: h), a, intent: .export)
+        let image = try Self.render(SceneFixtures.flat(0.18 / 4, width: w, height: h), a, intent: .export)
         let pixels = Self.centre(Self.codes(image), width: w, height: h, size: 256)
         let sigma = EmulsionTestCase.sd(pixels.map(DigicamModel.luma))
         #expect(abs(sigma - Self.defaultNoiseCodes) <= Self.noiseTolerance, "luma σ \(sigma) codes")
@@ -256,7 +252,7 @@ struct DigicamTests {
     }
 
     @Test func shadeRendersSlightlyCoolAndDaylightIsTheReference() throws {
-        let gray = Self.flat(0.18, width: 40, height: 30)
+        let gray = SceneFixtures.flat(0.18, width: 40, height: 30)
         func centre(_ asShot: Double?) throws -> SIMD3<Double> {
             Self.codes(try Self.render(gray, Self.clean, asShot: asShot))[15 * 40 + 20]
         }
@@ -286,7 +282,8 @@ struct DigicamTests {
         #expect(look.applying(to: photo).seed == 41)
     }
 
-    @Test func preProcessFilmRecipesRoundTripByteForByte() throws {
+    /// A format-1 film recipe reads as exactly these settings and re-encodes to the current format without loss.
+    @Test func preProcessFilmRecipesReadAsFilm() throws {
         let saved = """
             {
               "adjustments" : {
@@ -307,8 +304,19 @@ struct DigicamTests {
             }
             """
         let recipe = try Recipe.decode(Data(saved.utf8))
-        #expect(recipe.adjustments.process == .film)
-        #expect(String(decoding: try recipe.encoded(), as: UTF8.self) == saved)
+        var expected = Adjustments()
+        (expected.exposure, expected.warmth, expected.tint) = (1.2, 0.4, -0.2)
+        (expected.grain, expected.halation, expected.color, expected.highlights, expected.shadows) = (0.35, 0.35, 0, 0, 0)
+        (expected.process, expected.backing) = (.film, .remJet)
+        (expected.grainSize, expected.grainColor) = (FilmLook.grainSize, FilmLook.grainColor)
+        #expect(recipe.adjustments == expected)
+        #expect(recipe.id == UUID(uuidString: "8E2B3C64-6A0B-4B8D-9C64-4F1E0D2A9B11") && recipe.name == "Evening")
+        let rewritten = try recipe.encoded()
+        let object = try #require(try JSONSerialization.jsonObject(with: rewritten) as? [String: Any])
+        #expect(object["formatVersion"] as? Int == Recipe.formatVersion && Recipe.formatVersion == 2)
+        let reread = try Recipe.decode(rewritten)
+        #expect(reread == recipe && reread.adjustments == expected)
+        #expect(try Recipe.decode(reread.encoded()) == reread)
         #expect(throws: EmulsionError.recipeModelUnsupported) {
             try Recipe.decode(Data(saved.replacingOccurrences(of: "emulsion-default-v1", with: "emulsion-future-v1").utf8))
         }
