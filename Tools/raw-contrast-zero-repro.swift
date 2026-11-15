@@ -38,8 +38,9 @@ func render(_ image: CIImage, cachingIntermediates: Bool) -> [UInt8] {
     let context = CIContext(options: [.cacheIntermediates: cachingIntermediates])
     let width = Int(image.extent.width)
     var pixels = [UInt8](repeating: 0, count: width * Int(image.extent.height) * 4)
-    pixels.withUnsafeMutableBytes {
-        context.render(image, toBitmap: $0.baseAddress!, rowBytes: width * 4, bounds: image.extent, format: .RGBA8, colorSpace: displayP3)
+    pixels.withUnsafeMutableBytes { buffer in
+        guard let base = buffer.baseAddress else { return }
+        context.render(image, toBitmap: base, rowBytes: width * 4, bounds: image.extent, format: .RGBA8, colorSpace: displayP3)
     }
     return pixels
 }
@@ -57,6 +58,7 @@ func writePNG(_ pixels: [UInt8], width: Int, height: Int, named name: String) {
     CGImageDestinationFinalize(destination)
 }
 
+if let outputFolder { try FileManager.default.createDirectory(at: outputFolder, withIntermediateDirectories: true) }
 let reference = render(decode(), cachingIntermediates: true)
 let extent = decode().extent
 let width = Int(extent.width)
@@ -89,4 +91,7 @@ for index in 0..<renders {
     print("render \(index): \(corrupt.count) corrupt tiles\(corrupt.isEmpty ? "" : ", e.g. " + corrupt.prefix(3).joined(separator: ", "))")
 }
 print("\(corruptRenders) of \(renders) renders corrupt")
+if corruptRenders == 0, contrast == 0 {
+    print("None this run: it is intermittent and rarer on an idle machine. Run two or three copies at once, or more renders.")
+}
 exit(corruptRenders == 0 ? 0 : 1)

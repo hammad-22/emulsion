@@ -7,7 +7,7 @@ import Testing
 @testable import EmulsionCore
 
 /// Real-file full-size renders checked tile by tile against an independent decode (MOV-147); can't run on CI
-/// (docs/CONSTANTS.md). Each render must also repeat bit for bit.
+/// (docs/CONSTANTS.md). Each output must also repeat bit for bit.
 @Suite(.enabled(if: RAWDevelopSupport.samplesFolders != nil), .serialized)
 struct FullSizeRenderTests {
     static let repeats = 4
@@ -31,19 +31,25 @@ struct FullSizeRenderTests {
             let renderer = try Renderer()
             let anchor = try #require(renderer.developer.rawDecoder(data, maxDimension: nil, anchor: .measured)).exposureAnchorStops
             let reference = try Self.pixels(renderer.cgImage(renderer.render(Self.referenceNegative(data, anchor: anchor), Self.look)))
-            var exports: [Data] = []
+            // Another context decoding the same file first changed which renders corrupted.
+            let other = try Renderer()
+            _ = try other.export(other.render(other.developer.develop(data, exposureAnchorStops: anchor), Self.look), format: .jpeg)
+            var outputs: [String: Set<Data>] = [:]
             for run in 0..<Self.repeats {
                 let developed = try renderer.developer.develop(data, exposureAnchorStops: anchor)
-                exports.append(try renderer.export(renderer.render(developed, Self.look), format: .jpeg))
+                outputs["export", default: []].insert(try renderer.export(renderer.render(developed, Self.look), format: .jpeg))
                 let rendered = try Self.pixels(renderer.cgImage(renderer.render(developed, Self.look)))
                 // A later graph that reads the develop with no caching at all: a lazy decode corrupts there.
                 let uncached = try Self.pixels(Self.renderUncached(renderer.render(Self.uncachedRead(developed), Self.look)))
                 for (label, pixels) in [("render", rendered), ("uncached read", uncached)] {
                     let bad = Self.badTiles(pixels, reference)
                     #expect(bad.isEmpty, "\(name) \(label) \(run): \(bad.count) tiles off, first \(bad.first.map { "\($0)" } ?? "")")
+                    outputs[label, default: []].insert(pixels.bytes)
                 }
             }
-            #expect(Set(exports).count == 1, "\(name): exports differ between runs")
+            for (label, distinct) in outputs {
+                #expect(distinct.count == 1, "\(name): \(label) differs between runs (\(distinct.count) versions)")
+            }
         }
     }
 
