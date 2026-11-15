@@ -6,7 +6,7 @@
 - **Earlier versions:** everything published before this date stays available under Apache-2.0.
 - **One repository.** The engine stays a package in this repo; split it out only when something other than the two apps needs it.
 - **Third-party code:** no copyleft code or data may enter (GPL, AGPL, LGPL, CC BY-SA), so the owner keeps sole rights. Outside contributions need a contributor licence agreement first (not set up yet).
-- **Open for counsel (MOV-94):** copyright in AI-assisted code, the App Store position, a trademark for the name and icon. Research brief: `~/Documents/Emulsion Research/LICENCE-AND-REPO-DECISION-2026-11-15.md` (local).
+- **Open for counsel (MOV-94):** the App Store position and a trademark for the name and icon.
 - **Commits:** no tool-attribution lines in commit messages or PR descriptions.
 
 ## 14 November 2026: the digicam process reuses Grain and Halation (MOV-149)
