@@ -53,3 +53,25 @@ struct FullSizeRenderTests {
     let raw = try renderer.developer.develop(dng)
     #expect(throws: EmulsionError.renderFailed) { try renderer.viewfinderImage(raw, look) }
 }
+
+/// Apple's noise-reduction kernel for `contrastAmount` 0, which binds a wrong intermediate into whole render tiles
+/// (MOV-147, docs/ENGINE.md). The synthetic Bayer DNG reaches it at contrast 0; any other contrast avoids it.
+@Test func developNeverRunsAppleContrastZeroKernel() throws {
+    let dng = RAWDevelopChart.dng(.bayerRGGB, chart: RAWDevelopTests.chart)
+    let raw = try #require(CIRAWFilter(imageData: dng, identifierHint: Developer.dngTypeIdentifier))
+    Developer.bypassAppleRendering(raw)
+    let graph = try #require(raw.outputImage).debugDescription
+    #expect(graph.contains("nr_"), "the decode graph no longer names Apple's noise-reduction kernels; update this check")
+    #expect(!graph.contains("nr_expandAndSharpenThroughGradientMaskGather"))
+}
+
+/// Every RAW develop is one owned buffer, so no render can read Apple's lazy decode (MOV-147).
+@Test(arguments: SyntheticDNG.Mosaic.allCases, [nil, 64] as [CGFloat?])
+func everyRAWDevelopIsAnOwnedBuffer(_ mosaic: SyntheticDNG.Mosaic, maxDimension: CGFloat?) throws {
+    let developer = EmulsionTestCase.sharedRenderer.developer
+    let dng = RAWDevelopChart.dng(mosaic, chart: RAWDevelopTests.chart)
+    #expect(try developer.develop(dng, maxDimension: maxDimension).image.pixelBuffer != nil)
+    let decoder = try #require(developer.rawDecoder(dng, maxDimension: maxDimension))
+    #expect(try decoder.negative().image.pixelBuffer != nil)
+    #expect(try decoder.negative(whiteBalance: CameraWhiteBalance(temperature: 3200, tint: 0)).image.pixelBuffer != nil)
+}
