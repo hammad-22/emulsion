@@ -19,9 +19,9 @@ public final class Renderer: @unchecked Sendable {
     let kernels: Kernels
     let digicamKernels: DigicamKernels
     public let developer: Developer
-    /// For every render but viewfinder frames, and the developer's: any of these graphs may hold a
-    /// RAW decode, and a full-size one comes back with corrupted tiles from a context that doesn't
-    /// cache intermediates (MOV-147, docs/ENGINE.md). Each render clears the caches after itself.
+    /// For every render but viewfinder frames, and the developer's, which renders each RAW decode into a buffer here:
+    /// a full-size decode comes back with corrupted tiles from a context that doesn't cache intermediates (MOV-147,
+    /// docs/ENGINE.md). Each render clears the caches after itself.
     private let context: CIContext
     /// Viewfinder frames only (`viewfinderImage`), which hold no RAW decode, so they skip the
     /// caching context's per-frame cache write and clear (+0.8 ms per 1600 px frame, Mac).
@@ -107,22 +107,13 @@ public final class Renderer: @unchecked Sendable {
             .transformed(by: CGAffineTransform(scaleX: factor, y: factor))
     }
 
-    /// Develop once: render the (lazy) negative into a half-float buffer so interactive edits
-    /// only re-run the look, never the RAW demosaic. Extended-range values are preserved.
+    /// Render a negative once into a half-float buffer so interactive edits only re-run the look. RAW develops
+    /// already are one (`RAWDecoder.negative`); extended-range values are preserved.
     public func materialize(_ negative: Negative) throws -> Negative {
-        let w = Int(negative.size.width)
-        let h = Int(negative.size.height)
-        var buffer: CVPixelBuffer?
-        let attributes = [kCVPixelBufferIOSurfacePropertiesKey: [:], kCVPixelBufferMetalCompatibilityKey: true] as CFDictionary
-        guard CVPixelBufferCreate(nil, w, h, kCVPixelFormatType_64RGBAHalf, attributes, &buffer) == kCVReturnSuccess, let buffer else {
-            throw EmulsionError.renderFailed
-        }
-        defer { context.clearCaches() }
-        context.render(negative.image, to: buffer, bounds: negative.image.extent, colorSpace: Self.workingSpace)
-        let image = CIImage(cvPixelBuffer: buffer, options: [.colorSpace: Self.workingSpace])
+        guard negative.image.pixelBuffer == nil else { return negative }
         return Negative(
-            image: image, contract: negative.contract, exposureAnchorStops: negative.exposureAnchorStops,
-            asShotWhiteBalance: negative.asShotWhiteBalance)
+            image: try context.renderedToBuffer(negative.image, colorSpace: Self.workingSpace), contract: negative.contract,
+            exposureAnchorStops: negative.exposureAnchorStops, asShotWhiteBalance: negative.asShotWhiteBalance)
     }
 
     public func resized(_ negative: Negative, longestEdge: CGFloat) -> Negative {

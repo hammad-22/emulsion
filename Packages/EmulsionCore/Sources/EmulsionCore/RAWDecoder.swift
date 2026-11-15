@@ -4,9 +4,12 @@ import Foundation
 /// Apple's RAW decoder kept alive for one file, so developing it again at another white balance
 /// neither reads nor decodes the file again (MOV-137): only the white balance and what follows it
 /// are rendered. It holds the file's bytes and the decoder's caches, so keep one, for the photo
-/// being edited. Not thread-safe: use it from one actor.
+/// being edited. Each develop is rendered once into a buffer: no render ever reads Apple's lazy decode (MOV-147).
+/// Not thread-safe: use it from one actor.
 public final class RAWDecoder {
     private let raw: CIRAWFilter
+    /// The renderer's caching context: Apple's decode is safe only through a context that caches intermediates.
+    private let context: CIContext
     /// The neutral as the filter reported it before anything set it.
     private let asShot: (temperature: Float, tint: Float)
     /// An untouched filter develops the file's own neutral, which setting it doesn't reproduce
@@ -17,17 +20,27 @@ public final class RAWDecoder {
     public let exposureAnchorStops: Double
 
     /// `raw` is configured for the develop (rendering bypassed, preview scale set) and still as shot.
-    init(_ raw: CIRAWFilter, exposureAnchorStops: Double) {
+    init(_ raw: CIRAWFilter, exposureAnchorStops: Double, context: CIContext) {
         self.raw = raw
+        self.context = context
         self.exposureAnchorStops = exposureAnchorStops
         asShot = (raw.neutralTemperature, raw.neutralTint)
         asShotWhiteBalance = Self.whiteBalance(of: raw)
     }
 
-    /// The file developed at `whiteBalance` (clamped to Apple's ranges); nil is as shot. Back at
-    /// as shot after another white balance it develops within 1e-6 of the untouched file (measured
-    /// on synthetic linear and Bayer DNGs, MOV-137).
+    /// The file developed at `whiteBalance` (clamped to Apple's ranges); nil is as shot: `decode` rendered once into
+    /// a half-float buffer through the renderer's caching context.
     public func negative(whiteBalance: CameraWhiteBalance? = nil) throws -> Negative {
+        let decoded = try decode(whiteBalance: whiteBalance)
+        return Negative(
+            image: try context.renderedToBuffer(decoded.image, colorSpace: Renderer.workingSpace), contract: decoded.contract,
+            exposureAnchorStops: exposureAnchorStops, asShotWhiteBalance: asShotWhiteBalance)
+    }
+
+    /// Apple's lazy decode at `whiteBalance`. Only `negative` renders it, so no render reads it (MOV-147); tests read
+    /// it to measure the decoder at float precision. Back at as shot after another white balance it is within 1e-6
+    /// of the untouched file (measured on synthetic linear and Bayer DNGs, MOV-137).
+    func decode(whiteBalance: CameraWhiteBalance?) throws -> Negative {
         // Setting the neutral doesn't make the filter decode the file again (measured, MOV-10).
         if let whiteBalance = whiteBalance?.clamped() {
             raw.neutralTemperature = Float(whiteBalance.temperature)
