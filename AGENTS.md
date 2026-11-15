@@ -5,7 +5,7 @@ A free, open-source film lab for iPhone (Mac later): RAW and log footage in, a s
 - Background: `docs/ENGINE.md` (how it works), `docs/DECISIONS.md` (owner decisions), `docs/RESEARCH.md`, `docs/MARKET-RESEARCH.md`.
 - Constant sources: `docs/CONSTANTS.md` (non-film engine constants), `docs/DIGICAM.md` (the digicam process).
 - Film physics for E2 work: `docs/FILM-THEORY.md` (equations, sources, what the engine models vs approximates, gap list) and `docs/STOCK-DATA.md` (datasheet inventory). Read both before changing the film model.
-- Work: Linear team **Emulsion** (key `MOV`). GitHub: `hammad-22/emulsion` (open source, Apache-2.0).
+- Work: Linear team **Emulsion** (key `MOV`). GitHub: `hammad-22/emulsion` (open source, AGPL-3.0-only).
 - This file is the single source of rules for every coding agent (Codex reads it directly; `CLAUDE.md` imports it). Folder-specific rules live in nested `AGENTS.md` files: `Packages/EmulsionCore/Kernels/`, `Packages/EmulsionCore/Tests/`, `Packages/EmulsionKit/`, `Packages/EmulsionUI/`, `Apps/iOS/`, `Apps/macOS/`. Read the nested file before editing in that folder.
 
 ## Stack
@@ -71,7 +71,7 @@ Stock-data checks and `emulsion-fit` read the local reference data (traced curve
   - Proof images and recordings go on a `proof/<issue>` branch (e.g. `proof/mov-54`), linked from the PR by a commit-pinned `raw.githubusercontent.com/.../<sha>/...` URL. Never commit them to `main` or a feature branch (MOV-131).
 - **CI test crashes:** inspect the `test-diagnostics-<run>-<attempt>` artifact for the test log and macOS crash reports (MOV-127). Keep the failing exit status; don't mask crashes with retries.
 - **Run the app in the Simulator** for any app change; don't stop at "it compiles". Use the iPhone 17 Pro and iPhone Duo simulators.
-- **PR descriptions** cover what, why, proof, testing and the Linear issue. No tool-attribution footers.
+- **PR descriptions** cover what, why, proof, testing and the Linear issue. No tool-attribution footers, and no `Co-Authored-By` or other tool-attribution lines in commit messages (owner, 15 Nov 2026).
 - **Review before the PR, then open it as a draft:**
   1. On the finished branch, run a simplify pass (`/simplify` in Claude Code) and apply the fixes.
   2. Run the Swift review skill (`.agents/skills/swift-review/SKILL.md`; `/swift-review` in Claude Code).
@@ -107,7 +107,7 @@ Stock-data checks and `emulsion-fit` read the local reference data (traced curve
 - Film/input math changes go into the Metal kernel *and* its Swift mirror, with metallibs rebuilt in the same commit.
 - Every new input declares its `InputContract` (`docs/ENGINE.md`, "Input contracts"); never describe a display-referred source as scene light.
 - Don't call anything "physical", "accurate" or "like stock X" without a measurement or a primary source. Label artistic choices as artistic.
-- No GPL code or data in the engine or apps (Apache-2.0 plan, MOV-94). No film brand names in the product (MOV-92).
+- No third-party copyleft code or data (GPL, AGPL, LGPL, CC BY-SA) in the engine or apps: the project is AGPL-3.0-only and the owner must hold every right (MOV-94). No film brand names in the product (MOV-92).
 - Don't add per-pixel iterative solves to the live preview path without profiling on device.
 
 ## Keep this file current

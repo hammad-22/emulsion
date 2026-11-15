@@ -1,7 +1,16 @@
 Emulsion
 Copyright 2026 Hammad Shahid
 
-This product is licensed under the Apache License, Version 2.0 (see LICENSE).
+This program is free software: you can redistribute it and/or modify it under the
+terms of the GNU Affero General Public License, version 3 only, as published by the
+Free Software Foundation (see LICENSE). It is distributed WITHOUT ANY WARRANTY; without
+even the implied warranty of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.
+
+Versions published before 15 November 2026 were released under the Apache License,
+Version 2.0, and remain available under that licence.
+
+"Emulsion", its icon and its look names identify this project; the licence does not
+grant permission to use them for a modified version.
 
 Film stock names (e.g. Kodak, Vision, Fujifilm, Eterna) mentioned in the
 documentation are trademarks of their respective owners and are used only to

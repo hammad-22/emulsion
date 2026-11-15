@@ -1,5 +1,14 @@
 # Decisions
 
+## 15 November 2026: AGPL-3.0-only, one repository (owner)
+
+- **Licence:** the whole repository (engine, app logic, UI, apps, tools) moves from Apache-2.0 to **AGPL-3.0-only**. Why: the owner doesn't want a closed commercial product built on this work; AGPL requires anyone who distributes Emulsion or a modified version to publish their source under the same licence, while the owner, who holds all the copyright, keeps every option (App Store, closed Pro features, commercial licences).
+- **Earlier versions:** everything published before this date stays available under Apache-2.0.
+- **One repository.** The engine stays a package in this repo; split it out only when something other than the two apps needs it.
+- **Third-party code:** no copyleft code or data may enter (GPL, AGPL, LGPL, CC BY-SA), so the owner keeps sole rights. Outside contributions need a contributor licence agreement first (not set up yet).
+- **Open for counsel (MOV-94):** copyright in AI-assisted code, the App Store position, a trademark for the name and icon. Research brief: `~/Documents/Emulsion Research/LICENCE-AND-REPO-DECISION-2026-11-15.md` (local).
+- **Commits:** no tool-attribution lines in commit messages or PR descriptions.
+
 ## 14 November 2026: the digicam process reuses Grain and Halation (MOV-149)
 
 The digicam process (Digicam 2004) stores its sensor noise in `Adjustments.grain` (shown as "Noise") and its in-camera processing in `Adjustments.halation` (shown as "Processing"), so recipe files keep format version 1; only the engine model (`emulsion-digicam-v1`) tells the processes apart. Renaming these fields later needs a recipe format bump. The look is owner-directed to be stronger and more washed out than the period measurements in places; `DigicamLook` and `docs/ENGINE.md` say where.
@@ -24,7 +33,7 @@ The working prototype is not the final visual design. The iOS app should be beau
 | --- | --- |
 | First customer | **iPhone photographers.** Professional colorists come second, via a **desktop Mac Pro app** on the same engine. |
 | Price | **Free** (iPhone and Mac). |
-| Engine | **Open source**. Apache-2.0 proposed (permissive, with a patent grant), so no GPL code may enter the engine. Publishing the public repo needs a separate go-ahead (MOV-94). |
+| Engine | **Open source**. Apache-2.0 at first; **AGPL-3.0-only since 15 November 2026** (see that entry). |
 | Target devices | **The best current iPhones: iPhone 17 Pro / Pro Max and iPhone Duo.** All performance budgets are set on these; older devices are out of scope for targets. |
 | Look names | **Descriptive names only.** No Kodak or Fujifilm names in the app, the store listing or the marketing (MOV-92). |
 | Real film test shoot | **Funded** (MOV-89): 250D/500T, ECN-2, scan, optionally a 2383 print. It's the ground truth for every stock model. |
