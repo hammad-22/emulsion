@@ -1,7 +1,6 @@
 import EmulsionCore
 import SwiftUI
 
-/// A square thumbnail of a photo with its film look, for the library grid.
 public struct PhotoThumbnail: View {
     private let url: URL
     private let adjustments: Adjustments

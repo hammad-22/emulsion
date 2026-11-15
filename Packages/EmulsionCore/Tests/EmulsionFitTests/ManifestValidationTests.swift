@@ -3,11 +3,8 @@ import Testing
 
 @testable import EmulsionFit
 
-/// Manifest numbers are validated on load: a zero grid step or pixel scale would otherwise let the audit pass vacuously.
-/// Each traced CSV must be the one its manifest pins by SHA-256.
 struct ManifestValidationTests {
-    /// A minimal valid stock, written to a fresh temporary directory named `id`: the manifest and its CSVs side by side,
-    /// so the same directory serves as both the manifests and the reference-data folder.
+    /// A minimal valid stock; its directory is both the manifests and the reference-data folder.
     struct Fixture {
         static let csvs = [
             "characteristic.csv": "log_exposure_lux_s,red,green,blue\n-1.00,0.2,0.6,0.8\n1.00,1.2,1.6,1.8\n",
@@ -28,10 +25,8 @@ struct ManifestValidationTests {
         var xRange: [Double] = [-1, 1]
         var interpolatedSpans: [[Double]] = []
         var stopZero = -1.3
-        /// Replaces the characteristic chart's pinned digest.
         var characteristicSHA256: String?
         var writesCharacteristicCSV = true
-        /// Replaces the characteristic CSV written to disk; the manifest still pins the canonical one.
         var characteristicCSV: String?
 
         func chart(_ file: String, gridStep: Double, curves: [String], cameraStops: Bool = false) -> [String: Any] {
@@ -73,7 +68,6 @@ struct ManifestValidationTests {
             return root
         }
 
-        /// Loads the fixture; returns the error, or nil when it loads.
         func loadError() throws -> FitError? {
             let root = try write()
             defer { try? FileManager.default.removeItem(at: root) }
@@ -85,7 +79,6 @@ struct ManifestValidationTests {
             }
         }
 
-        /// Loads the fixture; returns the `invalidManifest` reason, or nil when it loads.
         func loadFailure() throws -> String? {
             guard let error = try loadError() else { return nil }
             guard case .invalidManifest(_, let reason) = error else { throw error }
@@ -111,7 +104,6 @@ struct ManifestValidationTests {
         #expect(found == Fixture.sha256("characteristic.csv"))
     }
 
-    /// The digest is checked before parsing, so a different file is a mismatch even when it wouldn't parse.
     @Test func unparsableTracingWithTheWrongDigestIsAMismatch() throws {
         var fixture = Fixture()
         let csv = (Fixture.csvs["characteristic.csv"] ?? "") + "2.00,not-a-number\n"
@@ -172,7 +164,7 @@ struct ManifestValidationTests {
         #expect(reason.contains("another-stock") && reason.contains("fixture-stock"))
     }
 
-    /// JSON can't carry a non-finite number, so this one is checked on a manifest built in code.
+    /// JSON can't carry a non-finite number, so this manifest is built in code.
     @Test func nonFiniteCameraStopAnchorIsAProblem() {
         let chart = StockManifest.Chart(
             file: "c.csv", sha256: String(repeating: "0", count: 64), gridStep: 0.05, conditions: "", xAxis: .init(pixelsPerUnit: 1),

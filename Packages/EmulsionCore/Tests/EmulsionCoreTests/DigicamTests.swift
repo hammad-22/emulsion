@@ -5,13 +5,10 @@ import Testing
 
 @testable import EmulsionCore
 
-/// The digicam process (MOV-149): GPU against its Swift mirror, the clip and tone curve, output
-/// geometry, noise, processing and the residual auto white balance.
 struct DigicamTests {
     static var renderer: Renderer { EmulsionTestCase.sharedRenderer }
     static let srgb = CGColorSpace(name: CGColorSpace.sRGB)!
 
-    /// The process alone: no noise, no processing, as-shot light unknown.
     static let clean: Adjustments = {
         var a = Adjustments.neutral
         a.process = .digicam
@@ -30,7 +27,6 @@ struct DigicamTests {
         return try renderer.render(negative, a, intent: intent)
     }
 
-    /// sRGB code values (0…255, before rounding) of `image`, bottom row first.
     static func codes(_ image: CIImage) -> [SIMD3<Double>] { Fixtures.encodedFloats(image, space: srgb).map { $0 * 255 } }
 
     static func flat(_ value: Double, width: Int, height: Int) -> CIImage {
@@ -39,23 +35,30 @@ struct DigicamTests {
 
     static func mean(_ values: [Double]) -> Double { values.reduce(0, +) / Double(values.count) }
 
-    /// Pixels of a centred `size` × `size` window of a `width`-wide image (bottom row first).
+    static let sensorWidth = 2592, sensorHeight = 1944
+    /// Sourced: ISO 12232 mid-gray code; owner-directed black floor (docs/DIGICAM.md).
+    static let middleGrayCode = 118.0, blackFloorCode = 22.0
+    static let tungstenKelvin = 2850.0
+    static let grayChart = PatchChart(Array(repeating: SIMD3(repeating: 0.18), count: 12), cell: 48, columns: 4)
+
     static func centre(_ pixels: [SIMD3<Double>], width: Int, height: Int, size: Int) -> [SIMD3<Double>] {
         let (x0, y0) = ((width - size) / 2, (height - size) / 2)
         return (y0..<y0 + size).flatMap { y in (x0..<x0 + size).map { pixels[y * width + $0] } }
     }
 
-    // MARK: Pointwise
+    static func centreCodes(_ negative: Negative) throws -> SIMD3<Double> {
+        let image = try renderer.render(negative, clean)
+        let pixels = centre(codes(image), width: Int(image.extent.width), height: Int(image.extent.height), size: 16)
+        return pixels.reduce(.zero, +) / Double(pixels.count)
+    }
 
-    /// Chromatic patches, a gray ramp and over-clip light, in 8 px blocks on a 4:3 frame.
     static let patches: [SIMD3<Double>] =
         SceneFixtures.chart24Patches.map { SIMD3<Double>($0.linear) }
         + stride(from: -8.0, through: 4.0, by: 0.5).map { SIMD3(repeating: 0.18 * pow(2, $0)) }
         + [SIMD3(3, 0.2, 0.05), SIMD3(0.4, 1.6, 0.2), SIMD3(0.3, 0.6, 2.4), SIMD3(-0.01, 0.05, 0.1), SIMD3(1.2, 1.0, 0.9)]
     static let block = 8, columns = 12, rows = 9
 
-    /// GPU float vs the Swift mirror in Double: worst difference, in sRGB-encoded 0…1, at the
-    /// centre of each block (corner softness at this size is far below a pixel).
+    /// Encoded 0…1 at block centres, GPU float against the Double mirror.
     static let mirrorTolerance = 0.002
 
     @Test(arguments: [
@@ -86,15 +89,14 @@ struct DigicamTests {
     @Test func midGrayLandsOnItsCodeAndBlackOnTheFloor() throws {
         let encoded = { (x: Double) in ColorMath.encodeSRGB(DigicamModel.toneCurve(x)) * 255 }
         let x = (0.18 / DigicamLook.clip - DigicamLook.blackOffset) / (1 - DigicamLook.blackOffset)
-        #expect(abs(encoded(x) - 118) < 1e-9)
+        #expect(abs(encoded(x) - Self.middleGrayCode) < 1e-9)
         #expect(abs(encoded(1) - 255) < 1e-9, "the clip reaches white")
-        #expect(abs(encoded(0) - 22) < 1e-9, "black is lifted to the floor")
-        // On the GPU, through the white balance's cool bias: luma within 1 code; scene black on the floor.
+        #expect(abs(encoded(0) - Self.blackFloorCode) < 1e-9, "black is lifted to the floor")
         let scene = Fixtures.image(width: 40, height: 30, space: SceneFixtures.linear) { x, _ in SIMD3(repeating: x < 20 ? 0 : 0.18) }
         let pixels = Self.codes(try Self.render(scene, Self.clean))
         let (black, gray) = (pixels[15 * 40 + 10], pixels[15 * 40 + 30])
-        #expect(abs(DigicamModel.luma(gray) - 118) < 1, "\(gray)")
-        #expect(abs(DigicamModel.luma(black) - 22) < 0.5, "\(black)")
+        #expect(abs(DigicamModel.luma(gray) - Self.middleGrayCode) < 1, "\(gray)")
+        #expect(abs(DigicamModel.luma(black) - Self.blackFloorCode) < 0.5, "\(black)")
     }
 
     @Test func lightAboveTheClipIsWhiteInThatChannelAndShiftsHue() throws {
@@ -110,8 +112,6 @@ struct DigicamTests {
         #expect(hueShift > 10, "per-channel clipping turns the sky toward cyan: \(hueShift)° (dim \(dim), bright \(bright))")
     }
 
-    // MARK: Geometry
-
     @Test(arguments: [
         (4032, 3024, 2592, 1944), (4032, 2268, 2592, 1944), (3024, 4032, 1944, 2592), (8064, 6048, 2592, 1944),
         (1600, 1200, 1600, 1200), (1600, 900, 1200, 900), (900, 1600, 900, 1200), (2592, 1944, 2592, 1944),
@@ -124,8 +124,7 @@ struct DigicamTests {
         #expect(try Self.render(moved, Self.clean).extent == rendered.extent, "output at the origin")
     }
 
-    @Test func cropIsCentredAndDownscaleKeepsEdges() throws {
-        // 16:9 with a bright column band at the far left and right, which the 4:3 crop removes.
+    @Test func cropIsCentredAndDownscaleDoesNotDarkenEdges() throws {
         let scene = Fixtures.image(width: 320, height: 180, space: SceneFixtures.linear) { x, _ in
             x < 40 || x >= 280 ? SIMD3(repeating: 1) : SIMD3(repeating: 0.18)
         }
@@ -133,13 +132,10 @@ struct DigicamTests {
         #expect(image.extent.size == CGSize(width: 240, height: 180))
         let pixels = Self.codes(image)
         #expect(pixels.allSatisfy { $0.y < 125 }, "no band left after the crop")
-        // Downscaled from a large source: the edge column is not darkened by transparency.
         let large = try Self.render(Self.flat(0.18, width: 3200, height: 2400), Self.clean)
         let edge = Self.codes(large.cropped(to: CGRect(x: 0, y: 972, width: 2, height: 1)))
         #expect(abs(edge[0].y - edge[1].y) < 1, "\(edge)")
     }
-
-    // MARK: Noise
 
     @Test func noiseIsDeterministicSeededAndZeroMean() throws {
         let scene = Self.flat(0.09, width: 1200, height: 900)
@@ -156,26 +152,22 @@ struct DigicamTests {
         #expect(abs(Self.mean(three) - Self.mean(clean)) < 0.5, "zero-mean within half a code")
     }
 
-    /// Luma σ, in codes, of a flat patch two stops under mid-gray at the default amounts, as exported
-    /// (sensor size, JPEG included). Owner direction (MOV-149 review), measured 5.02; period JPEGs
-    /// read about 2 (rough, n = 4).
+    /// Measured 5.02 codes (owner direction, MOV-149); period JPEGs read about 2.
     static let defaultNoiseCodes = 5.0
     static let noiseTolerance = 0.5
 
-    @Test func defaultNoiseIsTheOwnerDirectedAmount() throws {
+    @Test func defaultNoiseIsFiveCodesTwoStopsUnderMidGray() throws {
         let a = Self.adjust { ($0.grain, $0.halation, $0.seed) = (DigicamLook.defaultNoise, DigicamLook.defaultProcessing, 5) }
-        let image = try Self.render(Self.flat(0.18 / 4, width: 2592, height: 1944), a, intent: .export)
-        let pixels = Self.centre(Self.codes(image), width: 2592, height: 1944, size: 256)
+        let (w, h) = (Self.sensorWidth, Self.sensorHeight)
+        let image = try Self.render(Self.flat(0.18 / 4, width: w, height: h), a, intent: .export)
+        let pixels = Self.centre(Self.codes(image), width: w, height: h, size: 256)
         let sigma = EmulsionTestCase.sd(pixels.map(DigicamModel.luma))
         #expect(abs(sigma - Self.defaultNoiseCodes) <= Self.noiseTolerance, "luma σ \(sigma) codes")
     }
 
-    // MARK: Processing
-
-    /// Overshoot of a vertical step edge (scene 0.045 → 0.36) at sensor size, as a fraction of the
-    /// step in sRGB codes, on the bright side.
+    /// Step-edge (0.045 → 0.36) overshoot as a fraction of the step, bright side.
     static func overshoot(processing: Double) throws -> Double {
-        let (w, h) = (2592, 1944)
+        let (w, h) = (sensorWidth, sensorHeight)
         let scene = Fixtures.image(width: w, height: h, space: SceneFixtures.linear) { x, _ in
             SIMD3(repeating: x < w / 2 ? 0.045 : 0.36)
         }
@@ -185,9 +177,8 @@ struct DigicamTests {
         return (row.max()! - high) / (high - low)
     }
 
-    /// Owner direction (MOV-149 review): about 30 % at processing 1, 21 % at the default (measured
-    /// 30.3 % and 20.7 %, without the JPEG step).
-    @Test func sharpeningOvershootsAsDirected() throws {
+    /// Measured 30.3 % at processing 1 and 20.7 % at the default (owner direction, MOV-149).
+    @Test func sharpeningOvershootsAboutThirtyPercentAtFullProcessing() throws {
         let full = try Self.overshoot(processing: 1)
         let standard = try Self.overshoot(processing: DigicamLook.defaultProcessing)
         #expect(full >= 0.27 && full <= 0.33, "overshoot at processing 1: \(full)")
@@ -196,16 +187,13 @@ struct DigicamTests {
         #expect(none < 0.01, "no halos without processing: \(none)")
     }
 
-    /// The corners are never sharper than the lens-softened centre: at low processing the corner blur
-    /// (× processing) is below the whole-frame lens blur, and used to leave the corners crisper.
     @Test(arguments: [0, 0.2])
     func cornersAreNoSharperThanTheCentre(processing: Double) throws {
-        let (w, h) = (2592, 1944)
+        let (w, h) = (Self.sensorWidth, Self.sensorHeight)
         let stripes = Fixtures.image(width: w, height: h, space: SceneFixtures.linear) { x, _ in
             SIMD3(repeating: x.isMultiple(of: 2) ? 0.09 : 0.36)
         }
         let image = try Self.render(stripes, Self.adjust { $0.halation = processing })
-        /// Luma σ (codes) of a 32 × 32 window, a local contrast.
         func contrast(x: Int, y: Int) -> Double {
             let window = Self.codes(image.cropped(to: CGRect(x: x, y: y, width: 32, height: 32)))
             return EmulsionTestCase.sd(window.map(DigicamModel.luma))
@@ -215,8 +203,7 @@ struct DigicamTests {
         #expect(corner <= centre + 0.01, "corner \(corner), centre \(centre) codes")
     }
 
-    /// Only an export goes through the JPEG encoder, at any size; a preview, or no processing, doesn't.
-    @Test func onlyExportsAreCompressed() throws {
+    @Test func onlyExportsWithProcessingAreJPEGCompressed() throws {
         let scene = Fixtures.image(width: 640, height: 480, space: SceneFixtures.linear) { x, y in
             SIMD3(Float(x % 7) / 7, Float(y % 5) / 5, 0.2)
         }
@@ -233,10 +220,8 @@ struct DigicamTests {
     }
 
     @Test func processingAddsPurpleFringeAroundClippedLight() throws {
-        // A 1600 px frame cut from a square with a 32 px light at its centre.
         let scene = SceneFixtures.highlightPoint(size: 1600, radius: 8, level: 40).cropped(
             to: CGRect(x: 0, y: 200, width: 1600, height: 1200))
-        /// Blue over green just outside the light, on the row through its centre.
         func violet(_ processing: Double) throws -> [Double] {
             let image = try Self.render(scene, Self.adjust { $0.halation = processing })
             return Self.codes(image.cropped(to: CGRect(x: 800 + 33, y: 600, width: 24, height: 1))).map { $0.z - $0.y }
@@ -245,48 +230,28 @@ struct DigicamTests {
         #expect(gain > 5, "violet fringe, codes of blue over green: \(gain)")
     }
 
-    // MARK: White balance
-
-    /// Mid-gray under 2850 K against a neutral render, in code values: R +17.0 %, B −30.5 % (measured).
-    /// Owner direction (MOV-149 review), beyond period compacts under tungsten (published lab tests:
-    /// R +9.5…11.6 %, B −9.9…−17 %). The develop neutralises the light; the digicam process puts back
-    /// what its auto white balance leaves.
+    /// Measured R +17.0 %, B −30.5 % at 2850 K (owner direction; docs/DIGICAM.md).
     @Test(arguments: SyntheticDNG.Mosaic.allCases)
     func tungstenRAWKeepsAWarmCast(_ mosaic: SyntheticDNG.Mosaic) throws {
-        let chart = PatchChart(Array(repeating: SIMD3(repeating: 0.18), count: 12), cell: 48, columns: 4)
-        let light = SyntheticDNG.planckianChromaticity(kelvin: 2850)
-        let negative = try Self.renderer.developer.develop(RAWDevelopChart.dng(mosaic, chart: chart, light: light, taggedLight: light))
+        let light = SyntheticDNG.planckianChromaticity(kelvin: Self.tungstenKelvin)
+        let negative = try Self.renderer.developer.develop(
+            RAWDevelopChart.dng(mosaic, chart: Self.grayChart, light: light, taggedLight: light))
         let asShot = try #require(negative.asShotWhiteBalance)
-        #expect(abs(asShot.temperature - 2850) < 20)
+        #expect(abs(asShot.temperature - Self.tungstenKelvin) < 20)
         let unknownLight = Negative(image: negative.image, contract: negative.contract)
-        func centreCodes(_ n: Negative) throws -> SIMD3<Double> {
-            let image = try Self.renderer.render(n, Self.clean)
-            let (w, h) = (Int(image.extent.width), Int(image.extent.height))
-            let pixels = Self.centre(Self.codes(image), width: w, height: h, size: 16)
-            return pixels.reduce(.zero, +) / Double(pixels.count)
-        }
-        let ratio = try centreCodes(negative) / centreCodes(unknownLight)
+        let ratio = try Self.centreCodes(negative) / Self.centreCodes(unknownLight)
         #expect(ratio.x >= 1.15 && ratio.x <= 1.19, "R \(ratio.x)")
         #expect(ratio.z >= 0.67 && ratio.z <= 0.72, "B \(ratio.z)")
     }
 
-    /// A white balance set at develop is applied on top of the camera's cast: the negative still
-    /// reports the as-shot light, so the residual cast follows the light the photo was shot under.
-    @Test func developWhiteBalanceKeepsTheAsShotCast() throws {
-        let chart = PatchChart(Array(repeating: SIMD3(repeating: 0.18), count: 12), cell: 48, columns: 4)
-        let light = SyntheticDNG.planckianChromaticity(kelvin: 2850)
-        let data = RAWDevelopChart.dng(.linearRGB, chart: chart, light: light, taggedLight: light)
+    @Test func developWhiteBalanceKeepsTheAsShotLightsCast() throws {
+        let light = SyntheticDNG.planckianChromaticity(kelvin: Self.tungstenKelvin)
+        let data = RAWDevelopChart.dng(.linearRGB, chart: Self.grayChart, light: light, taggedLight: light)
         let developed = try Self.renderer.developer.develop(data, whiteBalance: CameraWhiteBalance(temperature: 4500, tint: 0))
         let asShot = try #require(developed.asShotWhiteBalance)
-        #expect(abs(asShot.temperature - 2850) < 20, "the as-shot light, not the develop's")
-        func centre(_ n: Negative) throws -> SIMD3<Double> {
-            let image = try Self.renderer.render(n, Self.clean)
-            let (w, h) = (Int(image.extent.width), Int(image.extent.height))
-            let pixels = Self.centre(Self.codes(image), width: w, height: h, size: 16)
-            return pixels.reduce(.zero, +) / Double(pixels.count)
-        }
-        let withCast = try centre(developed)
-        let withoutCast = try centre(Negative(image: developed.image, contract: developed.contract))
+        #expect(abs(asShot.temperature - Self.tungstenKelvin) < 20, "the as-shot light, not the develop's")
+        let withCast = try Self.centreCodes(developed)
+        let withoutCast = try Self.centreCodes(Negative(image: developed.image, contract: developed.contract))
         #expect(withCast.x / withCast.z > 1.3 * withoutCast.x / withoutCast.z, "cast \(withCast), none \(withoutCast)")
     }
 
@@ -309,8 +274,6 @@ struct DigicamTests {
         for g in [neutral, warm, magenta] { #expect(abs(DigicamModel.luma(g) - 1) < 1e-12) }
     }
 
-    // MARK: Persistence
-
     @Test func recipesCarryTheProcessInTheEngineModel() throws {
         let look = try #require(CuratedLooks.recipes.first { $0.adjustments.process == .digicam })
         let json = String(decoding: try look.encoded(), as: UTF8.self)
@@ -323,8 +286,7 @@ struct DigicamTests {
         #expect(look.applying(to: photo).seed == 41)
     }
 
-    /// A film recipe file written before processes existed: decodes the same and re-encodes byte for byte.
-    @Test func filmRecipesAreUnchanged() throws {
+    @Test func preProcessFilmRecipesRoundTripByteForByte() throws {
         let saved = """
             {
               "adjustments" : {

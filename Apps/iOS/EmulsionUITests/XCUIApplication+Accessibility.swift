@@ -1,29 +1,23 @@
 import XCTest
 
 extension XCUIApplication {
-    /// Launch arguments for the system text size and layout direction, so a test sees the app
-    /// as a user with those settings would without changing the simulator's settings.
     enum Presentation {
-        /// The largest accessibility text size (Settings › Accessibility › Larger Text, AX5).
+        /// AX5, the largest accessibility text size.
         static let largestText = ["-UIPreferredContentSizeCategoryName", "UICTContentSizeCategoryAccessibilityXXXL"]
         /// Xcode's right-to-left pseudolanguage: English text laid out right to left.
         static let rightToLeft = ["-AppleTextDirection", "YES", "-NSForceRightToLeftWritingDirection", "YES"]
     }
 
-    /// The library's photos, matched by the label `PhotoGrid` gives each one.
     var photos: XCUIElementQuery { buttons.matching(NSPredicate(format: "label BEGINSWITH 'Photo from'")) }
 
-    /// Launches on the library instead of the camera (debug builds).
     @MainActor
     static func launchLibrary(_ presentation: [String] = []) -> XCUIApplication {
         let app = XCUIApplication()
-        app.launchArguments = ["--library"] + presentation
+        app.launchArguments = LaunchArgument.libraryArguments + presentation
         app.launch()
         return app
     }
 
-    /// Launches on an empty library, scrolled so "Try Sample Photos" can be tapped, or skips
-    /// the test when the library already has photos.
     @MainActor
     static func launchEmptyLibrary(_ presentation: [String] = []) throws -> XCUIApplication {
         let app = launchLibrary(presentation)
@@ -38,7 +32,6 @@ extension XCUIApplication {
         return app
     }
 
-    /// Launches on the library with the sample photos added.
     @MainActor
     static func launchSampleLibrary(_ presentation: [String] = []) throws -> XCUIApplication {
         let app = try launchEmptyLibrary(presentation)
@@ -47,7 +40,6 @@ extension XCUIApplication {
         return app
     }
 
-    /// Deletes every photo, leaving the empty library for the next test.
     @MainActor
     func removeSamples() {
         if navigationBars["Looks"].exists { buttons["Done"].tap() }
@@ -61,13 +53,7 @@ extension XCUIApplication {
         XCTAssertTrue(buttons["Try Sample Photos"].waitForExistence(timeout: 5))
     }
 
-    /// A native accessibility audit (the engine behind Accessibility Inspector) whose failures
-    /// name the element, so a finding can be traced without opening the result bundle.
-    ///
-    /// On a folded iPhone Duo the contrast audit is unreliable: it failed text whose pixels
-    /// measure about 20:1, or threw "Invalid target app" (MOV-140). Unfolded it works. Contrast
-    /// is left out when folded, so folded contrast stays unverified, and a contrast-only audit
-    /// skips the test.
+    /// Skips contrast on a folded iPhone Duo, where that audit is unreliable (MOV-140).
     @MainActor
     func audit(_ types: XCUIAccessibilityAuditType, file: StaticString = #filePath, line: UInt = #line) throws {
         var types = types
@@ -86,20 +72,5 @@ extension XCUIApplication {
     @MainActor
     private static var isFoldedDuo: Bool {
         XCUIScreen.screens.dropFirst().contains { $0.screenshot().isBlank }
-    }
-}
-
-extension XCUIScreenshot {
-    /// Every pixel black, judged on an 8×8 reduction.
-    var isBlank: Bool {
-        let side = 8
-        var pixels = [UInt8](repeating: 0, count: side * side * 4)
-        guard let image = image.cgImage,
-            let context = CGContext(
-                data: &pixels, width: side, height: side, bitsPerComponent: 8, bytesPerRow: side * 4,
-                space: CGColorSpaceCreateDeviceRGB(), bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue)
-        else { return false }
-        context.draw(image, in: CGRect(x: 0, y: 0, width: side, height: side))
-        return pixels.enumerated().allSatisfy { index, value in index % 4 == 3 || value == 0 }
     }
 }

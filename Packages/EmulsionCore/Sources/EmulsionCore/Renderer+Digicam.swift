@@ -1,30 +1,23 @@
 import CoreImage
 import Foundation
 
-/// The digicam process: a mid-2000s compact CCD camera's in-camera JPEG, not a film process.
-/// Scene light is cropped to the sensor's 4:3 frame and capped at its size, passes a cheap lens
-/// (vignette, soft corners, purple fringing), the camera's partial auto white balance, a noisy
-/// sensor that clips hard per channel, saturation and a JPEG tone curve, then the in-camera
-/// sharpening and, for an export, a real JPEG encode. Constants are in `DigicamLook`.
+/// The digicam process: a mid-2000s compact camera's in-camera JPEG (docs/DIGICAM.md).
 extension Renderer {
     func renderDigicam(_ negative: Negative, _ a: Adjustments, intent: RenderIntent) throws -> CIImage {
         var scene = Self.sensorFrame(negative.image)
         let extent = scene.extent
-        // Spatial sizes are in sensor pixels, so a preview is close to a downscale of the export.
         let pixelsPerSensorPixel = max(extent.width, extent.height) / DigicamLook.sensorLongEdge
         let model = DigicamModel(a, asShotTemperature: negative.asShotWhiteBalance?.temperature)
         let processing = a.halation
         let k = digicamKernels
 
         if processing > 0 {
-            // The channel with the largest gain clips first.
             let clipsAt = DigicamLook.clip / model.gains.max()
             let mask = try kernels.run(k.fringeSource, extent, [scene, CIVector(x: clipsAt, y: DigicamLook.fringeOnset)])
             let maskBlur = Self.blurred(mask, sigma: DigicamLook.fringeRadius * pixelsPerSensorPixel)
             let fringe = DigicamLook.fringeColor * (DigicamLook.fringeStrength * processing * clipsAt)
             scene = try kernels.run(k.fringe, extent, [scene, mask, maskBlur, CIVector(x: fringe.x, y: fringe.y, z: fringe.z, w: 0)])
         }
-        // The corners are never sharper than the lens-softened centre, whatever the processing.
         let cornerSigma = max(DigicamLook.lensSoftnessSigma, DigicamLook.cornerSoftnessSigma * processing)
         let corners = Self.blurred(scene, sigma: cornerSigma * pixelsPerSensorPixel)
         scene = Self.blurred(scene, sigma: DigicamLook.lensSoftnessSigma * pixelsPerSensorPixel)
@@ -54,8 +47,7 @@ extension Renderer {
         return image.cropped(to: extent)
     }
 
-    /// The source centre-cropped to 4:3 (landscape or portrait, as the source), moved to the origin,
-    /// and Lanczos-downscaled when its long edge exceeds the sensor's.
+    /// Centre-cropped to 4:3, moved to the origin, and downscaled to the sensor size.
     static func sensorFrame(_ image: CIImage) -> CIImage {
         let source = image.extent
         let long = max(source.width, source.height)
@@ -76,15 +68,11 @@ extension Renderer {
         return frame.clampedToExtent().lanczosScaled(by: scale).cropped(to: output)
     }
 
-    /// A Gaussian blur of the image's own extent, edges extended; the image itself below
-    /// `DigicamLook.minimumBlurSigma`.
     private static func blurred(_ image: CIImage, sigma: Double) -> CIImage {
         guard sigma >= DigicamLook.minimumBlurSigma else { return image }
         return image.clampedToExtent().applyingGaussianBlur(sigma: sigma).cropped(to: image.extent)
     }
 
-    /// Display light through a real JPEG encode and decode (sRGB, Core Image's encoder), so the
-    /// export carries the camera's compression.
     private func jpegRoundTrip(_ image: CIImage, quality: Double) throws -> CIImage {
         guard let decoded = CIImage(data: try jpegData(image, colorSpace: Self.cameraSpace, quality: quality)) else {
             throw EmulsionError.renderFailed
@@ -92,6 +80,6 @@ extension Renderer {
         return decoded
     }
 
-    /// The cameras wrote sRGB.
+    /// Period cameras wrote sRGB JPEGs.
     private static let cameraSpace = CGColorSpace(name: CGColorSpace.sRGB)!
 }

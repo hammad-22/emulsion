@@ -3,6 +3,7 @@
 A free, open-source film lab for iPhone (Mac later): RAW and log footage in, a simulated negative → print film process out. **The engine is the product**: fast, honest about what it models, and verified.
 
 - Background: `docs/ENGINE.md` (how it works), `docs/DECISIONS.md` (owner decisions), `docs/RESEARCH.md`, `docs/MARKET-RESEARCH.md`.
+- Constant sources: `docs/CONSTANTS.md` (non-film engine constants), `docs/DIGICAM.md` (the digicam process).
 - Film physics for E2 work: `docs/FILM-THEORY.md` (equations, sources, what the engine models vs approximates, gap list) and `docs/STOCK-DATA.md` (datasheet inventory). Read both before changing the film model.
 - Work: Linear team **Emulsion** (key `MOV`). GitHub: `hammad-22/emulsion` (open source, Apache-2.0).
 - This file is the single source of rules for every coding agent (Codex reads it directly; `CLAUDE.md` imports it). Folder-specific rules live in nested `AGENTS.md` files: `Packages/EmulsionCore/Kernels/`, `Packages/EmulsionCore/Tests/`, `Packages/EmulsionKit/`, `Packages/EmulsionUI/`, `Apps/iOS/`, `Apps/macOS/`. Read the nested file before editing in that folder.
@@ -61,7 +62,7 @@ Stock-data checks and `emulsion-fit` read the local reference data (traced curve
 - **Reproduce bugs with a failing test first, then fix.**
 - **Review agents always.** Have an independent agent check any non-trivial engine change, research claim or verdict. Back claims with proof (file:line, a reproduced number, a source URL) and say what's unverified.
 - **Reuse before writing.** Search for an existing helper before adding one. Duplicates between Swift and Metal are deliberate mirrors; any other duplicate is a bug.
-- **Leave it cleaner.** Fix stale comments and dead code in the files you touch.
+- **Leave it cleaner.** Fix stale comments and dead code in the files you touch. For layout (file size, comments, constants, enums), follow the organize skill (`.agents/skills/swift-organize/SKILL.md`).
 - **Prove it in the PR.** Every PR has a **Proof** section (template in `.github/pull_request_template.md`):
   - UI changes: before/after screenshots or a short screen recording from the iOS Simulator (`xcrun simctl io booted screenshot|recordVideo`), and from a device when it matters;
   - engine changes: before/after renders of a reference fixture, plus the measured numbers;

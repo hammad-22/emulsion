@@ -1,6 +1,4 @@
-/// Orders renders that overlap while a slider moves. Each change starts a render and
-/// supersedes the last, so discarding superseded results would leave the photo frozen until
-/// the finger stops; instead a finished render is shown unless a newer one already is.
+/// Shows a finished render unless a newer one already is, so a moving slider never freezes the photo.
 struct RenderOrder {
     private var started = 0
     private var shown = 0

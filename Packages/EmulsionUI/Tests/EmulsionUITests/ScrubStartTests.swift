@@ -16,7 +16,6 @@ struct ScrubStartTests {
     }
 
     @Test func anAcceptedScrubIsNeverLockedVerticalByTheRuler() {
-        // The pan accepted a mostly horizontal start; the finger then drifts down.
         let start = ScrubStart(velocity: CGPoint(x: 100, y: 20), canScrollVertically: false)
         var drag = RulerDrag()
         let first = start.reported(CGPoint(x: -2, y: 12))

@@ -1,6 +1,6 @@
 import Foundation
 
-/// The Markdown summary `emulsion-fit dyes` writes and prints; the JSON report holds the same numbers in full.
+/// The Markdown summary `emulsion-fit dyes` writes; the JSON report has the numbers in full.
 enum NegativeDyeSetSummary {
     static func text(_ report: NegativeDyeSetReport) -> String {
         let midscale = report.midscale
@@ -120,7 +120,6 @@ enum NegativeDyeSetSummary {
             + (fit.fittedOn == .neutralScale ? " (fitted on neutral scale)" : " (fitted on neutral scale + lattice\(weight))")
     }
 
-    /// Neutral-scale max, lattice RMS and lattice max per channel, one row per fit.
     private static func comparisonTable(_ title: String, _ rows: [(String, PrintingDensityConversion)]) -> [String] {
         [
             "| \(title) | neutral max R | G | B | lattice RMS R | G | B | lattice max R | G | B |",

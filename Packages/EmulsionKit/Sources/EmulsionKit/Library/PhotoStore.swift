@@ -2,31 +2,26 @@ import EmulsionCore
 import Foundation
 import Observation
 
-/// Originals live in one folder (Application Support by default); edits are
-/// non-destructive and stored in an index next to them. The index is written before the
-/// library changes, so what the app shows is what the next launch finds.
+/// Originals and an index of their edits, in one folder. See Packages/EmulsionKit/NOTES.md, "PhotoStore".
 @MainActor @Observable
 public final class PhotoStore {
     public private(set) var photos: [PhotoRecord] = []
-    /// The last library problem that no caller could be told about directly (loading,
-    /// saving an edit, deleting), for the app to show. Set it to nil once shown.
+    /// A problem no caller could be told about directly; set it to nil once shown.
     public var lastError: EmulsionError?
     let folder: URL
     private let importer: OriginalImporter
     let renderService: RenderService
-    var indexURL: URL { folder.appending(path: "library.json") }
-    /// False while the index on disk couldn't be read or moved aside: it must never be overwritten.
+    var indexURL: URL { folder.appending(path: StoredFileName.libraryIndex) }
+    /// False while the index on disk couldn't be read or moved aside: never overwrite it.
     private var canWriteIndex = true
-    /// Set once a failed save is reported and cleared when one succeeds, so a full disk is
-    /// reported once rather than on every slider rest.
+    /// So a full disk is reported once, not on every slider rest.
     private var hasReportedSaveFailure = false
-    /// Measured anchors waiting for the save `exposureAnchorSave` holds back, by photo.
     private var unsavedExposureAnchors: [UUID: StoredExposureAnchor] = [:]
     private var exposureAnchorSave: Task<Void, Never>?
     static let exposureAnchorSaveDelay = Duration.seconds(1)
 
     public convenience init() {
-        self.init(folder: URL.applicationSupportDirectory.appending(path: "Emulsion", directoryHint: .isDirectory), renderService: .shared)
+        self.init(folder: StoredFileName.appFolderURL, renderService: .shared)
     }
 
     init(folder: URL, renderService: RenderService, importer: OriginalImporter = OriginalImporter()) {
@@ -50,7 +45,6 @@ public final class PhotoStore {
             if !originals.isEmpty { recoverOriginals(originals) }
             return
         } catch {
-            // Unreadable right now (e.g. file protection), not corrupt: keep it as it is.
             canWriteIndex = false
             recoverOriginals(originalFiles())
             return
@@ -67,31 +61,26 @@ public final class PhotoStore {
     public func url(for photo: PhotoRecord) -> URL { folder.appending(path: photo.fileName) }
     public func photo(_ id: UUID) -> PhotoRecord? { photos.first { $0.id == id } }
 
-    /// Prepares the original off the main actor, then commits against the latest library.
-    /// Cancellation before commit removes only this import's files. Once committed, an
-    /// import succeeds even if its caller is cancelled immediately afterward.
     @discardableResult
     public func add(_ data: Data) async throws -> PhotoRecord {
         try await insert([.data(data, fileExtension: nil)])[0]
     }
 
-    /// Adds an original with `look` as its starting edit (a camera recipe), given this photo's
-    /// own grain seed. The file itself is stored untouched.
     @discardableResult
     public func add(_ data: Data, fileExtension: String, look: Adjustments = Adjustments()) async throws -> PhotoRecord {
         try await insert([.data(data, fileExtension: fileExtension)], look: look)[0]
     }
 
-    /// Adds all bundled synthetic samples with one index commit.
     public func addSamples() async throws {
         try await insert(Self.sampleURLs.map { .file($0) })
     }
 
-    /// The bundled sample photos, in the order they're added.
-    public nonisolated static let sampleURLs: [URL] = (Bundle.module.urls(forResourcesWithExtension: "jpg", subdirectory: "Samples") ?? [])
+    public nonisolated static let sampleURLs: [URL] =
+        (Bundle.module.urls(forResourcesWithExtension: sampleFileExtension, subdirectory: samplesFolder) ?? [])
         .sorted { $0.lastPathComponent < $1.lastPathComponent }
+    private nonisolated static let samplesFolder = "Samples"
+    private nonisolated static let sampleFileExtension = "jpg"
 
-    /// Deletes several photos, e.g. the library's selection.
     public func delete(_ ids: some Sequence<UUID>) async {
         let selected = Set(ids)
         let files = photos.filter { selected.contains($0.id) }.map { url(for: $0) }
@@ -104,7 +93,6 @@ public final class PhotoStore {
             do {
                 try FileManager.default.removeItem(at: file)
             } catch CocoaError.fileNoSuchFile {
-                // Already gone: nothing to report.
             } catch {
                 report(.libraryDeleteFailed)
             }
@@ -128,8 +116,7 @@ public final class PhotoStore {
         for index in added.indices { added[index].adjustments = .defaults(for: added[index].id, look: look) }
         do {
             try Task.checkCancellation()
-            // No suspension between reading the current photos, committing, and publishing:
-            // imports cannot restore a deleted record or overwrite an intervening edit.
+            // No suspension until published, so an import can't undo a delete or an edit.
             try commit { $0.insert(contentsOf: added, at: 0) }
             return added
         } catch {
@@ -138,7 +125,6 @@ public final class PhotoStore {
         }
     }
 
-    /// Applies `change` to a copy of the library, writes it as the index, then shows it.
     private func commit(_ change: (inout [PhotoRecord]) -> Void) throws(EmulsionError) {
         guard canWriteIndex else { throw .librarySaveFailed }
         var updated = photos
@@ -152,16 +138,12 @@ public final class PhotoStore {
         photos = updated
     }
 
-    /// Gives the render service every saved anchor; it measures again for an original that changed.
     private func restoreExposureAnchors() {
         for photo in photos {
             if let anchor = photo.exposureAnchor { renderService.restoreExposureAnchor(anchor, for: url(for: photo)) }
         }
     }
 
-    /// Saves a newly measured anchor with its photo's record: at once, then with any others measured
-    /// within `exposureAnchorSaveDelay`, so opening a library of unmeasured RAWs writes the index
-    /// about once a second, not once per photo.
     private func keepExposureAnchor(_ anchor: StoredExposureAnchor, for file: URL) {
         guard let photo = photos.first(where: { $0.fileName == file.lastPathComponent }) else { return }
         unsavedExposureAnchors[photo.id] = anchor
@@ -196,9 +178,9 @@ public final class PhotoStore {
         lastError = error
     }
 
-    /// Keeps a corrupt index under a new name, so its edits can still be recovered.
     private func keepCorruptIndex() {
-        let kept = folder.appending(path: "library-unreadable-\(Date.now.timeIntervalSince1970)-\(UUID().uuidString).json")
+        let name = "\(StoredFileName.unreadableLibraryIndexPrefix)\(Date.now.timeIntervalSince1970)-\(UUID().uuidString).json"
+        let kept = folder.appending(path: name)
         do {
             try FileManager.default.moveItem(at: indexURL, to: kept)
         } catch {
@@ -215,8 +197,6 @@ public final class PhotoStore {
         return files.filter { UUID(uuidString: $0.deletingPathExtension().lastPathComponent) != nil }
     }
 
-    /// Lists originals again when the index can't be used, preserving edits from any
-    /// independently readable records before applying defaults to the rest.
     private func recoverOriginals(_ originals: [URL], preserving readable: [PhotoRecord] = []) {
         lastError = .libraryUnreadable
         let saved = Dictionary(readable.map { ($0.fileName, $0) }, uniquingKeysWith: { first, _ in first })
@@ -228,8 +208,6 @@ public final class PhotoStore {
             return PhotoRecord(id: id, created: created, fileName: file.lastPathComponent, isRAW: isRAW, adjustments: .defaults(for: id))
         }
         let newestFirst = recovered.sorted { $0.created > $1.created }
-        // Written now, so the next launch finds the recovered list rather than no index;
-        // shown either way.
         do { try commit { $0 = newestFirst } } catch { photos = newestFirst }
     }
 }
@@ -239,20 +217,5 @@ private struct RecoverablePhotoRecord: Decodable {
 
     init(from decoder: any Decoder) {
         photo = try? PhotoRecord(from: decoder)
-    }
-}
-
-extension Adjustments {
-    /// Grain seeds are whole numbers below this: small whole numbers keep float precision exact
-    /// in the grain kernel.
-    static let grainSeedCount = 1024
-
-    /// The starting edit for a photo: `look` (the default look unless a recipe was chosen), with
-    /// a grain seed (0 ..< `grainSeedCount`) derived from the photo's ID so re-renders, exports
-    /// and resets match, and photos differ.
-    static func defaults(for id: UUID, look: Adjustments = Adjustments()) -> Adjustments {
-        var adjustments = look
-        adjustments.seed = Double(id.uuid.0) * 4 + Double(id.uuid.1 % 4)
-        return adjustments
     }
 }

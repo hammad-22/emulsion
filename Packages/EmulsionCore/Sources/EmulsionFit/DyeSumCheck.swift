@@ -1,41 +1,28 @@
-/// Do the three dye spectra add up to the sheet's neutral spectrum? Compares a neutral against a_Y·yellow + a_M·magenta
-/// + a_C·cyan with non-negative scales (least squares, or fixed) over the wavelengths where every curve used is drawn.
-/// A check on the digitized spectra (MOV-17), not on the engine. Dye densities are used as drawn, negative lobes
-/// included (the negatives' magenta dye dips below zero near 445 nm).
-///
-/// Acceptance (`acceptance(_:filmType:)`), target max |residual| ≤ 0.05 D:
-/// - Camera negatives: neutral − minimum density against the fitted dye sum. The sheets draw the dye curves "D-mins
-///   subtracted" while the neutral and minimum-density spectra are drawn as measured.
-/// - Print film: neutral against the fitted dye sum over 400–700 nm.
+/// Do the dye spectra add up to the neutral? A data check, not an engine one (MOV-17; docs).
 struct DyeSumCheck: Sendable, Equatable {
-    /// MOV-17 acceptance: largest |residual| in density.
+    /// MOV-17 acceptance: largest |residual|, density.
     static let targetMaxResidual = 0.05
     static let dyes = ["yellow", "magenta", "cyan"]
-    /// Negatives draw a midscale neutral; the print film draws a visual neutral.
     static let neutrals = ["midscale_neutral", "visual_neutral"]
-    /// The negatives' base + mask spectrum.
     static let minimumDensity = "minimum_density"
-    /// Where the print film's three image dyes account for its visual neutral; below 400 nm the neutral rises steeply
-    /// above the dye sum.
+    /// Below 400 nm the print film's neutral rises steeply above the dye sum.
     static let imageDyeWavelengths = 400.0...700.0
 
-    /// What is compared with what.
     struct Comparison: Sendable, Equatable {
         var subtractsMinimumDensity = false
-        /// nil: every wavelength where all curves used are drawn.
         var wavelengths: ClosedRange<Double>?
-        /// nil: fit non-negative scales; otherwise use these.
+        /// nil: fit non-negative scales.
         var fixedScales: [Double]?
-        /// nil: every drawn wavelength; otherwise only multiples of this step (nm).
+        /// nil: every drawn wavelength; otherwise multiples of this step, nm.
         var wavelengthStep: Double?
     }
 
     let comparison: Comparison
     let neutral: String
-    /// a_Y, a_M, a_C.
+    /// Yellow, magenta, cyan.
     let scales: [Double]
     let wavelengths: [Double]
-    /// Neutral (less minimum density, when subtracted) minus the scaled dye sum, per wavelength.
+    /// Neutral (less minimum density, when subtracted) minus the scaled dye sum.
     let residuals: [Double]
 
     var rms: Double { residuals.rms }
@@ -46,7 +33,6 @@ struct DyeSumCheck: Sendable, Equatable {
     }
     var meetsTarget: Bool { maxAbsResidual <= Self.targetMaxResidual }
 
-    /// The MOV-17 acceptance comparison for this chart.
     static func acceptance(_ chart: DigitizedChart, filmType: StockManifest.FilmType) -> DyeSumCheck? {
         let comparison =
             switch filmType {
@@ -56,8 +42,7 @@ struct DyeSumCheck: Sendable, Equatable {
         return compared(chart, comparison)
     }
 
-    /// Reported alongside the acceptance row, never asserted: the plain neutral for negatives; the full overlap and
-    /// the scales-fixed-to-1 sum (the sheet says its dyes are normalized to the visual neutral) for the print film.
+    /// Reported, never asserted, beside the acceptance row.
     static func diagnostics(_ chart: DigitizedChart, filmType: StockManifest.FilmType) -> [(label: String, check: DyeSumCheck)] {
         let comparisons: [(String, Comparison)] =
             switch filmType {
@@ -79,8 +64,7 @@ struct DyeSumCheck: Sendable, Equatable {
             residuals: residuals(samples, scales))
     }
 
-    /// With three dyes every active set can be tried: the optimum of this convex problem is the unconstrained fit on
-    /// some subset of dyes, so the best non-negative subset fit is exact.
+    /// Exact: the convex optimum is the unconstrained fit on some subset of the three dyes.
     private static func bestNonNegativeScales(_ samples: Samples) -> [Double]? {
         var best: (scales: [Double], cost: Double)?
         for subset in 0..<(1 << dyes.count) {

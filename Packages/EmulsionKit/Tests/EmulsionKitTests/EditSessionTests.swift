@@ -113,8 +113,7 @@ struct EditSessionTests {
         #expect(await service.keptDecoderURL == nil)
     }
 
-    /// A record saved before `isRAW` existed says false for a RAW file.
-    @Test func aRAWFileGetsWhiteBalanceWhateverItsRecordSays() async throws {
+    @Test func aRAWFileGetsWhiteBalanceEvenIfAnOldRecordSaysNotRAW() async throws {
         let library = TestLibrary()
         let photo = try await library.store.add(TestRAW.tungstenTaggedAsDaylight, fileExtension: "dng")
         let old = PhotoRecord(id: photo.id, created: photo.created, fileName: photo.fileName, isRAW: false, adjustments: photo.adjustments)
@@ -125,7 +124,6 @@ struct EditSessionTests {
         #expect(session.asShotWhiteBalance != nil)
     }
 
-    /// The editor's photo keeps its RAW decoder until the editor closes.
     @Test func theOpenPhotoKeepsItsDecoderUntilTheSessionCloses() async throws {
         let library = TestLibrary()
         let photo = try await library.store.add(TestRAW.tungstenTaggedAsDaylight, fileExtension: "dng")

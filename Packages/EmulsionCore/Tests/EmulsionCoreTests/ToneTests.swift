@@ -10,17 +10,15 @@ final class ToneTests: EmulsionTestCase {
         let out = codes(rendered)
         let labs = Fixtures.oklab(rendered)
         let mid = stops.firstIndex { $0 >= 0 }!
-        // 18% gray → 0.17 display-linear ≈ 114 code (encoded).
+        // 18% gray → 0.17 display-linear ≈ code 114.
         XCTAssertEqual(out[mid].y, Double(Fixtures.encode(Float(FilmLook.stock.middleGrayOut))) * 255, accuracy: 1.0)
         for i in 1..<out.count where stops[i] > -6 && stops[i] < 5.5 {
             XCTAssertGreaterThan(luma(out[i]) - luma(out[i - 1]), 0.05, "tone flattens at \(stops[i]) stops")
         }
-        // The warm/cool split stays a tint, not a cast: |a,b| small on the gray scale, ~0 at mid-gray.
         XCTAssertLessThan(Fixtures.chroma(labs[mid]), 0.004)
         for (i, lab) in labs.enumerated() where stops[i] > -6 {
             XCTAssertLessThan(Fixtures.chroma(lab), 0.03, "gray tinted at \(stops[i])")
         }
-        // Highlights roll toward white instead of clipping: +4 and +5.5 stops still differ.
         let at4 = stops.firstIndex { $0 >= 4 }!
         let at55 = stops.firstIndex { $0 >= 5.5 }!
         XCTAssertGreaterThan(luma(out[at55]) - luma(out[at4]), 2)

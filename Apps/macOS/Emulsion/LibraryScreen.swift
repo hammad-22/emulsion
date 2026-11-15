@@ -6,9 +6,7 @@ struct LibraryScreen: View {
     @Environment(PhotoStore.self) private var store
     @State private var selection: PhotoRecord.ID?
     @State private var importError: String?
-    // Large enough to tell bundled and imported photos apart in the sidebar.
     private let thumbnailSize: CGFloat = 56
-    // Keep the date and a recognizable thumbnail visible together.
     private let sidebarWidth: CGFloat = 220
 
     var body: some View {

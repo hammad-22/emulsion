@@ -6,12 +6,10 @@ import simd
 
 @testable import EmulsionCore
 
-/// A RAW decoder kept alive for interactive white balance (MOV-137) develops exactly what a
-/// develop from the file does, at every white balance and back to as shot.
+/// A RAW decoder kept alive for interactive white balance (MOV-137) matches a fresh develop.
 struct RAWDecoderTests {
     static var developer: Developer { EmulsionTestCase.sharedRenderer.developer }
 
-    /// A tungsten-lit chart tagged as daylight, with a gain table so the develop measures an anchor.
     static func file(_ mosaic: SyntheticDNG.Mosaic) -> Data {
         RAWDevelopChart.dng(
             mosaic, chart: CameraWhiteBalanceTests.chart, light: CameraWhiteBalanceTests.tungsten,
@@ -23,17 +21,13 @@ struct RAWDecoderTests {
         nil, tungsten, CameraWhiteBalance(temperature: 4200, tint: 25), CameraWhiteBalance(temperature: 9000, tint: -40), nil,
     ]
 
-    /// Largest channel difference between two renders of the same size.
     static func worstDifference(_ a: CIImage, _ b: CIImage) -> Double {
         zip(Fixtures.linear(a), Fixtures.linear(b)).map { abs($0 - $1).max() }.max() ?? .nan
     }
 
-    /// Back at as shot after another white balance, against the file's own untouched neutral:
-    /// measured 6.0e-7 on the linear file and 9.5e-7 on the Bayer one (about 2× the worst).
+    // Measured tolerances, about 2× the worst on macOS 27.2: docs/CONSTANTS.md, "Test tolerances".
     static let backToAsShotTolerance = 2e-6
 
-    /// `Developer.develop` is itself one `negative` of a decoder, so the reference for as shot
-    /// is a `CIRAWFilter` nothing has set a neutral on.
     @Test(arguments: SyntheticDNG.Mosaic.allCases)
     func asShotIsTheUntouchedFilesNeutral(mosaic: SyntheticDNG.Mosaic) throws {
         let data = Self.file(mosaic)
@@ -57,8 +51,6 @@ struct RAWDecoderTests {
             let kept = try decoder.negative(whiteBalance: whiteBalance)
             let fresh = try Self.developer.develop(data, maxDimension: maxDimension, whiteBalance: whiteBalance)
             let difference = Self.worstDifference(kept.image, fresh.image)
-            // Exact at every white balance; as shot again is within the return tolerance, which
-            // the exposure anchor scales with every value.
             let tolerance = Self.backToAsShotTolerance * pow(2, kept.exposureAnchorStops)
             #expect(difference <= tolerance, "white balance \(String(describing: whiteBalance)): \(difference)")
             if whiteBalance != nil { #expect(difference == 0, "white balance \(String(describing: whiteBalance))") }

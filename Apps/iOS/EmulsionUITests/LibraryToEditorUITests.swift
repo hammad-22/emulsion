@@ -1,12 +1,6 @@
 import XCTest
 
-/// End-to-end walk through the app from an empty library: add the sample photos, select
-/// two, cancel and confirm deleting the selection, edit the remaining photo, compare with
-/// the original, reset, rotate, save to Photos and delete.
-/// Screenshots are kept in the result bundle as PR proof. Run on a fresh install
-/// with an isolated test bundle identifier so the owner's library stays untouched.
 final class LibraryToEditorUITests: XCTestCase {
-    /// Every text on the empty library, the Import label included, passes the contrast audit.
     @MainActor
     func testEmptyLibraryContrast() throws {
         let app = try XCUIApplication.launchEmptyLibrary()
@@ -34,7 +28,7 @@ final class LibraryToEditorUITests: XCTestCase {
         try app.performAccessibilityAudit(for: [.sufficientElementDescription, .trait, .hitRegion])
         photo.tap()
         app.buttons["Adjust"].tap()
-        let ruler = app.otherElements["adjustment-ruler"]
+        let ruler = app.otherElements[AccessibilityID.adjustmentRuler]
         XCTAssertTrue(ruler.waitForExistence(timeout: 5))
         XCTAssertEqual(ruler.label, "Exposure")
         XCTAssertEqual(ruler.value as? String, "0.0 EV")
@@ -69,14 +63,14 @@ final class LibraryToEditorUITests: XCTestCase {
         let photo = app.photos.firstMatch
         photo.tap()
         app.buttons["Adjust"].tap()
-        XCTAssertTrue(app.otherElements["adjustment-ruler"].waitForExistence(timeout: 5))
+        XCTAssertTrue(app.otherElements[AccessibilityID.adjustmentRuler].waitForExistence(timeout: 5))
         let group = app.descendants(matching: .any).matching(identifier: "Adjustment group").firstMatch
         XCTAssertEqual(group.value as? String, "Light")
         try app.performAccessibilityAudit(for: .hitRegion)
         group.tap()
         app.buttons["Color"].tap()
         XCTAssertEqual(group.value as? String, "Color")
-        XCTAssertEqual(app.otherElements["adjustment-ruler"].label, "Warmth")
+        XCTAssertEqual(app.otherElements[AccessibilityID.adjustmentRuler].label, "Warmth")
     }
 
     @MainActor
@@ -117,7 +111,7 @@ final class LibraryToEditorUITests: XCTestCase {
         firstPhoto.tap()
 
         app.buttons["Adjust"].tap()
-        let exposure = app.otherElements["adjustment-ruler"]
+        let exposure = app.otherElements[AccessibilityID.adjustmentRuler]
         XCTAssertTrue(exposure.waitForExistence(timeout: 5))
         sleep(2)
         keepScreenshot(app, named: "3 Editor")
@@ -144,7 +138,7 @@ final class LibraryToEditorUITests: XCTestCase {
         XCTAssertEqual(exposure.value as? String, editedExposure, "Hiding controls preserves the edit")
         app.buttons["Adjustment group"].tap()
         app.buttons["Color"].tap()
-        let warmth = app.otherElements["adjustment-ruler"]
+        let warmth = app.otherElements[AccessibilityID.adjustmentRuler]
         XCTAssertEqual(warmth.label, "Warmth")
         dragRuler(warmth)
         let editedWarmth = warmth.value as? String
@@ -168,7 +162,8 @@ final class LibraryToEditorUITests: XCTestCase {
 
         allowPhotoLibraryAdds()
         app.buttons["Save to Photos"].tap()
-        app.tap()  // Lets the interruption monitor answer the permission alert.
+        // Lets the interruption monitor answer the permission alert.
+        app.tap()
         XCTAssertTrue(app.alerts["Saved to Photos"].waitForExistence(timeout: 20))
         keepScreenshot(app, named: "7 Saved")
         app.alerts["Saved to Photos"].buttons["OK"].tap()

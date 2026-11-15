@@ -9,10 +9,8 @@ struct PhotoEditor: View {
     @State private var selection: [AdjustmentGroup: String] = [:]
     @Environment(\.scenePhase) private var scenePhase
 
-    // Fits the same labels and controls as the iPhone panel, with room to resize.
     private let minimumPanelWidth: CGFloat = 340
     private let maximumPanelWidth: CGFloat = 400
-    // Keep a useful photo area when the window or split divider is resized.
     private let minimumPhotoSize: CGFloat = 320
 
     init(photo: PhotoRecord, store: PhotoStore) {

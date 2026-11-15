@@ -1,15 +1,11 @@
 import Foundation
 
-/// What `emulsion-fit dyes` computes for a camera negative from its digitized dye spectra and characteristic curves,
-/// through the Status M, APD and RP 180 responsivities: the midscale reconstruction (MOV-88 acceptance), the mask
-/// check, the neutral scale in dye amounts and printing densities, straight-line gammas, and the printing-density
-/// conversions. Every number is computed from digitized datasheet data, not measured on film. Encodes with sorted keys
-/// so two runs write byte-identical files.
+/// What `emulsion-fit dyes` computes for a camera negative (docs/CONSTANTS.md).
 struct NegativeDyeSetReport: Codable, Sendable, Equatable {
-    /// The midscale check uses 10 nm steps within 400–700 nm, where the image dyes dominate.
+    /// Midscale check: 10 nm steps over 400–700 nm, where the image dyes dominate.
     static let midscaleWavelengths = 400.0...700.0
     static let midscaleWavelengthStep = 10.0
-    /// ADX scales Dmin-subtracted APD by k = (1.00, 0.92, 0.95) for red, green, blue (ST 2065-3:2020 Eqs. 1–2).
+    /// ADX k for red, green, blue. Sourced: ST 2065-3:2020 Eqs. 1–2.
     static let adxChannelFactors = [1.00, 0.92, 0.95]
 
     let tool: String
@@ -27,14 +23,12 @@ struct NegativeDyeSetReport: Codable, Sendable, Equatable {
     let latticeSteps: Int
     /// Through APD (SMPTE ST 2065-2); holds the engine's matrix.
     let academyConversions: ConversionSet
-    /// Through RP 180 printing density.
     let rp180Conversions: ConversionSet
     let dyeEdgeDiagnostic: EdgeDiagnostic
     let neutralScale: [NeutralScale.Sample]
 
     struct Midscale: Codable, Sendable, Equatable {
         let wavelengths: [Double]
-        /// Cyan, magenta, yellow.
         let amounts: [Double]
         let rms: Double
         let maxAbsResidual: Double
@@ -43,108 +37,21 @@ struct NegativeDyeSetReport: Codable, Sendable, Equatable {
         let meetsTarget: Bool
     }
 
-    /// Integral density of the minimum-density spectrum against the characteristic chart's lowest traced density
-    /// (the chart is Status M, so only the Status M row compares like with like).
+    /// Minimum density against the chart's lowest; only Status M compares like with like.
     struct MaskRow: Codable, Sendable, Equatable {
         let densityDefinition: String
         let minimumDensity: [Double]
         let chartLowest: [Double]
-        /// minimumDensity − chartLowest.
         let difference: [Double]
     }
 
-    /// Straight-line gammas (middle third of each curve's span), red/cyan, green/magenta, blue/yellow.
+    /// Middle-third gammas, red/cyan, green/magenta, blue/yellow.
     struct GammaRow: Codable, Sendable, Equatable {
         let quantity: String
         let values: [Double?]
     }
 
-    /// The neutral scale's straight-line gammas (`NegativeFit.straightLineGamma`), red/cyan, green/magenta, blue/yellow.
-    struct Gammas: Sendable, Equatable {
-        enum Quantity: CaseIterable, Sendable {
-            case statusM, dyeAmounts, academyPrintingDensity, rp180PrintingDensity, academyADX
-
-            var label: String {
-                switch self {
-                case .statusM: "Status M"
-                case .dyeAmounts: "Dye amounts (C, M, Y)"
-                case .academyPrintingDensity: "APD"
-                case .rp180PrintingDensity: "RP 180 PD"
-                case .academyADX: "APD × ADX k (1.00, 0.92, 0.95)"
-                }
-            }
-        }
-
-        let statusM: [Double?]
-        let dyeAmounts: [Double?]
-        let academyPrintingDensity: [Double?]
-        let rp180PrintingDensity: [Double?]
-
-        init(_ scale: NeutralScale) {
-            func gammas(_ quantity: Quantity, _ value: @escaping (NeutralScale.Sample) -> [Double]) -> [Double?] {
-                (0..<3).map { NegativeFit.straightLineGamma(scale.curve(quantity.label, channel: $0, value)) }
-            }
-            statusM = gammas(.statusM, \.statusM)
-            dyeAmounts = gammas(.dyeAmounts, \.dyeAmounts)
-            academyPrintingDensity = gammas(.academyPrintingDensity, \.academyPrintingDensity)
-            rp180PrintingDensity = gammas(.rp180PrintingDensity, \.rp180PrintingDensity)
-        }
-
-        func values(_ quantity: Quantity) -> [Double?] {
-            switch quantity {
-            case .statusM: statusM
-            case .dyeAmounts: dyeAmounts
-            case .academyPrintingDensity: academyPrintingDensity
-            case .rp180PrintingDensity: rp180PrintingDensity
-            case .academyADX: zip(academyPrintingDensity, adxChannelFactors).map { gamma, k in gamma.map { $0 * k } }
-            }
-        }
-
-        func rows(_ quantities: [Quantity] = Quantity.allCases) -> [GammaRow] {
-            quantities.map { GammaRow(quantity: $0.label, values: values($0)) }
-        }
-    }
-
-    struct ConversionSet: Codable, Sendable, Equatable {
-        let printingDensity: String
-        let fits: [PrintingDensityConversion]
-
-        /// Every fit the report compares: each model on the neutral scale and lattice, the engine form at each
-        /// `neutralScaleWeightSweep` weight, and the Status M fits on the neutral scale alone.
-        static func fitting(
-            printingDensity: String, neutralScale: [PrintingDensityConversion.Point], lattice: [PrintingDensityConversion.Point]
-        ) throws(DyeSetError) -> ConversionSet {
-            var fits: [PrintingDensityConversion] = []
-            for model in PrintingDensityConversion.Model.allCases {
-                fits.append(try PrintingDensityConversion.fit(model, neutralScale: neutralScale, lattice: lattice))
-            }
-            for weight in PrintingDensityConversion.neutralScaleWeightSweep where weight != 1 {
-                fits.append(
-                    try PrintingDensityConversion.fit(
-                        .dyeAmountsWithOffset, neutralScaleWeight: weight, neutralScale: neutralScale, lattice: lattice))
-            }
-            for model in [PrintingDensityConversion.Model.statusM, .statusMWithOffset] {
-                fits.append(try PrintingDensityConversion.fit(model, on: .neutralScale, neutralScale: neutralScale, lattice: lattice))
-            }
-            return ConversionSet(printingDensity: printingDensity, fits: fits)
-        }
-
-        func fit(
-            _ model: PrintingDensityConversion.Model, fittedOn fitSet: PrintingDensityConversion.FitSet = .neutralScaleAndLattice,
-            neutralScaleWeight: Double = 1
-        ) -> PrintingDensityConversion? {
-            fits.first { $0.model == model && $0.fittedOn == fitSet && $0.neutralScaleWeight == neutralScaleWeight }
-        }
-
-        /// The conversion the engine uses.
-        var engine: PrintingDensityConversion? {
-            fit(.dyeAmountsWithOffset, neutralScaleWeight: PrintingDensityConversion.engineNeutralScaleWeight)
-        }
-    }
-
-    /// How much zero-filling the dye curves outside their traced spans, instead of holding the end values, changes
-    /// the neutral scale: the largest absolute change of any channel at any sample, and of any entry of the engine's APD
-    /// matrix.
+    /// How much zero-filling the dyes outside their traced spans changes the results.
     struct EdgeDiagnostic: Codable, Sendable, Equatable {
         let dyeAmounts: Double
         let academyPrintingDensity: Double
@@ -154,17 +61,14 @@ struct NegativeDyeSetReport: Codable, Sendable, Equatable {
 
     var conversions: [ConversionSet] { [academyConversions, rp180Conversions] }
 
-    /// The engine's printing-density matrix, through APD.
     var academyEngineConversion: PrintingDensityConversion? { academyConversions.engine }
 
-    /// What the report is built from and a negative fit reuses.
     struct Reconstruction: Sendable {
         let dyeSet: NegativeDyeSet
         let neutralScale: NeutralScale
-        /// The characteristic chart's lowest traced Status M density, red, green, blue.
+        /// Lowest traced Status M density, red, green, blue.
         let chartLowest: [Double]
         let gammas: Gammas
-        /// `academyEngineConversion`.
         let engineConversion: PrintingDensityConversion
     }
 
@@ -172,7 +76,6 @@ struct NegativeDyeSetReport: Codable, Sendable, Equatable {
         try reconstructing(stock, standards: standards, tool: tool).report
     }
 
-    /// The report and the reconstruction it is built from.
     static func reconstructing(_ stock: DigitizedStock, standards: StandardsTables, tool: String) throws(DyeSetError)
         -> (report: Self, reconstruction: Reconstruction)
     {
@@ -280,7 +183,7 @@ struct NegativeDyeSetReport: Codable, Sendable, Equatable {
         return try ConversionSet.fitting(printingDensity: responsivities.name, neutralScale: neutral, lattice: box)
     }
 
-    /// `log_exposure_lux_s`, Status M, dye amounts, APD and RP 180 printing density above minimum, one row per sample.
+    /// CSV of the neutral scale, one row per sample.
     func neutralScaleTable() -> String {
         let header =
             "log_exposure_lux_s,status_m_red,status_m_green,status_m_blue,cyan,magenta,yellow,"

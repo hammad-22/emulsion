@@ -1,6 +1,6 @@
 import SwiftUI
 
-/// Shared spacing and corner radii. Artistic values chosen for this interface.
+/// Shared spacing and corner radii; artistic.
 public enum FilmLabLayout {
     /// Between library thumbnails: tight, so the grid reads as one sheet of photographs.
     public static let gridSpacing: CGFloat = 2

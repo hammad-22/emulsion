@@ -1,8 +1,6 @@
 import Foundation
 
-/// The fields of a digitized stock's `manifest.json` that this tool reads: the source document, the film type, and
-/// per chart its file and that file's SHA-256, sampling grid, conditions, axis scales, traced extents, interpolated
-/// stretches and digitizing uncertainty. Other keys are ignored.
+/// The fields of a stock's `manifest.json` this tool reads (docs/CONSTANTS.md).
 struct StockManifest: Decodable, Sendable, Equatable {
     static let supportedFormatVersion = 1
 
@@ -16,7 +14,6 @@ struct StockManifest: Decodable, Sendable, Equatable {
         case cameraNegative, printFilm
     }
 
-    /// Encoded into fit reports.
     struct Source: Codable, Sendable, Equatable {
         let publisher: String
         let document: String
@@ -28,16 +25,15 @@ struct StockManifest: Decodable, Sendable, Equatable {
 
     struct Chart: Decodable, Sendable, Equatable {
         let file: String
-        /// SHA-256 (lowercase hex) of the traced CSV this entry describes.
+        /// SHA-256 (lowercase hex) of the traced CSV.
         let sha256: String
-        /// Spacing of the x grid the digitizer resampled onto: 0.05 log10 exposure or 5 nm.
+        /// Digitizer grid: 0.05 log10 exposure or 5 nm.
         let gridStep: Double
         let conditions: String
         let xAxis: Axis
         let yAxis: Axis
         let uncertainty: Uncertainty
         let curves: [String: CurveExtent]
-        /// The chart's camera-stop axis; only camera negatives have one.
         let cameraStops: CameraStops?
     }
 
@@ -45,7 +41,7 @@ struct StockManifest: Decodable, Sendable, Equatable {
         let pixelsPerUnit: Double
     }
 
-    /// One-sigma digitizing error per traced point, in data units. Encoded into fit reports.
+    /// One-sigma digitizing error per traced point, data units.
     struct Uncertainty: Codable, Sendable, Equatable {
         let x: Double
         let y: Double
@@ -53,19 +49,16 @@ struct StockManifest: Decodable, Sendable, Equatable {
     }
 
     struct CurveExtent: Decodable, Sendable, Equatable {
-        /// The traced x extent, before resampling onto the grid.
         let xRange: [Double]
-        /// x spans bridged across a gap in the drawn line rather than traced.
+        /// x spans bridged across a gap in the drawn line.
         let interpolatedSpans: [[Double]]
-        /// x spans where this curve shares one drawn line with another, so the channels can't be told apart.
+        /// x spans where this curve shares one drawn line with another.
         let sharedSpans: [[Double]]?
 
-        /// Every span whose samples are not this curve's own trace.
         var untracedSpans: [[Double]] { interpolatedSpans + (sharedSpans ?? []) }
     }
 
-    /// Numbers the checks and fits divide by or compare against, each named by its key path when unusable. Empty
-    /// when all are usable; a zero grid step or pixel scale would otherwise make the audit pass vacuously.
+    /// Unusable divisors by key path; a zero step would make the audit pass vacuously.
     var problems: [String] {
         charts.sorted { $0.key < $1.key }.flatMap { name, chart in
             var problems: [String] = []
@@ -95,7 +88,7 @@ struct StockManifest: Decodable, Sendable, Equatable {
     }
 
     struct CameraStops: Decodable, Sendable, Equatable {
-        /// Where camera stop 0 (normal exposure) sits on the chart's log10 exposure axis.
+        /// log10 exposure of camera stop 0 (normal exposure).
         let stopZeroLogExposure: Double
     }
 }
@@ -103,7 +96,6 @@ struct StockManifest: Decodable, Sendable, Equatable {
 extension StockManifest {
     static func url(in stockDirectory: URL) -> URL { stockDirectory.appending(path: "manifest.json") }
 
-    /// The manifest of stock `id` under `directory`, validated; needs no traced curves.
     static func load(id: String, from directory: URL) throws(FitError) -> StockManifest {
         let stockDirectory = directory.appending(path: id, directoryHint: .isDirectory)
         guard FileManager.default.fileExists(atPath: url(in: stockDirectory).path) else {
@@ -112,8 +104,6 @@ extension StockManifest {
         return try StockManifest(directory: stockDirectory)
     }
 
-    /// Reads `directory/manifest.json` and checks its format version, that it names its directory's stock, and
-    /// that it has no `problems`.
     init(directory: URL) throws(FitError) {
         let file = Self.url(in: directory)
         do {

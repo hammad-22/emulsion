@@ -2,8 +2,7 @@ import EmulsionKit
 import SwiftUI
 
 extension View {
-    /// Shows the library's `lastError` (an index that couldn't be read, or an edit or
-    /// delete that couldn't be saved) as an alert, and clears it when dismissed.
+    /// Shows the library's `lastError` as an alert and clears it when dismissed.
     public func libraryErrorAlert(_ store: PhotoStore) -> some View {
         modifier(LibraryErrorAlert(store: store))
     }
