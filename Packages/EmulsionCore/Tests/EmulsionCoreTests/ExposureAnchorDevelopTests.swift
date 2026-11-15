@@ -28,7 +28,7 @@ struct ExposureAnchorDevelopTests {
         _ mosaic: SyntheticDNG.Mosaic, baselineStops: Double, profile: SyntheticDNG.Profile?, maxDimension: CGFloat? = nil,
         anchor: ExposureAnchor.Choice = .measured
     ) throws -> RAWDevelopSupport.Developed {
-        try RAWDevelopSupport.develop(
+        try RAWDevelopSupport.decoded(
             RAWDevelopChart.dng(mosaic, chart: chart, baselineStops: baselineStops, profile: profile), chart: chart,
             maxDimension: maxDimension, anchor: anchor)
     }

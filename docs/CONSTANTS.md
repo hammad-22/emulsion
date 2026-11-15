@@ -629,14 +629,15 @@ Full-size renders of real DNGs (MOV-147, `ENGINE.md` "RAW decode corruption"), o
 real files corrupt. Each file is rendered 4 times with the default look and full halation: the
 develop's own render, and a deliberately hostile one (the develop read through
 `insertingIntermediate(cache: false)` and rendered by a context that doesn't cache intermediates).
-Each is compared tile by tile (256 px, `tileSize`) with a reference decoded on Apple's contrast-0
-path, alone, through a caching context: an independent decode on the other noise-reduction kernel.
-`tileTolerance` is 3 codes of mean |Δ| per channel: clean tiles measured at most 1.3 codes, corrupt
-ones 15–134. Exports must also repeat bit for bit. On CI, `developNeverRunsAppleContrastZeroKernel`
-checks the decode graph for Apple's contrast-0 kernel (the synthetic Bayer DNG reaches it at 0),
-`everyRAWDevelopIsAnOwnedBuffer` that every RAW develop is a buffer, `everyRenderCachesIntermediates`
-the context setting, and `viewfinderRendersOnlyCameraFrames` that the viewfinder's uncached context
-only takes a camera frame's preview estimate, in either render process.
+Each is compared tile by tile (256 px, `tileSize`) with a reference decoded at contrast 0 (the
+develop's is 1e-4), alone, through a caching context: an independent decode on Apple's other
+path, which measured clean there. `tileTolerance` is 3 codes of mean |Δ| per channel: clean tiles
+measured at most 1.3 codes, corrupt ones 15–134. Exports must also repeat bit for bit. On CI,
+`developNeverSetsContrastToZero` checks the develop's contrast setting on a file that supports it,
+`everyRAWDevelopIsAnOwnedBuffer` that every RAW develop is a half-float buffer,
+`everyRenderCachesIntermediates` the context setting, and `viewfinderRendersOnlyCameraFrames` that
+the viewfinder's uncached context only takes a camera frame's preview estimate, in either render
+process.
 
 ## ExportTests
 

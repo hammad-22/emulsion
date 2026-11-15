@@ -27,7 +27,10 @@ extension CIContext {
             nil, Int(image.extent.width), Int(image.extent.height), kCVPixelFormatType_64RGBAHalf, attributes, &buffer)
         guard created == kCVReturnSuccess, let buffer else { throw EmulsionError.renderFailed }
         defer { clearCaches() }
-        render(image, to: buffer, bounds: image.extent, colorSpace: colorSpace)
+        let destination = CIRenderDestination(pixelBuffer: buffer)
+        destination.colorSpace = colorSpace
+        // A render task reports a failed render, which `render(_:to:bounds:colorSpace:)` doesn't.
+        try startTask(toRender: image, from: image.extent, to: destination, at: .zero).waitUntilCompleted()
         // Attached rather than passed as an option, which would hide the buffer from `CIImage.pixelBuffer`.
         CVBufferSetAttachment(buffer, kCVImageBufferCGColorSpaceKey, colorSpace, .shouldPropagate)
         return CIImage(cvPixelBuffer: buffer)

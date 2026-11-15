@@ -29,7 +29,7 @@ struct FullSizeRenderTests {
             let name = url.lastPathComponent
             let data = try Data(contentsOf: url)
             let renderer = try Renderer()
-            let anchor = try renderer.developer.develop(data, maxDimension: ExposureAnchor.thumbnailLongEdge).exposureAnchorStops
+            let anchor = try #require(renderer.developer.rawDecoder(data, maxDimension: nil, anchor: .measured)).exposureAnchorStops
             let reference = try Self.pixels(renderer.cgImage(renderer.render(Self.referenceNegative(data, anchor: anchor), Self.look)))
             var exports: [Data] = []
             for run in 0..<Self.repeats {
@@ -47,23 +47,23 @@ struct FullSizeRenderTests {
         }
     }
 
-    /// Apple's contrast-0 noise-reduction path (the develop's is contrast `Developer.nearZeroContrast`), rendered
-    /// alone into a buffer through a caching context, where it measured clean.
+    /// Apple's contrast-0 path (the develop's is `Developer.nearZeroContrast`), rendered alone into a buffer
+    /// through a caching context, where it measured clean.
     static func referenceNegative(_ data: Data, anchor: Double) throws -> Negative {
         let raw = try RAWDevelopSupport.filter(data)
         Developer.bypassAppleRendering(raw)
         if raw.isContrastSupported { raw.contrastAmount = 0 }
-        return try RAWDecoder(raw, exposureAnchorStops: anchor, context: CIContext(options: Renderer.contextOptions)).negative()
+        return try RAWDecoder(raw, exposureAnchorStops: anchor, context: RAWDevelopSupport.rendererLikeContext).negative()
     }
 
     static func uncachedRead(_ negative: Negative) -> Negative {
         Negative(image: negative.image.insertingIntermediate(cache: false), contract: negative.contract)
     }
 
+    static let uncachedContext = CIContext(options: Renderer.contextOptions.merging([.cacheIntermediates: false]) { $1 })
+
     static func renderUncached(_ image: CIImage) throws -> CGImage {
-        let options = Renderer.contextOptions.merging([.cacheIntermediates: false]) { $1 }
-        return try #require(
-            CIContext(options: options).createCGImage(image, from: image.extent, format: .RGBA8, colorSpace: Renderer.outputSpace))
+        try #require(uncachedContext.createCGImage(image, from: image.extent, format: .RGBA8, colorSpace: Renderer.outputSpace))
     }
 
     struct Pixels {
@@ -81,27 +81,28 @@ struct FullSizeRenderTests {
     /// Origins of tiles whose mean |Δ| per colour channel is over `tileTolerance` codes.
     static func badTiles(_ a: Pixels, _ b: Pixels) -> [CGPoint] {
         guard a.width == b.width, a.height == b.height else { return [.zero] }
-        var bad: [CGPoint] = []
+        let origins = stride(from: 0, to: a.height, by: tileSize).flatMap { y in
+            stride(from: 0, to: a.width, by: tileSize).map { x in (x: x, y: y) }
+        }
+        return origins.filter { meanTileDifference(a, b, x: $0.x, y: $0.y) > tileTolerance }.map { CGPoint(x: $0.x, y: $0.y) }
+    }
+
+    private static func meanTileDifference(_ a: Pixels, _ b: Pixels, x tileX: Int, y tileY: Int) -> Double {
+        var sum = 0
+        var count = 0
         a.bytes.withUnsafeBytes { pa in
             b.bytes.withUnsafeBytes { pb in
-                for ty in stride(from: 0, to: a.height, by: tileSize) {
-                    for tx in stride(from: 0, to: a.width, by: tileSize) {
-                        var sum = 0
-                        var count = 0
-                        for y in ty..<min(ty + tileSize, a.height) {
-                            for x in tx..<min(tx + tileSize, a.width) {
-                                for c in 0..<3 {
-                                    sum += abs(Int(pa[y * a.rowBytes + x * 4 + c]) - Int(pb[y * b.rowBytes + x * 4 + c]))
-                                }
-                                count += 3
-                            }
+                for y in tileY..<min(tileY + tileSize, a.height) {
+                    for x in tileX..<min(tileX + tileSize, a.width) {
+                        for channel in 0..<3 {
+                            sum += abs(Int(pa[y * a.rowBytes + x * 4 + channel]) - Int(pb[y * b.rowBytes + x * 4 + channel]))
                         }
-                        if Double(sum) / Double(count) > tileTolerance { bad.append(CGPoint(x: tx, y: ty)) }
+                        count += 3
                     }
                 }
             }
         }
-        return bad
+        return Double(sum) / Double(count)
     }
 }
 
@@ -120,15 +121,13 @@ struct FullSizeRenderTests {
     #expect(throws: EmulsionError.renderFailed) { try renderer.viewfinderImage(raw, look) }
 }
 
-/// Apple's noise-reduction kernel for `contrastAmount` 0, which binds a wrong intermediate into whole render tiles
-/// (MOV-147, docs/ENGINE.md). The synthetic Bayer DNG reaches it at contrast 0; any other contrast avoids it.
-@Test func developNeverRunsAppleContrastZeroKernel() throws {
-    let dng = RAWDevelopChart.dng(.bayerRGGB, chart: RAWDevelopTests.chart)
-    let raw = try #require(CIRAWFilter(imageData: dng, identifierHint: Developer.dngTypeIdentifier))
+/// At contrast exactly 0 Apple's decode corrupts whole render tiles (MOV-147, docs/ENGINE.md).
+@Test func developNeverSetsContrastToZero() throws {
+    let raw = try RAWDevelopSupport.filter(RAWDevelopChart.dng(.bayerRGGB, chart: RAWDevelopTests.chart))
+    try #require(raw.isContrastSupported, "the synthetic Bayer DNG no longer supports contrast; use a file that does")
     Developer.bypassAppleRendering(raw)
-    let graph = try #require(raw.outputImage).debugDescription
-    #expect(graph.contains("nr_"), "the decode graph no longer names Apple's noise-reduction kernels; update this check")
-    #expect(!graph.contains("nr_expandAndSharpenThroughGradientMaskGather"))
+    #expect(raw.contrastAmount == Developer.nearZeroContrast)
+    #expect(Developer.nearZeroContrast > 0)
 }
 
 /// Every RAW develop is one owned buffer, so no render can read Apple's lazy decode (MOV-147).
@@ -136,10 +135,13 @@ struct FullSizeRenderTests {
 func everyRAWDevelopIsAnOwnedBuffer(_ mosaic: SyntheticDNG.Mosaic, maxDimension: CGFloat?) throws {
     let developer = EmulsionTestCase.sharedRenderer.developer
     let dng = RAWDevelopChart.dng(mosaic, chart: RAWDevelopTests.chart)
-    #expect(try developer.develop(dng, maxDimension: maxDimension).image.pixelBuffer != nil)
+    func isHalfFloatBuffer(_ negative: Negative) -> Bool {
+        negative.image.pixelBuffer.map(CVPixelBufferGetPixelFormatType) == kCVPixelFormatType_64RGBAHalf
+    }
+    #expect(isHalfFloatBuffer(try developer.develop(dng, maxDimension: maxDimension)))
     let decoder = try #require(developer.rawDecoder(dng, maxDimension: maxDimension))
-    #expect(try decoder.negative().image.pixelBuffer != nil)
-    #expect(try decoder.negative(whiteBalance: CameraWhiteBalance(temperature: 3200, tint: 0)).image.pixelBuffer != nil)
+    #expect(isHalfFloatBuffer(try decoder.negative()))
+    #expect(isHalfFloatBuffer(try decoder.negative(whiteBalance: CameraWhiteBalance(temperature: 3200, tint: 0))))
 }
 
 /// The develop is Apple's decode rendered once into a half-float buffer: within half-float rounding of the decode read

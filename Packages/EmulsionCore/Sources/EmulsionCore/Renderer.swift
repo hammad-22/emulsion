@@ -107,23 +107,19 @@ public final class Renderer: @unchecked Sendable {
             .transformed(by: CGAffineTransform(scaleX: factor, y: factor))
     }
 
-    /// Render a negative once into a half-float buffer so interactive edits only re-run the look. RAW develops
-    /// already are one (`RAWDecoder.negative`); extended-range values are preserved.
+    /// Render a negative once into a half-float buffer so interactive edits only re-run the look; a RAW develop
+    /// already is one and is returned as is. Extended-range values are preserved.
     public func materialize(_ negative: Negative) throws -> Negative {
-        guard negative.image.pixelBuffer == nil else { return negative }
+        if let buffer = negative.image.pixelBuffer, CVPixelBufferGetPixelFormatType(buffer) == kCVPixelFormatType_64RGBAHalf {
+            return negative
+        }
         return Negative(
             image: try context.renderedToBuffer(negative.image, colorSpace: Self.workingSpace), contract: negative.contract,
             exposureAnchorStops: negative.exposureAnchorStops, asShotWhiteBalance: negative.asShotWhiteBalance)
     }
 
     public func resized(_ negative: Negative, longestEdge: CGFloat) -> Negative {
-        let scale = min(1, longestEdge / max(negative.size.width, negative.size.height))
-        guard scale < 1 else { return negative }
-        let image = negative.image.lanczosScaled(by: scale)
-        let e = CGRect(x: 0, y: 0, width: floor(negative.size.width * scale), height: floor(negative.size.height * scale))
-        return Negative(
-            image: image.cropped(to: e), contract: negative.contract, exposureAnchorStops: negative.exposureAnchorStops,
-            asShotWhiteBalance: negative.asShotWhiteBalance)
+        negative.resized(longestEdge: longestEdge)
     }
 
     public func cgImage(_ image: CIImage) throws -> CGImage {
