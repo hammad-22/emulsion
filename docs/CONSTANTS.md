@@ -566,6 +566,10 @@ highlights and no gamut mapping, for Bayer and linear (ProRAW-container) files.
 - A ProRAW file that ImageIO types as TIFF when read from memory must still develop as RAW: only real
   files show that (`RAWDevelopRealFileTests`). The DNG type hint the Developer passes exists for them.
 - A draft RAW decode may come back larger than asked, so preview tests only bound its size.
+- These tests measure Apple's decode as the develop configures it (`RAWDevelopSupport.develop` reads
+  `RAWDecoder.decode`), at float precision. The develop itself is that decode in a half-float buffer
+  (MOV-147); `developIsTheDecodeInHalfFloat` bounds the difference (`halfFloatTolerance` 0.002
+  relative, floor 0.01: measured worst 9.5e-4, about one half-float step, 2^-10).
 - The pre-MOV-79 configuration (`applyPreMOV79Develop`) is frozen for before/after comparisons:
   Apple's look processing off, gamut mapping, shadow bias and highlight recovery at the file's
   defaults. Real files are decoded at a 1024 px long edge to keep 48 MP files fast.
@@ -621,15 +625,18 @@ as-shot light, so the residual cast follows the light the photo was shot under.
 
 ## FullSizeRenderTests
 
-Full-size exports, materialized negatives and display renders of real DNGs repeat bit for bit
-(MOV-147, `ENGINE.md`). Only real ProRAW triggers the corruption, so it can't run on CI. The
-corruption is intermittent: before the fix, 4 repeats caught it on two 48 MP iPhone 15 Pro Max files
-in one of two runs, so a pass makes it unlikely without proving it absent. It also followed another
-context decoding the same file first. On CI, `everyRenderCachesIntermediates` checks the setting
-itself (without caching, a full-size RAW decode comes back with corrupted tiles), and
-`viewfinderRendersOnlyCameraFrames` that the viewfinder's uncached context only takes a camera
-frame's preview estimate, in either render process (the digicam process renders a viewfinder frame as
-a preview, so its export-only JPEG step never runs there).
+Full-size renders of real DNGs (MOV-147, `ENGINE.md` "RAW decode corruption"), opt-in because only
+real files corrupt. Each file is rendered 4 times with the default look and full halation: the
+develop's own render, and a deliberately hostile one (the develop read through
+`insertingIntermediate(cache: false)` and rendered by a context that doesn't cache intermediates).
+Each is compared tile by tile (256 px, `tileSize`) with a reference decoded on Apple's contrast-0
+path, alone, through a caching context: an independent decode on the other noise-reduction kernel.
+`tileTolerance` is 3 codes of mean |Δ| per channel: clean tiles measured at most 1.3 codes, corrupt
+ones 15–134. Exports must also repeat bit for bit. On CI, `developNeverRunsAppleContrastZeroKernel`
+checks the decode graph for Apple's contrast-0 kernel (the synthetic Bayer DNG reaches it at 0),
+`everyRAWDevelopIsAnOwnedBuffer` that every RAW develop is a buffer, `everyRenderCachesIntermediates`
+the context setting, and `viewfinderRendersOnlyCameraFrames` that the viewfinder's uncached context
+only takes a camera frame's preview estimate, in either render process.
 
 ## ExportTests
 

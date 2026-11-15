@@ -109,6 +109,7 @@ Stock-data checks and `emulsion-fit` read the local reference data (traced curve
 - Don't call anything "physical", "accurate" or "like stock X" without a measurement or a primary source. Label artistic choices as artistic.
 - No GPL code or data in the engine or apps (Apache-2.0 plan, MOV-94). No film brand names in the product (MOV-92).
 - Don't add per-pixel iterative solves to the live preview path without profiling on device.
+- Never set `CIRAWFilter.contrastAmount` to 0 or render Apple's lazy RAW decode outside `RAWDecoder.negative`: it corrupts whole tiles (MOV-147, `docs/ENGINE.md`).
 
 ## Keep this file current
 Update this file, or the matching nested `AGENTS.md`, in the same change when:
