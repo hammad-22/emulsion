@@ -1,30 +1,19 @@
 import Foundation
 
-/// Bounded nonlinear least squares: minimizes Σ rᵢ(p)² over `lower ≤ p ≤ upper`. Deterministic: no randomness,
-/// no concurrency, so the same problem always gives bit-identical results.
-///
-/// Levenberg–Marquardt with Marquardt's diagonal damping and Nielsen's gain-ratio update; bounds hold by projecting
-/// each step into the box, and a parameter on a bound whose gradient points outward is frozen for that step. When
-/// it stops without converging (iteration or damping limit, singular system), a bounded Nelder–Mead search restarts
-/// from its best point and Levenberg–Marquardt polishes once more.
+/// Deterministic bounded Levenberg–Marquardt with a Nelder–Mead restart (docs/CONSTANTS.md).
 struct LeastSquares {
     typealias Residuals = ([Double]) -> [Double]
 
-    /// Central-difference step relative to max(|p|, 1): the cube root of machine epsilon (≈ 6e-6) balances
-    /// truncation against rounding error (Nocedal & Wright, Numerical Optimization, 2nd ed., §8.1).
+    /// Cube root of machine epsilon (Nocedal & Wright §8.1); MINPACK ftol, xtol and gtol.
     static let jacobianRelativeStep = cbrt(Double.ulpOfOne)
-    /// Converged when both the actual and the predicted relative cost reductions fall below this (MINPACK's ftol).
     static let costTolerance = 1e-12
-    /// Converged when a step is shorter than this relative to |p| (MINPACK's xtol).
     static let stepTolerance = 1e-12
-    /// Converged when every free Jacobian column is this close to orthogonal to the residuals (MINPACK's gtol, a cosine).
     static let gradientTolerance = 1e-12
     static let iterationLimit = 500
-    /// Marquardt damping λ at the start, relative to diag(JᵀJ).
+    /// Damping λ relative to diag(JᵀJ); past the limit the search has stalled.
     static let initialDamping = 1e-3
-    /// Past this the damped step is too short to matter: the search has stalled.
     static let dampingLimit = 1e16
-    /// Nelder–Mead's starting simplex spans this fraction of each parameter's box.
+    /// Starting simplex as a fraction of each parameter's box.
     static let simplexFraction = 0.1
     static let nelderMeadEvaluationsPerParameter = 2000
 
@@ -40,21 +29,17 @@ struct LeastSquares {
         case nelderMeadThenLevenbergMarquardt
     }
 
-    /// The solution and its fit statistics. Standard errors come from σ²·(JᵀJ)⁻¹ over the free parameters (those not on
-    /// a bound, which are held fixed), with σ² = SSR / (n − p_free): they describe the scatter of the residuals around
-    /// this model only, not the digitizing error of the data.
+    /// Standard errors are σ²·(JᵀJ)⁻¹ over free parameters: residual scatter, not digitizing error.
     struct Result: Sendable {
         let parameters: [Double]
         let residuals: [Double]
-        /// Levenberg–Marquardt iterations of the run that produced `parameters`.
         let iterations: Int
         let termination: Termination
         let path: Path
         let nelderMeadEvaluations: Int
-        /// nil for a parameter on a bound, or for all of them when JᵀJ is singular or n ≤ p.
+        /// nil on a bound, or for all when JᵀJ is singular or n ≤ p.
         let standardErrors: [Double?]
         let atBound: [Bool]
-        /// Why some standard errors are missing, when they are.
         let standardErrorNote: String?
 
         var rms: Double { residuals.rms }
@@ -74,8 +59,6 @@ struct LeastSquares {
         }
         return result(first, path: .levenbergMarquardt, evaluations: search.evaluations)
     }
-
-    // MARK: Levenberg–Marquardt
 
     private struct Run {
         let parameters: [Double]
@@ -143,7 +126,7 @@ struct LeastSquares {
         }
     }
 
-    /// The Jacobian at a point, with the normal matrix JᵀJ, the gradient Jᵀr and the parameters free to move.
+    /// The Jacobian at a point, with JᵀJ, Jᵀr and the parameters free to move.
     private struct Linearization {
         let jacobianColumns: [[Double]]
         let normal: [Double]
@@ -190,73 +173,6 @@ struct LeastSquares {
         }
     }
 
-    // MARK: Nelder–Mead
-
-    /// Bounded by clamping every vertex into the box; standard coefficients (reflect 1, expand 2, contract and
-    /// shrink ½). Ties are broken by vertex index, so the search is deterministic.
-    private func nelderMead(from start: [Double]) -> (parameters: [Double], evaluations: Int) {
-        let count = start.count
-        let evaluationLimit = Self.nelderMeadEvaluationsPerParameter * count
-        var evaluations = 0
-        func cost(_ p: [Double]) -> Double {
-            evaluations += 1
-            let value = residuals(p).sumOfSquares
-            return value.isNaN ? .infinity : value
-        }
-        var vertices = [start]
-        for i in 0..<count {
-            var vertex = start
-            let step = Self.simplexFraction * (upper[i] - lower[i])
-            vertex[i] = start[i] + step <= upper[i] ? start[i] + step : start[i] - step
-            vertices.append(vertex)
-        }
-        var costs = vertices.map(cost)
-
-        while evaluations < evaluationLimit {
-            let order = costs.indices.sorted { (costs[$0], $0) < (costs[$1], $1) }
-            let best = order[0]
-            let worst = order[count]
-            let secondWorst = order[count - 1]
-            let size = vertices.map { zip($0, vertices[best]).map { $0 - $1 }.norm }.max() ?? 0
-            if costs[worst] - costs[best] <= Self.costTolerance * costs[best]
-                && size <= Self.stepTolerance * (vertices[best].norm + Self.stepTolerance)
-            {
-                break
-            }
-            let centroid = (0..<count).map { i in
-                order.dropLast().reduce(0) { $0 + vertices[$1][i] } / Double(count)
-            }
-            func toward(_ target: [Double], _ factor: Double) -> [Double] {
-                clamped(zip(centroid, target).map { $0 + factor * ($1 - $0) })
-            }
-            let reflected = toward(vertices[worst], -1)
-            let reflectedCost = cost(reflected)
-            if reflectedCost < costs[best] {
-                let expanded = toward(vertices[worst], -2)
-                let expandedCost = cost(expanded)
-                (vertices[worst], costs[worst]) = expandedCost < reflectedCost ? (expanded, expandedCost) : (reflected, reflectedCost)
-            } else if reflectedCost < costs[secondWorst] {
-                (vertices[worst], costs[worst]) = (reflected, reflectedCost)
-            } else {
-                let outside = reflectedCost < costs[worst]
-                let contracted = toward(outside ? reflected : vertices[worst], 0.5)
-                let contractedCost = cost(contracted)
-                if contractedCost < min(reflectedCost, costs[worst]) {
-                    (vertices[worst], costs[worst]) = (contracted, contractedCost)
-                } else {
-                    for i in order.dropFirst() {
-                        vertices[i] = zip(vertices[best], vertices[i]).map { $0 + 0.5 * ($1 - $0) }
-                        costs[i] = cost(vertices[i])
-                    }
-                }
-            }
-        }
-        let best = costs.indices.min { (costs[$0], $0) < (costs[$1], $1) } ?? 0
-        return (vertices[best], evaluations)
-    }
-
-    // MARK: Statistics
-
     private func result(_ run: Run, path: Path, evaluations: Int) -> Result {
         let p = run.parameters
         let r = residuals(p)
@@ -282,5 +198,5 @@ struct LeastSquares {
             nelderMeadEvaluations: evaluations, standardErrors: errors, atBound: atBound, standardErrorNote: note)
     }
 
-    private func clamped(_ p: [Double]) -> [Double] { p.clamped(lower: lower, upper: upper) }
+    func clamped(_ p: [Double]) -> [Double] { p.clamped(lower: lower, upper: upper) }
 }

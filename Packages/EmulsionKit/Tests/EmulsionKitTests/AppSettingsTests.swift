@@ -6,8 +6,7 @@ import Testing
 
 @MainActor
 struct AppSettingsTests {
-    /// The camera's recipe is a snapshot: it reads back whole, even once no saved look has it.
-    @Test func cameraRecipePersistsAsASnapshot() throws {
+    @Test func cameraRecipeReadsBackWholeOnceNoSavedLookHasIt() throws {
         let library = TestLibrary()
         #expect(library.settings.recipe == CuratedLooks.recipes.first, "Everyday until one is chosen")
 

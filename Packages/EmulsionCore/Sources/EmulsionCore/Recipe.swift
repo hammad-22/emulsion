@@ -1,13 +1,12 @@
 import Foundation
 
-/// An artistic adjustment snapshot for the single built-in film model. A photo owns its grain
+/// An artistic adjustment snapshot for one of the built-in render processes. A photo owns its grain
 /// seed and its RAW white balance, which describes the light it was shot under.
 public struct Recipe: Codable, Equatable, Identifiable, Sendable {
     /// The format written. Format 2 added the required `backing` (MOV-32).
     public static let formatVersion = 2
     /// Formats read: format 1 (no backing) prints with rem-jet.
     static let readableFormatVersions: ClosedRange<Int> = 1...formatVersion
-    public static let engineModel = "emulsion-default-v1"
     public static let maximumFileSize = 65_536
 
     // Bounds combining-character sequences as well as visible character counts.
@@ -68,11 +67,12 @@ public struct Recipe: Codable, Equatable, Identifiable, Sendable {
         let container = try decoder.container(keyedBy: CodingKeys.self)
         let version = try container.decode(Int.self, forKey: .formatVersion)
         guard Self.readableFormatVersions.contains(version) else { throw EmulsionError.recipeVersionUnsupported }
-        guard try container.decode(String.self, forKey: .engineModel) == Self.engineModel else {
+        guard let process = RenderProcess(engineModel: try container.decode(String.self, forKey: .engineModel)) else {
             throw EmulsionError.recipeModelUnsupported
         }
         let settings = try container.nestedContainer(keyedBy: Field.self, forKey: .adjustments)
         var adjustments = Adjustments()
+        adjustments.process = process
         for field in Self.numericFields { adjustments[keyPath: field.path] = try settings.decode(Double.self, forKey: field.key) }
         // Format 1 has no backing (a `backing` key there is unknown and ignored, as format 1
         // readers ignore it) and prints with rem-jet; format 2 requires it (docs/RECIPES.md).
@@ -85,7 +85,7 @@ public struct Recipe: Codable, Equatable, Identifiable, Sendable {
     public func encode(to encoder: any Encoder) throws {
         var container = encoder.container(keyedBy: CodingKeys.self)
         try container.encode(Self.formatVersion, forKey: .formatVersion)
-        try container.encode(Self.engineModel, forKey: .engineModel)
+        try container.encode(adjustments.process.engineModel, forKey: .engineModel)
         try container.encode(id, forKey: .id)
         try container.encode(name, forKey: .name)
         try container.encode(summary, forKey: .summary)

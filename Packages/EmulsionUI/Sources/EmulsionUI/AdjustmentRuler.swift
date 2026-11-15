@@ -40,7 +40,7 @@ struct AdjustmentRuler: View {
             scale
         }
         .accessibilityElement(children: .ignore)
-        .accessibilityLabel(control.accessibilityLabel)
+        .accessibilityLabel(control.accessibilityLabel(for: adjustments.process))
         .accessibilityValue(control.accessibilityValue(value))
         .accessibilityIdentifier("adjustment-ruler")
         .accessibilityAdjustableAction { direction in
@@ -55,7 +55,7 @@ struct AdjustmentRuler: View {
         .onChange(of: control.id) { drag.end() }
     }
 
-    private var title: some View { Text(control.title).font(.subheadline.weight(.medium)) }
+    private var title: some View { Text(control.title(for: adjustments.process)).font(.subheadline.weight(.medium)) }
 
     private var readout: some View {
         Text(control.formatted(value)).font((isCompact ? Font.body : .title2).weight(.medium)).monospacedDigit()

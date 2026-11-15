@@ -3,16 +3,12 @@
     import EmulsionKit
     import SwiftUI
 
-    /// The shared controls on one screen, for checking them in light and dark, at large text
-    /// sizes and with Reduce Transparency. The iOS debug build opens it with `--component-gallery`.
     public struct ComponentGallery: View {
         @State private var adjustments = Adjustments()
         @State private var isComparing = false
         @State private var group = AdjustmentGroup.light
         @State private var selection: [AdjustmentGroup: String] = [:]
-        /// A stand-in as-shot white balance, so the gallery shows a RAW photo's White Balance group.
         private let whiteBalanceAsShot = CameraWhiteBalance(temperature: 5200, tint: 8)
-        /// Room for a few rulers, so the inspector's own scrolling shows inside the gallery.
         private let inspectorHeight: CGFloat = 480
 
         public init() {}

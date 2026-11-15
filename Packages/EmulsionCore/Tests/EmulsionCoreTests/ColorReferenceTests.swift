@@ -4,8 +4,6 @@ import simd
 
 @testable import EmulsionCore
 
-/// The input transforms against colour-science, with chromatic samples so a wrong gamut
-/// matrix can't hide behind gray.
 struct ColorReferenceTests {
     @Test(arguments: InputColorSpace.allCases)
     func swiftMirrorMatchesColourScience(space: InputColorSpace) throws {
@@ -15,16 +13,12 @@ struct ColorReferenceTests {
         }
     }
 
-    /// The GPU input transform (curve and gamut matrix, before display encodings' inverse film
-    /// curve), including display negatives and superwhite. Each sample's code is its formula's own
-    /// input, so it is decoded in `formulaRange`.
     @Test(arguments: InputColorSpace.allCases)
     func kernelMatchesColourScience(space: InputColorSpace) throws {
         let samples = try ColorReferences.samples(for: space)
         try expectKernelMatches(samples, codes: samples.map(\.code), in: space.formulaRange, as: space)
     }
 
-    /// The same samples re-coded into the other signal range decode to the same light (MOV-80).
     @Test(arguments: InputColorSpace.allCases)
     func kernelMatchesColourScienceInTheOtherRange(space: InputColorSpace) throws {
         let samples = try ColorReferences.samples(for: space)
@@ -46,8 +40,7 @@ struct ColorReferenceTests {
         }
     }
 
-    /// Sub-black policy (docs/ENGINE.md): every decode is monotonic through black, so a sub-black
-    /// signal never decodes brighter than code 0 (MOV-125 found HLG doing exactly that).
+    /// MOV-125: HLG once decoded sub-black signals brighter than code 0.
     @Test(arguments: InputColorSpace.allCases)
     func subBlackNeverDecodesAboveBlack(space: InputColorSpace) {
         let decoded = [-0.2, -0.1, -0.05, -0.01, 0].map { ColorMath.decode($0, curve: space.curve) }

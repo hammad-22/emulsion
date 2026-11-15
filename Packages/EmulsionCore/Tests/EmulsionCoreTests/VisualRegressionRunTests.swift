@@ -1,8 +1,6 @@
 import Foundation
 import Testing
 
-/// The regression harness itself, run on tiny synthetic images in a temporary directory that is
-/// both the golden store and the report directory.
 struct VisualRegressionRunTests {
     private struct RenderFailure: Error {}
 

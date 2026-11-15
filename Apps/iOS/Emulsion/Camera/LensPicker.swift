@@ -2,22 +2,19 @@ import EmulsionKit
 import EmulsionUI
 import SwiftUI
 
-/// The back lenses on a glass capsule. The selected one is filled, bolder and reads
-/// "1×", so the choice doesn't rely on color.
 struct LensPicker: View {
     let capabilities: CameraCapabilities
     let select: (CameraLens) -> Void
 
     @ScaledMetric private var buttonSize = FilmLabLayout.minimumControlHeight
-    private let spacing = FilmLabLayout.hairline
 
     var body: some View {
-        HStack(spacing: spacing) {
+        HStack(spacing: FilmLabLayout.hairline) {
             ForEach(capabilities.lenses) { option in
                 lensButton(option, isSelected: option.lens == capabilities.lens)
             }
         }
-        .padding(spacing)
+        .padding(FilmLabLayout.hairline)
         .glassEffect(.regular, in: .capsule)
     }
 

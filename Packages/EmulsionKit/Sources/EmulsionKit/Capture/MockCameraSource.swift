@@ -3,17 +3,12 @@ import CoreVideo
 import Foundation
 import ImageIO
 
-/// A stand-in camera for the Simulator (which has none) and tests: the bundled sample
-/// photos as a live viewfinder, drifting slowly so it visibly moves, one sample per lens.
-/// Capture returns the sample's JPEG: there's no DNG to bundle, since the samples are
-/// synthetic renders, not camera files. Frames are drawn on the CPU, so the stand-in makes no
-/// GPU context of its own: the renderer's stays the only one (MOV-127).
+/// A stand-in camera for the Simulator and tests. See Packages/EmulsionKit/NOTES.md, "MockCameraSource".
 public actor MockCameraSource: CameraSource {
-    /// Portrait 3:4, like a phone camera's viewfinder held upright.
     static let frameSize = CGSize(width: 768, height: 1024)
-    /// About 30 frames per second, the camera's viewfinder rate.
+    /// About 30 fps, the camera's viewfinder rate.
     private static let frameInterval: Duration = .milliseconds(33)
-    /// Artistic: how far the crop pans across a sample, and how long one sweep takes.
+    /// Artistic: the fraction of a sample the crop pans across, and one sweep in seconds.
     private static let drift = (pan: 0.25, period: 8.0)
 
     private let startError: CameraError?
@@ -24,14 +19,10 @@ public actor MockCameraSource: CameraSource {
     private nonisolated let eventStream = SourceStream.events()
     private var lens = CameraLens.wide
     private var delivery: Task<Void, Never>?
-    /// Paused by an emitted interruption: a real session delivers no frames then.
     private var isInterrupted = false
-    /// Each sample scaled once to cover the frame with room to pan.
     private var samples: [CGImage] = []
 
-    /// Whether frames are being delivered, as a session runs; for tests.
     var isRunning: Bool { delivery != nil }
-    /// The last focus point and capture resolution asked for; for tests.
     private(set) var lastFocusPoint: CGPoint?
     private(set) var lastCaptureResolution: AppSettings.Resolution?
 
@@ -44,7 +35,6 @@ public actor MockCameraSource: CameraSource {
         self.init(startError: nil)
     }
 
-    /// A camera that never starts, as when access is denied or restricted.
     public init(failingStartWith error: CameraError) {
         self.init(startError: error)
     }
@@ -59,8 +49,6 @@ public actor MockCameraSource: CameraSource {
         self.captureGate = captureGate
     }
 
-    /// For tests: a capture says it has started, then waits until released, so a test can act
-    /// while the shutter is in flight.
     struct CaptureGate {
         let started: AsyncStream<Void>.Continuation
         let release: AsyncStream<Void>
@@ -70,8 +58,6 @@ public actor MockCameraSource: CameraSource {
 
     public nonisolated func events() -> AsyncStream<CameraEvent> { eventStream.makeStream() }
 
-    /// Reports `event` as if the system caused it, for tests and the Simulator's walkthrough of
-    /// the camera's states. Frames pause while interrupted, as a session's do.
     public func emit(_ event: CameraEvent) {
         switch event {
         case .interrupted: isInterrupted = true
@@ -138,20 +124,16 @@ public actor MockCameraSource: CameraSource {
         }
     }
 
-    /// A portrait crop of the lens's sample, panning back and forth: the frame `seconds` into
-    /// the pan.
     func frame(at seconds: Double) -> CameraFrame? {
         guard !samples.isEmpty else { return nil }
         let sample = samples[sampleIndex % samples.count]
         let room = CGSize(width: CGFloat(sample.width) - Self.frameSize.width, height: CGFloat(sample.height) - Self.frameSize.height)
         let travel = room.width * (0.5 + 0.5 * sin(seconds * 2 * .pi / Self.drift.period))
-        // Whole pixels, inside the sample, so every frame is exactly `frameSize`.
         let origin = CGPoint(x: min(max(travel.rounded(), 0), room.width), y: min(max((room.height / 2).rounded(), 0), room.height))
         let crop = CGRect(origin: origin, size: Self.frameSize)
         return sample.cropping(to: crop).flatMap(CameraFrame.init(drawing:))
     }
 
-    /// A bundled sample decoded and scaled, once, to cover the frame plus the pan.
     private static func panningSample(_ url: URL) -> CGImage? {
         guard let source = CGImageSourceCreateWithURL(url as CFURL, nil),
             let image = CGImageSourceCreateImageAtIndex(source, 0, nil)
@@ -168,5 +150,4 @@ public actor MockCameraSource: CameraSource {
         context.draw(image, in: CGRect(x: 0, y: 0, width: width, height: height))
         return context.makeImage()
     }
-
 }

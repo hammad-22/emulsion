@@ -25,7 +25,7 @@ extension Developer {
 ///
 /// `CIColorCurves` looks the table up in extended Display P3, whose sRGB-shaped encoding spaces
 /// the steps by lightness instead of linear light, so the deep shadows (the floor is −9 stops)
-/// aren't coarse. Table values are encoded the same way and the filter decodes them back; it
+/// aren't coarse. Table values are encoded the same way (`ColorMath.encodeSRGB`) and the filter decodes them back; it
 /// doesn't clamp them, so white keeps its +4-stop estimate. Its input is clamped to the table's
 /// domain, 0…1, as the kernel clamps display values, and alpha passes through
 /// (`ViewfinderEstimateTests`).
@@ -46,7 +46,7 @@ struct ViewfinderEstimate {
         let exposures = (0..<Self.steps).map {
             model.layerExposure(fromDisplay: display.decode(signal: Double($0) / Double(Self.steps - 1)), ends: ends)
         }
-        table = exposures.map { Float(Self.encode($0)) }.flatMap { [$0, $0, $0] }.withUnsafeBytes { Data($0) }
+        table = exposures.map { Float(ColorMath.encodeSRGB($0)) }.flatMap { [$0, $0, $0] }.withUnsafeBytes { Data($0) }
         let toWorking = InputColorSpace.displayP3.toWorking
         let m = toWorking * model.sensitivity.inverse * toWorking.inverse
         rows = CIVector.rows(of: m)
@@ -66,12 +66,5 @@ struct ViewfinderEstimate {
         matrix.aVector = CIVector(x: 0, y: 0, z: 0, w: 1)
         matrix.biasVector = CIVector(x: 0, y: 0, z: 0, w: 0)
         return (matrix.outputImage ?? image).cropped(to: image.extent)
-    }
-
-    /// The sRGB transfer function (IEC 61966-2-1), which extended Display P3 uses.
-    /// The engine decodes it (`InputColorSpace.displayP3`) but never encodes, so this is the one
-    /// encoder.
-    private static func encode(_ linear: Double) -> Double {
-        linear <= 0.0031308 ? 12.92 * linear : 1.055 * pow(linear, 1 / 2.4) - 0.055
     }
 }

@@ -3,11 +3,6 @@ import EmulsionKit
 import EmulsionUI
 import SwiftUI
 
-/// Portrait: the format bar, the viewfinder, then lenses and the shutter below it.
-/// Wide (landscape, iPhone Duo unfolded): the viewfinder on the leading side and the same
-/// controls in a trailing rail. The recipe strip appears over the viewfinder's bottom edge on
-/// demand, so the viewfinder never changes size; on a regular-width, regular-height canvas
-/// (iPhone Duo unfolded) it sits beneath the viewfinder all the time.
 struct CameraContent: View {
     @Bindable var model: CameraModel
     @Binding var showsLibrary: Bool
@@ -18,6 +13,9 @@ struct CameraContent: View {
     @Environment(\.verticalSizeClass) private var verticalSizeClass
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @State private var showsRecipes = false
+
+    private static let recipesAnimation = Animation.snappy(duration: 0.3)
+    private static let reducedMotionRecipesAnimation = Animation.easeInOut(duration: 0.2)
 
     var body: some View {
         Group {
@@ -76,11 +74,9 @@ struct CameraContent: View {
     }
 
     private func toggleRecipes() {
-        withAnimation(reduceMotion ? .easeInOut(duration: 0.2) : .snappy(duration: 0.3)) { showsRecipes.toggle() }
+        withAnimation(reduceMotion ? Self.reducedMotionRecipesAnimation : Self.recipesAnimation) { showsRecipes.toggle() }
     }
 
-    /// The same rule as the editor: a regular-width or compact-height canvas.
     private var isWide: Bool { horizontalSizeClass == .regular || verticalSizeClass == .compact }
-    /// Room for the viewfinder plus the strip: iPhone Duo unfolded.
     private var alwaysShowsRecipes: Bool { horizontalSizeClass == .regular && verticalSizeClass == .regular }
 }

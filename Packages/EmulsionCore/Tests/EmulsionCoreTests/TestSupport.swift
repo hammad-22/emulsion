@@ -29,6 +29,12 @@ class EmulsionTestCase: XCTestCase {
     /// Display P3 luminance.
     func luma(_ c: SIMD3<Double>) -> Double { Self.luma(c) }
     static func luma(_ c: SIMD3<Double>) -> Double { dot(c, FilmModel.p3Luminance) }
+    func sd(_ v: [Double]) -> Double { Self.sd(v) }
+    /// Population standard deviation.
+    static func sd(_ v: [Double]) -> Double {
+        let m = v.reduce(0, +) / Double(v.count)
+        return (v.map { ($0 - m) * ($0 - m) }.reduce(0, +) / Double(v.count)).squareRoot()
+    }
     /// Index of pixel (x, y) in a fixture's bottom-row-first pixel array.
     func pixel(x: Int, y: Int, width: Int) -> Int { Self.pixel(x: x, y: y, width: width) }
     static func pixel(x: Int, y: Int, width: Int) -> Int { y * width + x }

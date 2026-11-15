@@ -4,6 +4,8 @@ import Foundation
 /// The editor's controls, grouped the way the film process is: exposure and local tone, the
 /// RAW develop's white balance, printer lights and color density, then texture. Shared so iOS
 /// and Mac show the same controls with the same ranges; the iPhone panel shows one group at a time.
+/// The digicam process uses the same controls, two of them under its own names
+/// (`AdjustmentControl.title(for:)`).
 public enum AdjustmentGroup: String, CaseIterable, Identifiable, Sendable {
     case light, whiteBalance, color, texture
 
@@ -71,8 +73,12 @@ public enum AdjustmentGroup: String, CaseIterable, Identifiable, Sendable {
             ]
         case .texture:
             return [
-                .init(title: String(localized: "Grain", bundle: .module), keyPath: \.grain, range: Self.amountRange),
-                .init(title: String(localized: "Halation", bundle: .module), keyPath: \.halation, range: Self.amountRange),
+                .init(
+                    title: String(localized: "Grain", bundle: .module), digicamTitle: String(localized: "Noise", bundle: .module),
+                    keyPath: \.grain, range: Self.amountRange),
+                .init(
+                    title: String(localized: "Halation", bundle: .module), digicamTitle: String(localized: "Processing", bundle: .module),
+                    keyPath: \.halation, range: Self.amountRange),
             ]
         }
     }
@@ -82,25 +88,47 @@ public enum AdjustmentGroup: String, CaseIterable, Identifiable, Sendable {
 public struct AdjustmentControl: Identifiable {
     enum Unit { case stops, amount, temperature, whiteBalanceTint }
 
-    public let title: String
-    /// What VoiceOver calls it: the title, unless another group has a control of the same title.
-    public let accessibilityLabel: String
+    /// The film process's title, and VoiceOver's label: the title, unless another group has a
+    /// control of the same title.
+    private let filmTitle: String
+    private let filmAccessibilityLabel: String
+    /// The title in the digicam process when it differs (Grain is sensor noise, Halation the
+    /// in-camera processing: fringing, lens, sharpening and JPEG).
+    private let digicamTitle: String?
     public let keyPath: WritableKeyPath<Adjustments, Double>
     public let range: ClosedRange<Double>
     let unit: Unit
 
-    /// Unique across groups, which the title isn't: both tints are titled "Tint".
-    public var id: String { accessibilityLabel }
+    /// Unique across groups, which the title isn't (both tints are titled "Tint"), and the same in
+    /// every process, so a selection survives switching process.
+    public var id: String { filmAccessibilityLabel }
 
     init(
-        title: String, accessibilityLabel: String? = nil, keyPath: WritableKeyPath<Adjustments, Double>, range: ClosedRange<Double>,
-        unit: Unit = .amount
+        title: String, accessibilityLabel: String? = nil, digicamTitle: String? = nil, keyPath: WritableKeyPath<Adjustments, Double>,
+        range: ClosedRange<Double>, unit: Unit = .amount
     ) {
-        self.title = title
-        self.accessibilityLabel = accessibilityLabel ?? title
+        self.filmTitle = title
+        self.filmAccessibilityLabel = accessibilityLabel ?? title
+        self.digicamTitle = digicamTitle
         self.keyPath = keyPath
         self.range = range
         self.unit = unit
+    }
+
+    /// What the control is called in `process`.
+    public func title(for process: RenderProcess) -> String {
+        switch process {
+        case .film: filmTitle
+        case .digicam: digicamTitle ?? filmTitle
+        }
+    }
+
+    /// What VoiceOver calls the control in `process`.
+    public func accessibilityLabel(for process: RenderProcess) -> String {
+        switch process {
+        case .film: filmAccessibilityLabel
+        case .digicam: digicamTitle ?? filmAccessibilityLabel
+        }
     }
 
     /// A visible ruler tick and an accessible adjustment step.

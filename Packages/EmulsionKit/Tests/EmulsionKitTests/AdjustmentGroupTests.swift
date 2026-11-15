@@ -20,7 +20,7 @@ struct AdjustmentGroupTests {
     @Test func defaultsSitInsideTheirRanges() {
         let defaults = Adjustments()
         for control in AdjustmentGroup.allCases.flatMap({ $0.controls(whiteBalanceAsShot: nil) }) {
-            #expect(control.range.contains(defaults[keyPath: control.keyPath]), "\(control.title)")
+            #expect(control.range.contains(defaults[keyPath: control.keyPath]), "\(control.id)")
         }
     }
 
@@ -30,8 +30,8 @@ struct AdjustmentGroupTests {
             low[keyPath: control.keyPath] = -100
             var high = Adjustments()
             high[keyPath: control.keyPath] = 100
-            #expect(low.clamped()[keyPath: control.keyPath] == control.range.lowerBound, "\(control.title)")
-            #expect(high.clamped()[keyPath: control.keyPath] == control.range.upperBound, "\(control.title)")
+            #expect(low.clamped()[keyPath: control.keyPath] == control.range.lowerBound, "\(control.id)")
+            #expect(high.clamped()[keyPath: control.keyPath] == control.range.upperBound, "\(control.id)")
         }
     }
 
@@ -133,7 +133,22 @@ extension AdjustmentGroupTests {
 
     @Test func theTwoTintsHaveDifferentVoiceOverLabelsAndIdentities() throws {
         let controls = AdjustmentGroup.allCases.flatMap { $0.controls(whiteBalanceAsShot: Self.asShot) }
-        #expect(Set(controls.map(\.accessibilityLabel)).count == controls.count)
+        for process in RenderProcess.allCases {
+            #expect(Set(controls.map { $0.accessibilityLabel(for: process) }).count == controls.count)
+        }
         #expect(Set(controls.map(\.id)).count == controls.count)
+    }
+
+    /// The digicam process renames two texture controls, for VoiceOver too; ids, key paths and
+    /// ranges are shared, so a selection survives switching process.
+    @Test func digicamRenamesTheTextureControlsOnly() {
+        let controls = AdjustmentGroup.allCases.flatMap { $0.controls(whiteBalanceAsShot: Self.asShot) }
+        let renamed = controls.filter { $0.title(for: .digicam) != $0.title(for: .film) }
+        #expect(renamed.map(\.id) == ["Grain", "Halation"])
+        let texture = AdjustmentGroup.texture.controls(whiteBalanceAsShot: nil)
+        #expect(texture.map { $0.title(for: .digicam) } == ["Noise", "Processing"])
+        #expect(texture.map { $0.accessibilityLabel(for: .digicam) } == ["Noise", "Processing"])
+        #expect(texture.map { $0.title(for: .film) } == ["Grain", "Halation"])
+        #expect(texture.map { $0.accessibilityLabel(for: .film) } == ["Grain", "Halation"])
     }
 }

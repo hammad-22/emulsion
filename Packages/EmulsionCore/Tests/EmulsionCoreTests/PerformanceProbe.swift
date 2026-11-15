@@ -37,10 +37,36 @@ final class PerformanceProbe: XCTestCase {
     private func time(_ r: Renderer, _ neg: Negative, _ kind: String, full a: Adjustments, _ w: Int, _ h: Int) throws {
         for (label, adj) in [("look only", Adjustments.neutral), ("full", a)] {
             let times = try Self.milliseconds(runs: 5) {
-                let cg = try r.cgImage(try r.render(neg, adj))
+                // Viewfinder frames go through the viewfinder's own render, as in the app.
+                let cg = neg.contract == .previewEstimate ? try r.viewfinderImage(neg, adj) : try r.cgImage(try r.render(neg, adj))
                 _ = cg.dataProvider?.data
             }
             print(String(format: "%dx%d %@%@: median %.1f ms (first %.1f)", w, h, kind, label, times.dropFirst().sorted()[2], times[0]))
+        }
+    }
+
+    /// The digicam process (MOV-149) at its default look: a 1600 px preview, and a 12 MP source to its
+    /// 5 MP frame as an export (with the JPEG round trip) and as a preview (without). Opt-in: EMULSION_PERF=1.
+    func testDigicamTimings() throws {
+        try XCTSkipUnless(ProcessInfo.processInfo.environment["EMULSION_PERF"] != nil, "set EMULSION_PERF=1 to run")
+        let r = try Renderer()
+        var look = Adjustments()
+        (look.process, look.grain, look.halation, look.seed) = (.digicam, DigicamLook.defaultNoise, DigicamLook.defaultProcessing, 2)
+        for (w, h, label, intent) in [
+            (1600, 1200, "preview", RenderIntent.preview), (4032, 3024, "12 MP → 5 MP export (JPEG)", .export),
+            (4032, 3024, "12 MP → 5 MP as a preview (no JPEG)", .preview),
+        ] {
+            let scene = Fixtures.image(width: 64, height: 48, space: SceneFixtures.linear) { x, y in
+                SIMD3(Float(x) / 16, Float(y) / 24, 0.18)
+            }
+            .samplingLinear().transformed(by: CGAffineTransform(scaleX: CGFloat(w) / 64, y: CGFloat(h) / 48))
+            .cropped(to: CGRect(x: 0, y: 0, width: w, height: h))
+            let negative = try r.materialize(Negative(image: scene, contract: .sceneReferred))
+            let times = try Self.milliseconds(runs: 5) {
+                let cg = try r.cgImage(try r.render(negative, look, intent: intent))
+                _ = cg.dataProvider?.data
+            }
+            print(String(format: "digicam %dx%d %@: median %.1f ms (first %.1f)", w, h, label, times.dropFirst().sorted()[2], times[0]))
         }
     }
 

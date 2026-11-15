@@ -1,8 +1,9 @@
 import CoreImage
-import EmulsionCore
 import EmulsionFixtures
 import Foundation
 import Testing
+
+@testable import EmulsionCore
 
 /// One golden: a scene rendered with fixed adjustments (and a fixed grain seed). `name` is
 /// `scene.variant`, also the golden's file name.
@@ -16,7 +17,7 @@ struct RegressionCase: Sendable {
 }
 
 extension RegressionCase {
-    static let all: [RegressionCase] = pointCases + spatialCases + displayCases + realSceneCases
+    static let all: [RegressionCase] = pointCases + spatialCases + displayCases + realSceneCases + digicamCases
 
     static func named(_ name: String) throws -> RegressionCase {
         try #require(all.first { $0.name == name }, "no regression case named \(name)")
@@ -98,4 +99,23 @@ extension RegressionCase {
                 adjustments: adjust { ($0.highlights, $0.shadows) = (0.5, 0.4) }, thresholds: VisualRegression.photoLocalToneThresholds),
         ]
     }
+
+    /// The digicam process (MOV-149) at its default amounts.
+    static let digicamLook = adjust {
+        ($0.process, $0.grain, $0.halation, $0.seed) = (.digicam, DigicamLook.defaultNoise, DigicamLook.defaultProcessing, 7)
+    }
+
+    /// The 24 patches as a 6 × 4 grid of 16 × 18 px cells: 96 × 72, already 4:3, so the digicam
+    /// crop keeps every patch.
+    static func chart24Grid() -> CIImage {
+        let patches = SceneFixtures.chart24Patches.map(\.linear)
+        return Fixtures.image(width: 96, height: 72, space: SceneFixtures.linear) { x, y in patches[(3 - y / 18) * 6 + x / 16] }
+    }
+
+    private static let digicamCases: [RegressionCase] = [
+        RegressionCase(name: "chart24-grid.digicam", scene: { chart24Grid() }, adjustments: digicamLook),
+        RegressionCase(
+            name: "\(RealScene.iphone12ProRAW.rawValue).digicam", scene: { try RealScene.iphone12ProRAW.image() }, adjustments: digicamLook,
+            thresholds: VisualRegression.photoThresholds),
+    ]
 }

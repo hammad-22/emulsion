@@ -9,3 +9,11 @@ Shared SwiftUI components for the iOS and Mac apps: the rendered photo, adjustme
 - Follow `Apps/iOS/AGENTS.md` for SwiftUI rules (Observation, small views, `.task(id:)`, accessibility).
 - **Rendering** always goes through the `RenderService` in the environment (`\.renderService`); never render on the main actor. A rebuilt `RenderedPhoto` (a fold, the library preview opening the editor) shows `RenderService.latestRender` until it renders again; originals never borrow it.
 - Run `(cd Packages/EmulsionUI && swift test)` for the shared control interaction tests and macOS build, plus the iOS app build. CI runs these tests too.
+
+## Notes
+- **Ruler drags (`ScrubStart`, `HorizontalPanGesture`):** on iOS a drag on the scale decides once, as it starts. *Scrub* when at least as horizontal as vertical (a still start included), reporting no vertical travel. *Claim* when vertical with nothing behind that can scroll, so the editor's dismiss doesn't move; the full translation lets `RulerDrag` ignore it. *Yield* when vertical over a scroll view that can scroll. It is a UIKit pan because a SwiftUI `DragGesture` claims the touch before the scroll view's pan even when vertical. Gestures behind the scale (a navigation dismiss) wait for the pan to decide. SwiftUI may attach the recognizer to a host view above the scroll view, so it walks up from the hit view. macOS uses a simultaneous `DragGesture` and reports the full translation.
+- **`RenderOrder`:** each slider change starts a render that supersedes the last; dropping superseded results would freeze the photo until the finger stops, so a finished render shows unless a newer one already has.
+- **`AdjustmentInspector`:** the ruler touched last is the one `AdjustmentPanel` shows when the canvas narrows; Reset Edits changes several controls and keeps the selection.
+- **`PhotoImportButton`:** a plain button presents the picker so button and label styles apply; `fillsWidth` stretches the label for stacked buttons of equal width.
+- **`SelectionBadge`:** a ring, filled with a checkmark once selected; plain symbols with a shadow to stay visible on bright photos, not glass, which belongs to controls.
+- **`ComponentGallery`:** opened by `--component-gallery` on iOS; it stands in an as-shot white balance (5200 K, +8) to show the White Balance group, and sizes the inspector to show its own scrolling.

@@ -2,8 +2,6 @@ import EmulsionKit
 import EmulsionUI
 import SwiftUI
 
-/// Compare and Reset together, Save to Photos as the one prominent action, and Delete
-/// under More.
 struct EditorToolbar: ToolbarContent {
     let session: EditSession
     @Binding var isComparing: Bool
@@ -24,7 +22,6 @@ struct EditorToolbar: ToolbarContent {
             adjustmentButton
         }
         ToolbarItemGroup(placement: .topBarTrailing) {
-            // Neutral like the rest of the editor: no accent color beside the photograph.
             Toggle("Compare", systemImage: "square.split.2x1", isOn: $isComparing)
                 .tint(.white)
             Button("Reset Edits", systemImage: "arrow.counterclockwise") { session.reset() }
@@ -72,25 +69,6 @@ struct EditorToolbar: ToolbarContent {
             exportResult = .saved
         } catch {
             exportResult = .failed(error.localizedDescription)
-        }
-    }
-}
-
-private enum ExportResult: Equatable {
-    case saved
-    case failed(String)
-
-    var message: String {
-        switch self {
-        case .saved: String(localized: "Saved to Photos")
-        case .failed(let message): message
-        }
-    }
-
-    var feedback: SensoryFeedback {
-        switch self {
-        case .saved: .success
-        case .failed: .error
         }
     }
 }

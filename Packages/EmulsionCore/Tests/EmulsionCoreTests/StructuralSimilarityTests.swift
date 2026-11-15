@@ -15,7 +15,6 @@ struct StructuralSimilarityTests {
         let cases: [Case]
     }
 
-    /// The planes of `Tools/color-references/generate_ssim_references.py`, row `i`, column `j`.
     private static func base(_ i: Double, _ j: Double) -> Double {
         50 + 25 * sin(0.3 * i) * cos(0.2 * j) + 10 * (Double((7 * Int(i) + 13 * Int(j)) % 11) / 11)
     }
@@ -28,8 +27,7 @@ struct StructuralSimilarityTests {
         "texture removed": { 50 + 25 * sin(0.3 * $0) * cos(0.2 * $1) + 5 },
     ]
 
-    /// Against scikit-image 0.26 (`References/ssim.json`). Measured largest difference 2e-6 (this
-    /// implementation works in Float).
+    /// Measured worst 2e-6 against scikit-image 0.26 (this implementation works in Float).
     @Test func matchesScikitImage() throws {
         let reference = try JSONDecoder().decode(Reference.self, from: ColorReferences.reference("ssim"))
         func plane(_ f: (Double, Double) -> Double) -> [Float] {

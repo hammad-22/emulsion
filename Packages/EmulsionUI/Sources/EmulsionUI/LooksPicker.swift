@@ -12,7 +12,7 @@ struct LooksPicker: View {
     @State private var name = ""
     @State private var errorMessage: String?
     @State private var deleting: Recipe?
-    // Keeps the Mac sheet usable at its smallest size.
+    // The Mac sheet at its smallest usable size.
     private let minimumSheetSize = CGSize(width: 300, height: 320)
 
     var body: some View {
@@ -70,7 +70,7 @@ struct LooksPicker: View {
                 Text("Emulsion")
             } footer: {
                 Text(
-                    "Artistic looks made with Emulsion's current film model. Applying a look replaces the adjustment values and keeps your original photo."
+                    "Artistic looks made with Emulsion's film and digicam processes. Applying a look replaces the adjustment values and keeps your original photo."
                 )
             }
             Section("Your Looks") {

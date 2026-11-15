@@ -2,8 +2,7 @@ import Foundation
 
 public enum EmulsionError: LocalizedError, Equatable {
     case unsupportedPhoto, unsupportedVideoFormat, renderFailed, kernelsMissing
-    /// A stock file or `FilmStock` the engine can't print with. The reason (developer English, not for alerts) is the
-    /// `failureReason`.
+    /// A stock the engine can't print with; the reason (developer English) is `failureReason`.
     case invalidStock(String)
     case libraryUnreadable, librarySaveFailed, libraryDeleteFailed
     case invalidRecipe, recipeVersionUnsupported, recipeModelUnsupported, recipesUnreadable, recipeSaveFailed

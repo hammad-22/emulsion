@@ -5,11 +5,9 @@ import simd
 
 @testable import EmulsionCore
 
-/// A rendered image as 16-bit Display P3 encoded code values, top row first: the form goldens are
-/// stored and compared in (16-bit RGB PNG, tagged Display P3).
+/// 16-bit Display P3 encoded values, top row first: the form goldens are stored in.
 struct RegressionImage: Equatable {
     static let maxCode = Double(UInt16.max)
-    /// Read back like the Renderer's own context: extended linear sRGB working space, half float.
     static let context = CIContext(options: [
         .workingColorSpace: Renderer.workingSpace, .workingFormat: CIFormat.RGBAh, .cacheIntermediates: false,
     ])
@@ -23,7 +21,6 @@ struct RegressionImage: Equatable {
         (self.width, self.height, self.pixels) = (width, height, pixels)
     }
 
-    /// Renders a working-space image to 16-bit unsigned Display P3 (Core Image quantises and clips).
     init(rendering image: CIImage) {
         let (w, h) = (Int(image.extent.width), Int(image.extent.height))
         var codes = [UInt16](repeating: 0, count: w * h * 4)
@@ -32,10 +29,8 @@ struct RegressionImage: Equatable {
         self.init(width: w, height: h, pixels: (0..<w * h).map { SIMD3(codes[$0 * 4], codes[$0 * 4 + 1], codes[$0 * 4 + 2]) })
     }
 
-    /// Encoded Display P3 values in 0…1.
     var encoded: [SIMD3<Double>] { pixels.map { SIMD3<Double>($0) / Self.maxCode } }
 
-    /// Per-pixel CIEDE2000 against another image of the same size.
     func deltaE(to other: RegressionImage) -> [Double] {
         precondition(width == other.width && height == other.height)
         return zip(encoded, other.encoded).map(ColorDifference.deltaE2000(displayP3:_:))
@@ -50,7 +45,6 @@ struct RegressionImage: Equatable {
 
     // MARK: PNG
 
-    /// 16-bit RGB PNG, big-endian samples, tagged Display P3.
     func pngData() throws -> Data {
         var samples = [UInt16]()
         samples.reserveCapacity(pixels.count * 3)
@@ -72,7 +66,7 @@ struct RegressionImage: Equatable {
         return try ImageFile.write(image, as: .png)
     }
 
-    /// Reads the PNG's raw samples: no colour matching, no premultiplication.
+    /// No colour matching, no premultiplication.
     init(pngData data: Data) throws {
         let image = try ImageFile.read(data)
         guard image.bitsPerComponent == 16, !image.bitmapInfo.contains(.floatComponents) else {
