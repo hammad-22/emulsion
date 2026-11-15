@@ -19,9 +19,9 @@ public enum FilmLook {
     /// Pixel side on the film in µm: the image's long edge spans the assumed frame width.
     static func micrometresPerPixel(longEdge: Double) -> Double { frameWidthMillimetres * 1000 / longEdge }
     /// Default grain amount, size and color, the owner's look pick of 14 Nov 2026 (docs/DECISIONS.md; artistic).
-    public static let grainAmount = 1.0, grainSize = 1.75, grainColor = 0.3
+    static let grainAmount = 1.0, grainSize = 1.75, grainColor = 0.3
     /// The film grain control's top: twice the datasheet granularity (artistic headroom, owner 14 Nov 2026).
-    public static let maximumGrainAmount = 2.0
+    static let maximumGrainAmount = 2.0
     /// Printer points per unit of the Warmth/Tint controls (log10 print exposure).
     public static let printerPoint = 0.05
     /// Saturation gain per unit of the Color control, above and below zero.

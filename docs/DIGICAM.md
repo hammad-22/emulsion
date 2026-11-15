@@ -25,6 +25,7 @@ downscale of the export.
 | --- | --- | --- | --- | --- |
 | `defaultNoise` | 0.75 | Grain amount | owner direction | Renders exactly as 0.6 did before the Noise control was rescaled (see `shotNoise`). |
 | `defaultProcessing` | 0.7 | Halation amount | owner direction | Default in-camera processing. |
+| `maximumNoise` | 1.0 | Grain amount | owner direction (14 Nov 2026) | Top of the Noise control; film grain reaches 2 (`FilmLook.maximumGrainAmount`). Reset returns Noise and Processing to these defaults (`Adjustments.defaults(for:)`). |
 | `aspectRatio` | 4 / 3 | long ÷ short | measured | The compact-camera sensor format. |
 | `sensorLongEdge` | 2592 | px | measured | 2592 × 1944 = 5.0 MP, from period file headers. |
 | `vignetteStops` | 1.0 | stops at the corners, at processing 1 | owner direction | Radial falloff ∝ r²; unmeasured. |

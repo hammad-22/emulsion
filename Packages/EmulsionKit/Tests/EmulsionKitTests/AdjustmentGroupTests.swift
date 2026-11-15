@@ -46,6 +46,15 @@ struct AdjustmentGroupTests {
         #expect(grain.formatted(Adjustments().grain) == "+100")
     }
 
+    /// Reset returns each process to its own default: digicam Noise 0.75, not film grain's 1 (its maximum there).
+    @Test func resetDefaultsFollowTheProcess() throws {
+        let digicam = Adjustments.defaults(for: .digicam)
+        let look = try #require(CuratedLooks.recipes.first { $0.adjustments.process == .digicam }).adjustments
+        #expect((digicam.grain, digicam.halation) == (look.grain, look.halation))
+        #expect(digicam.grain < Adjustments.grainRange(for: .digicam).upperBound)
+        #expect(Adjustments.defaults(for: .film) == Adjustments())
+    }
+
     @Test func valuesShowWithSignAndUnit() {
         let exposure = AdjustmentGroup.light.controls(whiteBalanceAsShot: nil)[0]
         #expect(exposure.formatted(0.7) == "+0.7 EV")

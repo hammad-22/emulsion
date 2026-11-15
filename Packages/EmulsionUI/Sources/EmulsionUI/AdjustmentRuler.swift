@@ -19,7 +19,7 @@ struct AdjustmentRuler: View {
     private let indicatorSize = CGSize(width: 2, height: 36)
     private var scaleHeight: CGFloat { isCompact ? FilmLabLayout.minimumControlHeight : 56 }
     private var value: Double { adjustments[keyPath: control.keyPath] }
-    private var neutral: Double { Adjustments()[keyPath: control.keyPath] }
+    private var neutral: Double { Adjustments.defaults(for: adjustments.process)[keyPath: control.keyPath] }
     private var range: ClosedRange<Double> { control.range(for: adjustments.process) }
     private var tickCount: Int { Int(((range.upperBound - range.lowerBound) / control.increment).rounded()) }
     private var side: Int { value < neutral ? -1 : value > neutral ? 1 : 0 }

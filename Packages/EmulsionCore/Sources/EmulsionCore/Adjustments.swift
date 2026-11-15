@@ -39,8 +39,16 @@ public struct Adjustments: Codable, Equatable, Sendable {
     public static func grainRange(for process: RenderProcess) -> ClosedRange<Double> {
         switch process {
         case .film: 0...FilmLook.maximumGrainAmount
-        case .digicam: 0...1
+        case .digicam: 0...DigicamLook.maximumNoise
         }
+    }
+
+    /// The default edit in `process`, where Reset returns a control: the digicam process has its own Noise and Processing.
+    public static func defaults(for process: RenderProcess) -> Adjustments {
+        var a = Adjustments()
+        a.process = process
+        if process == .digicam { (a.grain, a.halation) = (DigicamLook.defaultNoise, DigicamLook.defaultProcessing) }
+        return a
     }
     public static let neutral: Adjustments = {
         var a = Adjustments()
