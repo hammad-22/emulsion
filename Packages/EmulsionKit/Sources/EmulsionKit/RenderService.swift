@@ -20,8 +20,10 @@ public actor RenderService {
     /// isn't RAW (no `asShotWhiteBalance`) is never developed again for a white balance. The open
     /// photo develops again from its kept decoder (`openDecoder`); any other reads its file again.
     private var previews: [String: (negative: Negative, whiteBalance: CameraWhiteBalance?)] = [:]
-    /// Least recently used first; the oldest previews are dropped past `previewCacheBytes`.
+    /// Least recently used first; the oldest previews are dropped past `previewCacheBytes` or
+    /// `maxCachedPreviews`, so library scrolling keeps a dozen thumbnail develops, not 128 MB of them.
     private var lruKeys: [String] = []
+    private let maxCachedPreviews = 12
     /// Three editor develops at the cap (2560 × 1920 half-float RGBA is 39 MB) plus the library's thumbnails.
     static let previewCacheBytes = 128 << 20
     /// Editor previews are developed no larger than this: above a phone screen's long edge
@@ -89,7 +91,9 @@ public actor RenderService {
         let fitted = try renderer.materialize(renderer.resized(developed, longestEdge: maxDimension))
         previews[key] = (fitted, whiteBalance)
         markUsed(key)
-        while lruKeys.count > 1, cachedPreviewBytes > Self.previewCacheBytes { previews[lruKeys.removeFirst()] = nil }
+        while lruKeys.count > maxCachedPreviews || (lruKeys.count > 1 && cachedPreviewBytes > Self.previewCacheBytes) {
+            previews[lruKeys.removeFirst()] = nil
+        }
         return fitted
     }
 
@@ -109,8 +113,8 @@ public actor RenderService {
     @concurrent public nonisolated func image(_ url: URL, _ adjustments: Adjustments, maxDimension: CGFloat) async throws -> CGImage {
         let thumbnail = ThumbnailCache.Key(url, adjustments, maxDimension: maxDimension)
         if let thumbnail, let cached = thumbnails.image(thumbnail) ?? thumbnails.storedImage(thumbnail) { return cached }
-        let image = try await render(url, adjustments, maxDimension: maxDimension, thumbnail: thumbnail)
-        if let thumbnail { thumbnails.store(image, thumbnail) }
+        let (image, isNew) = try await render(url, adjustments, maxDimension: maxDimension, thumbnail: thumbnail)
+        if let thumbnail, isNew { thumbnails.store(image, thumbnail) }
         return image
     }
 
@@ -120,8 +124,11 @@ public actor RenderService {
         maxDimension <= ThumbnailCache.maxDimension ? .utility : .userInitiated
     }
 
-    private func render(_ url: URL, _ adjustments: Adjustments, maxDimension: CGFloat, thumbnail: ThumbnailCache.Key?) throws -> CGImage {
-        if let thumbnail, let cached = thumbnails.image(thumbnail) { return cached }
+    /// The render, and whether it is new rather than a thumbnail another request kept meanwhile.
+    private func render(
+        _ url: URL, _ adjustments: Adjustments, maxDimension: CGFloat, thumbnail: ThumbnailCache.Key?
+    ) throws -> (CGImage, isNew: Bool) {
+        if let thumbnail, let cached = thumbnails.image(thumbnail) { return (cached, false) }
         try Task.checkCancellation()
         let renderer = try engine()
         let negative = try negative(url, maxDimension: maxDimension, whiteBalance: adjustments.whiteBalance)
@@ -129,7 +136,7 @@ public actor RenderService {
         let image = try renderer.cgImage(renderer.render(negative, adjustments))
         if let thumbnail { thumbnails.keep(image, thumbnail) }
         latestRenders.keep(image, url, maxDimension: maxDimension)
-        return image
+        return (image, true)
     }
 
     /// The last editor-sized film render of this photo, whatever its edit or size: a stand-in

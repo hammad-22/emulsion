@@ -9,7 +9,7 @@ import UniformTypeIdentifiers
 /// Rendered thumbnails kept on disk, so a relaunched library doesn't develop every visible photo
 /// again. See Packages/EmulsionKit/NOTES.md, "ThumbnailFiles".
 final class ThumbnailFiles: Sendable {
-    /// About 1,500 thumbnails at 40 KB (a 512 px JPEG, measured): a large library's grid.
+    /// About 2,800 grid thumbnails at 23 KB (bundled samples at 372 px on the Duo simulator, measured).
     static let byteLimit = 64 << 20
     /// Visually lossless at thumbnail size (artistic).
     private static let jpegQuality = 0.9
@@ -20,7 +20,10 @@ final class ThumbnailFiles: Sendable {
     let folder: URL
     private let byteLimit: Int
     /// Bytes stored in `folder`; nil until the first write prepares the folder and counts them.
+    /// Writes run concurrently, so preparing happens under this lock, once.
     private let storedBytes = Mutex<Int?>(nil)
+    /// True while a trim runs, so concurrent writes don't trim the same files twice.
+    private let isTrimming = Mutex(false)
 
     init(parent: URL = StoredFileName.thumbnailsFolderURL, byteLimit: Int = ThumbnailFiles.byteLimit) {
         folder = parent.appending(path: Self.buildIdentity, directoryHint: .isDirectory)
@@ -39,12 +42,7 @@ final class ThumbnailFiles: Sendable {
 
     func keep(_ image: CGImage, _ key: ThumbnailCache.Key) {
         guard let file = file(for: key), let data = Self.jpeg(image) else { return }
-        do {
-            if storedBytes.withLock({ $0 }) == nil { try prepareFolder() }
-            try data.write(to: file, options: .atomic)
-        } catch {
-            return
-        }
+        guard prepareFolderOnce(), (try? data.write(to: file, options: .atomic)) != nil else { return }
         let total = storedBytes.withLock { bytes in
             let total = (bytes ?? 0) + data.count
             bytes = total
@@ -71,19 +69,30 @@ final class ThumbnailFiles: Sendable {
         return folder.appending(path: name).appendingPathExtension(StoredFileName.thumbnailExtension)
     }
 
-    /// Creates this build's folder, removes other builds' and counts what's already stored.
-    private func prepareFolder() throws {
-        let parent = folder.deletingLastPathComponent()
-        try FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
-        let builds = (try? FileManager.default.contentsOfDirectory(at: parent, includingPropertiesForKeys: nil)) ?? []
-        for build in builds where build.lastPathComponent != folder.lastPathComponent { try? FileManager.default.removeItem(at: build) }
-        let total = storedFiles().reduce(0) { $0 + $1.size }
-        storedBytes.withLock { $0 = total }
+    /// Creates this build's folder, removes other builds' and counts what's already stored; false
+    /// if the folder can't be made.
+    private func prepareFolderOnce() -> Bool {
+        storedBytes.withLock { bytes in
+            guard bytes == nil else { return true }
+            let parent = folder.deletingLastPathComponent()
+            guard (try? FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)) != nil else { return false }
+            let builds = (try? FileManager.default.contentsOfDirectory(at: parent, includingPropertiesForKeys: nil)) ?? []
+            for build in builds where build.lastPathComponent != folder.lastPathComponent { try? FileManager.default.removeItem(at: build) }
+            bytes = storedFiles().reduce(0) { $0 + $1.size }
+            return true
+        }
     }
 
     /// Deletes the least recently shown thumbnails until the folder is back under its limit,
     /// always keeping the newest.
     private func trim() {
+        let started = isTrimming.withLock { trimming in
+            guard !trimming else { return false }
+            trimming = true
+            return true
+        }
+        guard started else { return }
+        defer { isTrimming.withLock { $0 = false } }
         let files = storedFiles().sorted { $0.modified < $1.modified }
         var total = files.reduce(0) { $0 + $1.size }
         let target = Int(Double(byteLimit) * Self.trimmedShare)

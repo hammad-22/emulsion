@@ -61,15 +61,22 @@ struct RenderQueueProbe {
         let baseline = Footprint.current
 
         let peak = Footprint.Peak()
-        let export = Task(priority: .utility) { try await service.export(url, .init(), format: .jpeg) }
+        let start = Self.clock.now
+        let export = Task { () throws -> ContinuousClock.Instant in
+            _ = try await service.export(url, .init(), format: .jpeg)
+            return Self.clock.now
+        }
         try await Task.sleep(for: .milliseconds(50))
-        let latency = try await Self.clock.measure { _ = try await service.image(url, Self.sliderStep, maxDimension: Self.previewPixels) }
-        let exportTime = try await Self.clock.measure { _ = try await export.value }
+        let stepAsked = Self.clock.now
+        _ = try await service.image(url, Self.sliderStep, maxDimension: Self.previewPixels)
+        let stepDone = Self.clock.now
+        let exportDone = try await export.value
         let peakBytes = await peak.stop()
         print(
             String(
-                format: "Slider step during a 48 MP export: %.0f ms; export finished %.0f ms later; peak footprint +%.2f GB",
-                latency / .milliseconds(1), exportTime / .milliseconds(1), Double(peakBytes - baseline) / 1e9))
+                format: "48 MP export %.0f ms; slider step asked at %.0f ms took %.0f ms, finishing %@ the export; peak footprint +%.2f GB",
+                (exportDone - start) / .milliseconds(1), (stepAsked - start) / .milliseconds(1), (stepDone - stepAsked) / .milliseconds(1),
+                stepDone > exportDone ? "after" : "before", Double(peakBytes - baseline) / 1e9))
     }
 
     @Test func relaunchedLibraryDevelops() async throws {
