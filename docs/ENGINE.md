@@ -159,7 +159,7 @@ Tone scale of the stock, in output codes:
 | --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
 | Output code | 5 | 17.5 | 45 | 114.5 | 202 | 242 | 252 |
 
-Speed on an Apple-silicon Mac GPU, full pipeline: the look render and readback of an image already developed (synthetic), not an export. A real 48 MP ProRAW develop + render + JPEG export takes 1.0–1.2 s at a 2.2–2.3 GB peak (see the MOV-147 numbers above); Apple's RAW decode dominates it.
+Speed on an Apple-silicon Mac GPU, full pipeline: the look render and readback of an image already developed (synthetic), not an export. A real 48 MP ProRAW develop + render + JPEG export takes 1.7–2.0 s at a 1.85–2.14 GB peak footprint (the MOV-147 cost above); Apple's RAW decode dominates it.
 
 | Size | Time |
 | --- | ---: |
