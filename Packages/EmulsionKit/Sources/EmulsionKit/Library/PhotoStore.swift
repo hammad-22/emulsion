@@ -18,6 +18,8 @@ public final class PhotoStore {
     private var hasReportedSaveFailure = false
     private var unsavedExposureAnchors: [UUID: StoredExposureAnchor] = [:]
     private var exposureAnchorSave: Task<Void, Never>?
+    /// Callers waiting for the next anchor save; for tests, so they never wait on the clock.
+    private var exposureAnchorSaveWaiters: [CheckedContinuation<Void, Never>] = []
     static let exposureAnchorSaveDelay = Duration.seconds(1)
 
     public convenience init() {
@@ -168,6 +170,14 @@ public final class PhotoStore {
         } catch {
             report(error)
         }
+        let waiters = exposureAnchorSaveWaiters
+        exposureAnchorSaveWaiters = []
+        for waiter in waiters { waiter.resume() }
+    }
+
+    /// Returns after the next attempt to save measured anchors, whether it succeeded or not; for tests.
+    func exposureAnchorsSaved() async {
+        await withCheckedContinuation { exposureAnchorSaveWaiters.append($0) }
     }
 
     private func report(_ error: EmulsionError) {

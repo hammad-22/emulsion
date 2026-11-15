@@ -5,7 +5,9 @@ import Testing
 
 @testable import EmulsionKit
 
-@MainActor
+/// Saves are awaited through `PhotoStore.exposureAnchorsSaved()`, never a wall-clock deadline: a
+/// busy CI runner took about 145 s a test (MOV-163). The time limit only stops a save that never comes.
+@MainActor @Suite(.timeLimit(.minutes(10)))
 struct ExposureAnchorPersistenceTests {
     @Test func aRelaunchUsesTheStoredAnchorWithoutMeasuringAgain() async throws {
         let library = TestLibrary()
@@ -13,7 +15,7 @@ struct ExposureAnchorPersistenceTests {
         let url = library.store.url(for: photo)
         // Larger than a thumbnail, so the relaunch develops again instead of reading a stored one.
         let first = try await library.renderService.image(url, .init(), maxDimension: 600)
-        let stored = try await Self.storedAnchor(of: photo.id, in: library.store)
+        let stored = await Self.storedAnchor(of: photo.id, in: library.store)
         #expect(stored.stops != 0)
         #expect(stored.stops == library.renderService.exposureAnchor(url))
 
@@ -30,7 +32,7 @@ struct ExposureAnchorPersistenceTests {
         let photo = try await library.store.add(TestPhoto.anchoredRAW, fileExtension: "dng")
         let url = library.store.url(for: photo)
         _ = try await library.renderService.image(url, .init(), maxDimension: 512)
-        _ = try await Self.storedAnchor(of: photo.id, in: library.store)
+        _ = await Self.storedAnchor(of: photo.id, in: library.store)
         var warm = Adjustments()
         warm.whiteBalance = CameraWhiteBalance(temperature: 2856, tint: 0)
 
@@ -52,7 +54,7 @@ struct ExposureAnchorPersistenceTests {
         #expect(migrated.photo(photo.id)?.exposureAnchor == nil)
         _ = try await migrated.renderService.image(migrated.url(for: photo), .init(), maxDimension: 256)
         #expect(await migrated.renderService.exposureAnchorMeasurements == 1)
-        let stored = try await Self.storedAnchor(of: photo.id, in: migrated)
+        let stored = await Self.storedAnchor(of: photo.id, in: migrated)
 
         #expect(library.reopened().photo(photo.id)?.exposureAnchor == stored)
     }
@@ -62,14 +64,14 @@ struct ExposureAnchorPersistenceTests {
         let photo = try await library.store.add(TestPhoto.anchoredRAW, fileExtension: "dng")
         let url = library.store.url(for: photo)
         _ = try await library.renderService.image(url, .init(), maxDimension: 256)
-        let stale = try await Self.storedAnchor(of: photo.id, in: library.store)
+        let stale = await Self.storedAnchor(of: photo.id, in: library.store)
         try Self.brighterRAW.write(to: url)
 
         let reopened = library.reopened()
         _ = try await reopened.renderService.image(url, .init(), maxDimension: 256)
 
         #expect(await reopened.renderService.exposureAnchorMeasurements == 1)
-        let fresh = try await Self.storedAnchor(of: photo.id, in: reopened) { $0 != stale }
+        let fresh = await Self.storedAnchor(of: photo.id, in: reopened) { $0 != stale }
         #expect(fresh.source != stale.source)
     }
 
@@ -96,7 +98,7 @@ struct ExposureAnchorPersistenceTests {
         for photo in photos {
             _ = try await library.renderService.image(library.store.url(for: photo), .init(), maxDimension: 256)
         }
-        for photo in photos { _ = try await Self.storedAnchor(of: photo.id, in: library.store) }
+        for photo in photos { _ = await Self.storedAnchor(of: photo.id, in: library.store) }
 
         let reopened = library.reopened()
         #expect(photos.allSatisfy { reopened.photo($0.id)?.exposureAnchor != nil })
@@ -108,8 +110,7 @@ struct ExposureAnchorPersistenceTests {
         try library.blockIndexWrites()
 
         _ = try await library.renderService.image(library.store.url(for: photo), .init(), maxDimension: 256)
-        let deadline = ContinuousClock.now + .seconds(60)
-        while library.store.lastError == nil, ContinuousClock.now < deadline { try await Task.sleep(for: .milliseconds(20)) }
+        while library.store.lastError == nil { await library.store.exposureAnchorsSaved() }
 
         #expect(library.store.lastError == .librarySaveFailed)
         #expect(library.store.photo(photo.id)?.exposureAnchor == nil)
@@ -133,7 +134,7 @@ struct ExposureAnchorPersistenceTests {
         let migrated = library.reopened()
         _ = try await migrated.renderService.image(migrated.url(for: photo), .init(), maxDimension: 256)
 
-        _ = try await Self.storedAnchor(of: photo.id, in: migrated)
+        _ = await Self.storedAnchor(of: photo.id, in: migrated)
     }
 
     /// A different file at the same path: the anchor fixture with a stronger gain table.
@@ -142,12 +143,10 @@ struct ExposureAnchorPersistenceTests {
 
     private static func storedAnchor(
         of id: UUID, in store: PhotoStore, where accepted: (StoredExposureAnchor) -> Bool = { _ in true }
-    ) async throws -> StoredExposureAnchor {
-        let deadline = ContinuousClock.now + .seconds(60)
-        while ContinuousClock.now < deadline {
+    ) async -> StoredExposureAnchor {
+        while true {
             if let anchor = store.photo(id)?.exposureAnchor, accepted(anchor) { return anchor }
-            try await Task.sleep(for: .milliseconds(20))
+            await store.exposureAnchorsSaved()
         }
-        return try #require(nil as StoredExposureAnchor?, "anchor never saved")
     }
 }
