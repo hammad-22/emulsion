@@ -21,6 +21,8 @@ public struct Adjustments: Codable, Equatable, Sendable {
     /// Texture (0 … 1).
     public var grain: Double = 0.35
     public var halation: Double = 0.35
+    /// What stops halation at the back of the negative.
+    public var backing: AntihalationBacking = .remJet
     public var process: RenderProcess = .film
     /// Grain pattern seed, fixed per photo so re-renders and exports match.
     public var seed: Double = 0
@@ -65,6 +67,7 @@ extension Adjustments {
         try decode(.shadows, into: &shadows)
         try decode(.grain, into: &grain)
         try decode(.halation, into: &halation)
+        try decode(.backing, into: &backing)
         try decode(.seed, into: &seed)
         try decode(.whiteBalance, into: &whiteBalance)
         // A process this version doesn't know (saved by a newer app) renders as film rather than
