@@ -27,6 +27,16 @@ public struct Negative: @unchecked Sendable {
         self.exposureAnchorStops = exposureAnchorStops
         self.asShotWhiteBalance = asShotWhiteBalance
     }
+
+    /// Scaled down (Lanczos) to `longestEdge` on its long side; unchanged when it already fits.
+    func resized(longestEdge: CGFloat) -> Negative {
+        let scale = min(1, longestEdge / max(size.width, size.height))
+        guard scale < 1 else { return self }
+        let fitted = CGRect(x: 0, y: 0, width: floor(size.width * scale), height: floor(size.height * scale))
+        return Negative(
+            image: image.lanczosScaled(by: scale).cropped(to: fitted), contract: contract, exposureAnchorStops: exposureAnchorStops,
+            asShotWhiteBalance: asShotWhiteBalance)
+    }
 }
 
 /// Turns camera data into linear light for the film system. RAW (ProRAW or Bayer DNG) goes
@@ -35,8 +45,7 @@ public struct Negative: @unchecked Sendable {
 /// film curve: the camera's rendering can't be undone.
 public struct Developer {
     private let kernels: Kernels
-    /// The renderer's caching context, shared with its renders but viewfinder frames (MOV-147);
-    /// used here by `ExposureAnchor.stops(of:context:)`.
+    /// The renderer's caching context (MOV-147), for the exposure anchor and each `RAWDecoder`.
     private let context: CIContext
 
     init(kernels: Kernels, context: CIContext) {
@@ -131,7 +140,7 @@ public struct Developer {
         // Draft mode stays off after the anchor's thumbnails: switching it on decodes the file again.
         Self.applyPreviewScale(raw, maxDimension: maxDimension, allowsDraftMode: !measuresAnchor)
         // The anchor was measured as shot; the decoder sets each develop's white balance after it.
-        return RAWDecoder(raw, exposureAnchorStops: anchorStops)
+        return RAWDecoder(raw, exposureAnchorStops: anchorStops, longestEdge: maxDimension, context: context)
     }
 
     /// The white balance a RAW file reports, read without developing it; nil when `data` isn't RAW.
@@ -157,6 +166,10 @@ public struct Developer {
         raw.isDraftModeEnabled = allowsDraftMode && scale < 1
     }
 
+    /// A thousandth of Apple's default 0.1. At exactly 0 Apple's decode intermittently fills whole render tiles with
+    /// another intermediate (MOV-147, docs/ENGINE.md "RAW decode corruption").
+    static let nearZeroContrast: Float = 1e-4
+
     /// Bypass Apple's rendering: no tone boost, local tone mapping, extra contrast, gamut
     /// mapping or shadow bias. What remains is demosaiced, white-balanced, linear scene light
     /// scaled by the file's BaselineExposure (the exposure anchor comes after); noise reduction,
@@ -170,7 +183,7 @@ public struct Developer {
         // anchor's profile render. Set once, so the anchor's two thumbnails share one decode.
         raw.boostShadowAmount = 1
         if raw.isLocalToneMapSupported { raw.localToneMapAmount = 0 }
-        if raw.isContrastSupported { raw.contrastAmount = 0 }
+        if raw.isContrastSupported { raw.contrastAmount = nearZeroContrast }
         // EDR 1–2 re-expands ProRAW highlights non-linearly and shifts midtones; 0 keeps them linear.
         raw.extendedDynamicRangeAmount = 0
         // Apple's gamut mapping clips highlights near 1.0 and pulls saturated colours inward;

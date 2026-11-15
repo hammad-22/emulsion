@@ -82,12 +82,11 @@ public actor RenderService {
         }
         let renderer = try engine()
         let developed =
-            try openDecoder(for: url, maxDimension: maxDimension)?.negative(whiteBalance: whiteBalance)
+            try openDecoder(for: url, maxDimension: maxDimension)?.negative(whiteBalance: whiteBalance, longestEdge: maxDimension)
             ?? develop(url, maxDimension: maxDimension, whiteBalance: whiteBalance)
         developCount += 1
-        // Draft RAW decode may come back larger than asked; fit it exactly. Then render it
-        // once into a half-float buffer, so slider moves don't redo the RAW develop or the
-        // JPEG inversion, and the RAW decode never reaches the interactive context (MOV-147).
+        // A RAW develop is already a fitted half-float buffer (MOV-147). Other photos are fitted and rendered
+        // into one here, so slider moves don't redo the resize or the JPEG inversion.
         let fitted = try renderer.materialize(renderer.resized(developed, longestEdge: maxDimension))
         previews[key] = (fitted, whiteBalance)
         markUsed(key)
