@@ -45,9 +45,9 @@ enum VisualRegression {
         mean: thresholds.mean, p95: thresholds.p95, max: thresholds.max, allowsIsolatedOutliers: true,
         minimumStructuralSimilarity: 0.999)
     /// Real photographs: the ΔE00 limits plus structure (MOV-146). Removing the default look's grain
-    /// (MOV-30: amount 1, size 1.5, color 0.3) from a frozen photo moves it by mean 0.33–0.34, p95
-    /// 0.66–0.68, max 1.34–1.59, SSIM 0.99775–0.99866; a new seed by mean 0.46–0.47, p95 0.93–0.96,
-    /// max 2.13–2.40, SSIM 0.99556–0.99734. Each fails both the per-pixel ΔE00 limit and the
+    /// (MOV-30: amount 1, size 1.75, color 0.3) from a frozen photo moves it by mean 0.38–0.39, p95
+    /// 0.77–0.79, max 1.56–1.85, SSIM 0.99694–0.99818; a new seed by mean 0.54–0.55, p95 1.08–1.11,
+    /// max 2.49–2.79, SSIM 0.99397–0.99639. Each fails both the per-pixel ΔE00 limit and the
     /// structural floor (`grainChangesFailThePhotoThresholds`). Blur of σ 0.3 px gives SSIM
     /// 0.994–0.997, and rendered twice SSIM is 1. The local-tone cases above take 0.999 instead: CI's
     /// isolated outliers (16 pixels moved ≈ 4 ΔE00, simulated) cost them up to 0.00034, and they

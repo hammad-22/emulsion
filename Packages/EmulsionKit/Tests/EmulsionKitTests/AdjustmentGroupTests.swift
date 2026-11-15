@@ -21,19 +21,29 @@ struct AdjustmentGroupTests {
     @Test func defaultsSitInsideTheirRanges() {
         let defaults = Adjustments()
         for control in AdjustmentGroup.allCases.flatMap({ $0.controls(whiteBalanceAsShot: nil) }) {
-            #expect(control.range.contains(defaults[keyPath: control.keyPath]), "\(control.id)")
+            #expect(control.range(for: .film).contains(defaults[keyPath: control.keyPath]), "\(control.id)")
         }
     }
 
-    @Test func rangesMatchWhatTheEngineClampsTo() {
+    @Test(arguments: RenderProcess.allCases)
+    func rangesMatchWhatTheEngineClampsTo(process: RenderProcess) {
         for control in AdjustmentGroup.allCases.flatMap({ $0.controls(whiteBalanceAsShot: nil) }) {
             var low = Adjustments()
+            low.process = process
             low[keyPath: control.keyPath] = -100
-            var high = Adjustments()
+            var high = low
             high[keyPath: control.keyPath] = 100
-            #expect(low.clamped()[keyPath: control.keyPath] == control.range.lowerBound, "\(control.id)")
-            #expect(high.clamped()[keyPath: control.keyPath] == control.range.upperBound, "\(control.id)")
+            #expect(low.clamped()[keyPath: control.keyPath] == control.range(for: process).lowerBound, "\(control.id)")
+            #expect(high.clamped()[keyPath: control.keyPath] == control.range(for: process).upperBound, "\(control.id)")
         }
+    }
+
+    /// Film grain reaches twice the datasheet granularity; the digicam process's Noise stops at 1 (owner, 14 Nov 2026).
+    @Test func filmGrainHasHeadroomAndDigicamNoiseDoesNot() throws {
+        let grain = try #require(AdjustmentGroup.texture.controls(whiteBalanceAsShot: nil).first { $0.keyPath == \.grain })
+        #expect(grain.range(for: .film) == 0...2)
+        #expect(grain.range(for: .digicam) == 0...1)
+        #expect(grain.formatted(Adjustments().grain) == "+100")
     }
 
     @Test func valuesShowWithSignAndUnit() {
@@ -49,7 +59,7 @@ struct AdjustmentGroupTests {
     func oneMovedRulerIsTheChangedControl(group: AdjustmentGroup) throws {
         let control = try #require(group.controls(whiteBalanceAsShot: Self.asShot).last)
         var moved = Adjustments()
-        moved[keyPath: control.keyPath] = control.range.upperBound
+        moved[keyPath: control.keyPath] = control.range(for: .film).upperBound
         let changed = try #require(AdjustmentGroup.changedControl(from: Adjustments(), to: moved, whiteBalanceAsShot: Self.asShot))
         #expect(changed.group == group)
         #expect(changed.control == control.id)
@@ -86,7 +96,7 @@ extension AdjustmentGroupTests {
         let untouched = Adjustments()
         #expect(temperature.formatted(untouched[keyPath: temperature.keyPath]) == "5,200 K")
         #expect(tint.formatted(untouched[keyPath: tint.keyPath]) == "+8")
-        for control in [temperature, tint] { #expect(control.range.contains(untouched[keyPath: control.keyPath])) }
+        for control in [temperature, tint] { #expect(control.range(for: .film).contains(untouched[keyPath: control.keyPath])) }
     }
 
     @Test func movingOneRulerKeepsTheOtherAsShot() throws {
@@ -122,13 +132,13 @@ extension AdjustmentGroupTests {
 
     @Test func temperatureRulerCoversApplesRangeInEqualMiredSteps() throws {
         let (temperature, tint) = try Self.whiteBalanceControls()
-        #expect(temperature.formatted(temperature.range.lowerBound) == "2,000 K")
-        #expect(temperature.formatted(temperature.range.upperBound) == "50,000 K")
-        #expect(temperature.range.lowerBound < temperature.range.upperBound, "a higher value is a higher kelvin")
-        #expect(tint.range == CameraWhiteBalance.tintRange)
+        #expect(temperature.formatted(temperature.range(for: .film).lowerBound) == "2,000 K")
+        #expect(temperature.formatted(temperature.range(for: .film).upperBound) == "50,000 K")
+        #expect(temperature.range(for: .film).lowerBound < temperature.range(for: .film).upperBound, "a higher value is a higher kelvin")
+        #expect(tint.range(for: .film) == CameraWhiteBalance.tintRange)
         var extreme = Adjustments()
-        extreme[keyPath: temperature.keyPath] = temperature.range.upperBound
-        extreme[keyPath: tint.keyPath] = tint.range.lowerBound
+        extreme[keyPath: temperature.keyPath] = temperature.range(for: .film).upperBound
+        extreme[keyPath: tint.keyPath] = tint.range(for: .film).lowerBound
         #expect(extreme.clamped() == extreme, "the rulers stay inside what the engine clamps to")
     }
 

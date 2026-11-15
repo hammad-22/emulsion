@@ -73,7 +73,7 @@ public struct Recipe: Codable, Equatable, Identifiable, Sendable {
         let settings = try container.nestedContainer(keyedBy: Field.self, forKey: .adjustments)
         var adjustments = Adjustments()
         adjustments.process = process
-        for field in Self.numericFields where version > 1 || !Self.formatTwoFields.contains(field.key) {
+        for field in Self.numericFields where version >= field.since {
             adjustments[keyPath: field.path] = try settings.decode(Double.self, forKey: field.key)
         }
         // Format 1 has no backing or grain size and color (such keys there are unknown and ignored,
@@ -101,12 +101,12 @@ public struct Recipe: Codable, Equatable, Identifiable, Sendable {
         case exposure, warmth, tint, color, highlights, shadows, grain, halation, grainSize, grainColor, backing
     }
 
-    private static let formatTwoFields: Set<Field> = [.grainSize, .grainColor]
-
-    private static var numericFields: [(key: Field, path: WritableKeyPath<Adjustments, Double>)] {
+    /// The numeric adjustments and the format that added each; older formats read the default.
+    private static var numericFields: [(key: Field, path: WritableKeyPath<Adjustments, Double>, since: Int)] {
         [
-            (.exposure, \.exposure), (.warmth, \.warmth), (.tint, \.tint), (.color, \.color), (.highlights, \.highlights),
-            (.shadows, \.shadows), (.grain, \.grain), (.halation, \.halation), (.grainSize, \.grainSize), (.grainColor, \.grainColor),
+            (.exposure, \.exposure, 1), (.warmth, \.warmth, 1), (.tint, \.tint, 1), (.color, \.color, 1),
+            (.highlights, \.highlights, 1), (.shadows, \.shadows, 1), (.grain, \.grain, 1), (.halation, \.halation, 1),
+            (.grainSize, \.grainSize, 2), (.grainColor, \.grainColor, 2),
         ]
     }
 }

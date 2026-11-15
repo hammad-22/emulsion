@@ -197,6 +197,13 @@ enum GrainMeasurement {
         }
     }
 
+    /// The measured grain model: white noise at the pixel (size 1) with the layers' full color.
+    static func measuredModel(grain: Double, seed: Double) -> Adjustments {
+        var a = Adjustments.neutral
+        (a.grain, a.grainSize, a.grainColor, a.seed) = (grain, 1, 1, seed)
+        return a
+    }
+
     /// Display-luma σ of a preview against the full-size render reduced to the preview's size.
     struct PreviewExport {
         let previewLongEdge: Int

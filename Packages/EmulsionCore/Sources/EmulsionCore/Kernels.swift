@@ -49,11 +49,17 @@ struct Kernels {
         return image
     }
 
-    /// `image` blurred by a Gaussian of `sigma` pixels: below `Halation.exactBlurPixels` with the exact
+    /// Below this σ (pixels) blurs use the exact `gaussianPass`: CIGaussianBlur's width is 0.9–1.2% off at 1.9–2.5 px (measured).
+    static let exactBlurPixels = 4.0
+
+    /// Pixels `gaussianPass` reads on each side for a Gaussian of `sigma` pixels.
+    static func gaussianRadius(sigma: Double) -> Double { (4 * sigma).rounded(.up) }
+
+    /// `image` blurred by a Gaussian of `sigma` pixels: below `exactBlurPixels` with the exact
     /// separable kernel `gaussianPass`, above with Core Image's.
     func gaussianBlur(_ image: CIImage, sigma: Double) throws -> CIImage {
-        guard sigma < Halation.exactBlurPixels else { return image.applyingGaussianBlur(sigma: sigma) }
-        let radius = (4 * sigma).rounded(.up)
+        guard sigma < Self.exactBlurPixels else { return image.applyingGaussianBlur(sigma: sigma) }
+        let radius = Self.gaussianRadius(sigma: sigma)
         func pass(_ input: CIImage, _ step: CIVector) throws -> CIImage {
             guard
                 let output = gaussianPass.apply(

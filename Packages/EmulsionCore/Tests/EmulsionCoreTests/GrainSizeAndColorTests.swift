@@ -9,11 +9,10 @@ import simd
 /// Grain size (clumps that keep a narrower frame's low-frequency granularity) and grain color (the
 /// color part of the layers' density noise, scaled about P3 luminance), MOV-30.
 struct GrainSizeAndColorTests {
-    private static let fullSizeLongEdge = 8064.0
 
     /// Exact discrete Gaussian taps of the kernel `gaussianPass`, normalised.
     private static func taps(sigma: Double) -> [Double] {
-        let radius = Int((4 * sigma).rounded(.up))
+        let radius = Int(Kernels.gaussianRadius(sigma: sigma))
         let w = (-radius...radius).map { exp(-Double($0 * $0) / (2 * sigma * sigma)) }
         let total = w.reduce(0, +)
         return w.map { $0 / total }
@@ -21,7 +20,7 @@ struct GrainSizeAndColorTests {
 
     private static func noise(size: Double, seed: Double = 5, width: Int = 2048, height: Int = 512) throws -> [SIMD3<Double>] {
         // Clumps are sized to the long edge, so the field is a strip of a full-size frame.
-        let extent = CGRect(x: 0, y: 0, width: fullSizeLongEdge, height: Double(height))
+        let extent = CGRect(x: 0, y: 0, width: Grain.clumpReferenceLongEdge, height: Double(height))
         let field = try EmulsionTestCase.kernels.grainNoise(extent, seed: seed, size: size)
         return Fixtures.linear(field.cropped(to: CGRect(x: 0, y: 0, width: width, height: height)))
     }
@@ -31,20 +30,15 @@ struct GrainSizeAndColorTests {
     @Test(arguments: [1.5, 2, 3])
     func clumpsKeepLowFrequencyPower(size: Double) throws {
         let (width, height, block) = (2048, 512, 16)
-        let sigma = Grain.clumpSigmaPixels(size: size, longEdge: Self.fullSizeLongEdge)
+        let sigma = Grain.clumpSigmaPixels(size: size, longEdge: Grain.clumpReferenceLongEdge)
         let w = Self.taps(sigma: sigma)
         let field = try Self.noise(size: size, width: width, height: height)
         let red = field.map(\.x)
         let pixelVariance = pow(GrainMeasurement.standardDeviation(red), 2)
         let expectedPixel = pow(w.map { $0 * $0 }.reduce(0, +), 2)
-        var means: [Double] = []
-        for by in 0..<(height / block) {
-            for bx in 0..<(width / block) {
-                var sum = 0.0
-                for y in 0..<block { for x in 0..<block { sum += red[(by * block + y) * width + bx * block + x] } }
-                means.append(sum / Double(block * block))
-            }
-        }
+        let means = GrainMeasurement.areaReduced(
+            field, width: width, scale: Double(block), outWidth: width / block, outHeight: height / block
+        ).values.map(\.x)
         let radius = w.count / 2
         let coverage = (-radius..<(block + radius)).map { j in
             (0..<block).map { i in abs(i - j) <= radius ? w[i - j + radius] : 0 }.reduce(0, +)
@@ -92,12 +86,13 @@ struct GrainSizeAndColorTests {
             var a = Adjustments.neutral
             (a.grain, a.grainSize, a.grainColor, a.seed) = (1, size, color, 3)
             let image = try EmulsionTestCase.render(GrainMeasurement.flat(stops: 0, width: 1600, height: 1200), a)
-            return GrainMeasurement.linearCrop(image, size: 512).map(GrainMeasurement.codes)
+            return GrainMeasurement.linearCrop(image, size: 512)
         }
-        func correlations(_ c: [SIMD3<Double>]) -> (Double, Double) {
-            (GrainMeasurement.correlation(c.map(\.x), c.map(\.y)), GrainMeasurement.correlation(c.map(\.y), c.map(\.z)))
+        func correlations(_ linear: [SIMD3<Double>]) -> (Double, Double) {
+            let c = linear.map(GrainMeasurement.codes)
+            return (GrainMeasurement.correlation(c.map(\.x), c.map(\.y)), GrainMeasurement.correlation(c.map(\.y), c.map(\.z)))
         }
-        func lumaSD(_ c: [SIMD3<Double>]) -> Double { GrainMeasurement.standardDeviation(c.map(EmulsionTestCase.luma)) }
+        let lumaSD = GrainMeasurement.lumaSD
         let measured = try displayed(size: 1, color: 1)
         let mono = try displayed(size: 1, color: 0)
         let coarse = try displayed(size: 1.5, color: 1)

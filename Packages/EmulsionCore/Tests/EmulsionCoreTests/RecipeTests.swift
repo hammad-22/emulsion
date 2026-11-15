@@ -47,7 +47,7 @@ struct RecipeTests {
         #expect(throws: EmulsionError.invalidRecipe) { try Recipe(name: "  ", adjustments: Adjustments()) }
         #expect(throws: EmulsionError.invalidRecipe) { try Recipe(name: "Bad\nName", adjustments: Adjustments()) }
         #expect(throws: EmulsionError.invalidRecipe) { try Recipe(name: String(repeating: "a", count: 81), adjustments: Adjustments()) }
-        let paths: [WritableKeyPath<Adjustments, Double>] = [\.warmth, \.tint, \.color, \.highlights, \.shadows, \.grain, \.halation]
+        let paths: [WritableKeyPath<Adjustments, Double>] = [\.warmth, \.tint, \.color, \.highlights, \.shadows, \.halation]
         for path in paths {
             for value in [Double.nan, .infinity, -.infinity, -1.01, 1.01] {
                 var settings = Adjustments()
@@ -59,6 +59,15 @@ struct RecipeTests {
             var settings = Adjustments()
             settings[keyPath: path] = -0.01
             #expect(throws: EmulsionError.invalidRecipe) { try Recipe(name: "Bad", adjustments: settings) }
+        }
+        let outOfRange: [(WritableKeyPath<Adjustments, Double>, RenderProcess, Double)] = [
+            (\.grain, .film, 2.01), (\.grain, .digicam, 1.01), (\.grainSize, .film, 0.99), (\.grainSize, .film, 3.01),
+            (\.grainColor, .film, -0.01), (\.grainColor, .film, 1.01),
+        ]
+        for (path, process, value) in outOfRange {
+            var settings = Adjustments()
+            (settings.process, settings[keyPath: path]) = (process, value)
+            #expect(throws: EmulsionError.invalidRecipe, "\(path) \(value)") { try Recipe(name: "Bad", adjustments: settings) }
         }
     }
 

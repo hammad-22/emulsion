@@ -282,7 +282,8 @@ struct DigicamTests {
         #expect(look.applying(to: photo).seed == 41)
     }
 
-    @Test func preProcessFilmRecipesDecodeAsFilmAndReencodeAsFormat2() throws {
+    /// A format-1 film recipe reads as exactly these settings and re-encodes to the current format without loss.
+    @Test func preProcessFilmRecipesReadAsFilm() throws {
         let saved = """
             {
               "adjustments" : {
@@ -303,13 +304,19 @@ struct DigicamTests {
             }
             """
         let recipe = try Recipe.decode(Data(saved.utf8))
-        #expect(recipe.adjustments.process == .film)
-        // Re-encoded as format 2, which adds the backing and grain size and color it prints with (MOV-32, MOV-30).
-        let upgraded = saved.replacingOccurrences(of: "\"formatVersion\" : 1", with: "\"formatVersion\" : 2")
-            .replacingOccurrences(of: "\"adjustments\" : {\n", with: "\"adjustments\" : {\n    \"backing\" : \"remJet\",\n")
-            .replacingOccurrences(
-                of: "\"grain\" : 0.35,\n", with: "\"grain\" : 0.35,\n    \"grainColor\" : 0.3,\n    \"grainSize\" : 1.5,\n")
-        #expect(String(decoding: try recipe.encoded(), as: UTF8.self) == upgraded)
+        var expected = Adjustments()
+        (expected.exposure, expected.warmth, expected.tint) = (1.2, 0.4, -0.2)
+        (expected.grain, expected.halation, expected.color, expected.highlights, expected.shadows) = (0.35, 0.35, 0, 0, 0)
+        (expected.process, expected.backing) = (.film, .remJet)
+        (expected.grainSize, expected.grainColor) = (FilmLook.grainSize, FilmLook.grainColor)
+        #expect(recipe.adjustments == expected)
+        #expect(recipe.id == UUID(uuidString: "8E2B3C64-6A0B-4B8D-9C64-4F1E0D2A9B11") && recipe.name == "Evening")
+        let rewritten = try recipe.encoded()
+        let object = try #require(try JSONSerialization.jsonObject(with: rewritten) as? [String: Any])
+        #expect(object["formatVersion"] as? Int == Recipe.formatVersion && Recipe.formatVersion == 2)
+        let reread = try Recipe.decode(rewritten)
+        #expect(reread == recipe && reread.adjustments == expected)
+        #expect(try Recipe.decode(reread.encoded()) == reread)
         #expect(throws: EmulsionError.recipeModelUnsupported) {
             try Recipe.decode(Data(saved.replacingOccurrences(of: "emulsion-default-v1", with: "emulsion-future-v1").utf8))
         }

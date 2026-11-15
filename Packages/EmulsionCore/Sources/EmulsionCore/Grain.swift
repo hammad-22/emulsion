@@ -20,8 +20,10 @@ enum Grain {
     static let sigmaD48Blue = [0.01169, 0.012, 0.01617, 0.01612, 0.01185, 0.0142, 0.01261, 0.0084]
     /// The datasheet's microdensitometer aperture: "a 48-micrometre aperture" (circular).
     static let datasheetApertureDiameterMicrometres = 48.0
-    /// Clump σ per unit of size, film µm: s² pixels of correlation area at 48 MP, as look-reviewed (artistic).
-    static let clumpSigmaMicrometresPerSize = FilmLook.micrometresPerPixel(longEdge: 8064) / (4 * Double.pi).squareRoot()
+    /// Long edge of the 48 MP frames the clump size was look-reviewed on (iPhone ProRAW, 8064 × 6048).
+    static let clumpReferenceLongEdge = 8064.0
+    /// Clump σ per unit of size, film µm: s² pixels of correlation area at the reference frame (artistic).
+    static let clumpSigmaMicrometresPerSize = FilmLook.micrometresPerPixel(longEdge: clumpReferenceLongEdge) / (4 * Double.pi).squareRoot()
     /// Below this clump σ (pixels) a neighbour's tap weight is under exp(−8), so the blur is skipped.
     static let minimumClumpSigmaPixels = 0.25
 
@@ -44,10 +46,7 @@ enum Grain {
         (Double.pi).squareRoot() * datasheetApertureDiameterMicrometres / 2 / p
     }
 
-    /// Density standard deviation per pixel and layer before the clump blur (kernel `densitySigma`).
-    /// `amount` 1 is the datasheet's granularity on the assumed frame; `size` s scales it as a frame
-    /// s times narrower would (Selwyn), so the clump blur, which keeps low-frequency power, gives
-    /// that frame's granularity at any aperture wider than a clump. See docs/FILM-THEORY.md §6.2.
+    /// Density σ per pixel and layer before the clump blur (kernel `densitySigma`); see docs/FILM-THEORY.md §6.2.
     static func densitySigma(logExposure: SIMD3<Double>, amount: Double, size: Double, longEdge: Double) -> SIMD3<Double> {
         sigmaD48(logExposure: logExposure) * scale(amount: amount, size: size, longEdge: longEdge)
     }
@@ -89,7 +88,7 @@ extension Kernels {
     func grainNoise(_ extent: CGRect, seed: Double, size: Double) throws -> CIImage {
         let sigma = Grain.clumpSigmaPixels(size: size, longEdge: max(extent.width, extent.height))
         guard sigma >= Grain.minimumClumpSigmaPixels else { return try grainNoise(extent, seed: seed) }
-        let margin = (4 * sigma).rounded(.up)
+        let margin = Kernels.gaussianRadius(sigma: sigma)
         return try gaussianBlur(grainNoise(extent.insetBy(dx: -margin, dy: -margin), seed: seed), sigma: sigma).cropped(to: extent)
     }
 }

@@ -14,11 +14,8 @@ struct GrainProof {
     private var renderer: Renderer { EmulsionTestCase.sharedRenderer }
     private static let (width, height, side) = (4032, 3024, 1024)
 
-    /// The measured model: white noise at the pixel (size 1) with the layers' full color.
     private static func adjustments(grain: Double, seed: Double = 3) -> Adjustments {
-        var a = Adjustments.neutral
-        (a.grain, a.grainSize, a.grainColor, a.seed) = (grain, 1, 1, seed)
-        return a
+        GrainMeasurement.measuredModel(grain: grain, seed: seed)
     }
 
     private static func write(_ rows: [String], _ url: URL) throws {

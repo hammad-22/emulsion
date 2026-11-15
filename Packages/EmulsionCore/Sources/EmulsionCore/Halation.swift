@@ -69,9 +69,6 @@ enum Halation {
     /// at 4032×3024 (the blurs then sit at different scales, so they are mixed at full size).
     static let minBlurPixels = 2.0
     static let maxHalvings = 3
-    /// Blurs narrower than this (reduced pixels) use the exact kernel `gaussianPass`: CIGaussianBlur's
-    /// width was measured 0.9–1.2% off at 1.9–2.5 px and within 0.5% from 3.8 px up.
-    static let exactBlurPixels = 4.0
 
     /// The pixels of `extent` (rounded out to whole pixels) that the reflection at its edges (kernel
     /// `mirroredEdges`) reads to fill `rect`: the rect itself inside, its reflection at the edges

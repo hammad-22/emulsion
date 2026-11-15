@@ -18,7 +18,7 @@ public struct Adjustments: Codable, Equatable, Sendable {
     /// Local tone (−1 … 1). Positive highlights recover, positive shadows lift.
     public var highlights: Double = 0
     public var shadows: Double = 0
-    /// Texture (0 … 1).
+    /// Grain amount (see `grainRange(for:)`; 1 is the datasheet granularity) and halation (0 … 1).
     public var grain: Double = FilmLook.grainAmount
     public var halation: Double = 0.35
     /// Grain clump size (1…3, a frame that many times narrower) and its color part (0 mono … 1 measured).
@@ -34,6 +34,14 @@ public struct Adjustments: Codable, Equatable, Sendable {
     public var whiteBalance: CameraWhiteBalance?
 
     public init() {}
+
+    /// The Grain control's range: film grain to `FilmLook.maximumGrainAmount`, the digicam process's noise to 1.
+    public static func grainRange(for process: RenderProcess) -> ClosedRange<Double> {
+        switch process {
+        case .film: 0...FilmLook.maximumGrainAmount
+        case .digicam: 0...1
+        }
+    }
     public static let neutral: Adjustments = {
         var a = Adjustments()
         a.grain = 0
@@ -45,7 +53,7 @@ public struct Adjustments: Codable, Equatable, Sendable {
         var a = self
         a.exposure = min(3, max(-3, exposure))
         for k in [\Adjustments.warmth, \.tint, \.color, \.highlights, \.shadows] { a[keyPath: k] = min(1, max(-1, a[keyPath: k])) }
-        a.grain = min(1, max(0, grain))
+        a.grain = min(Self.grainRange(for: process).upperBound, max(0, grain))
         a.halation = min(1, max(0, halation))
         a.grainSize = min(3, max(1, grainSize))
         a.grainColor = min(1, max(0, grainColor))
