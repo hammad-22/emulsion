@@ -6,7 +6,6 @@ struct ImageFileError: Error, CustomStringConvertible {
     let description: String
 }
 
-/// ImageIO reads and writes, and raw 16-bit sample access, shared by goldens and frozen scenes.
 enum ImageFile {
     static func write(_ image: CGImage, as type: UTType, properties: CFDictionary? = nil) throws -> Data {
         let data = NSMutableData()
@@ -25,7 +24,6 @@ enum ImageFile {
         return image
     }
 
-    /// Raw 16-bit samples of a CGImage with 3 or 4 components per pixel, in host byte order.
     struct Samples {
         let values: [UInt16]
         let rowSamples: Int
@@ -41,7 +39,6 @@ enum ImageFile {
             return SIMD3(values[c], values[c + 1], values[c + 2])
         }
 
-        /// The fourth component (4-component layouts only).
         func alpha(ofPixel index: Int) -> UInt16 { values[pixelStart(index) + (alphaFirst ? 0 : 3)] }
     }
 
@@ -53,7 +50,7 @@ enum ImageFile {
             throw ImageFileError(description: "unsupported layout: \(image.bitsPerComponent) bits, \(image.bitsPerPixel) bits per pixel")
         }
         let alphaFirstLayouts: Set<CGImageAlphaInfo> = [.first, .premultipliedFirst, .noneSkipFirst]
-        // 16-bit samples without an explicit order are big-endian (Quartz default).
+        // 16-bit samples without an explicit order are big-endian (the Quartz default).
         let bigEndian = image.bitmapInfo.intersection(.byteOrderMask) != .byteOrder16Little
         let values = data.withUnsafeBytes { bytes in
             bytes.bindMemory(to: UInt16.self).map { bigEndian ? UInt16(bigEndian: $0) : UInt16(littleEndian: $0) }

@@ -1,13 +1,6 @@
 import Foundation
 
-/// The density definitions the dye-set checks integrate through, read from a local directory of standards tables
-/// (`--standards`, see `directory(flag:environment:referenceData:)`); each file must match the SHA-256 in
-/// `StandardsManifest`.
-///
-/// - Status M: ISO 5-3:1995 Table 4 tabulates log10 spectral products, 5.000 at the peak, at 10 nm. Interpolated
-///   linearly in log10 and extrapolated in log10 with the table's slopes below and above each channel's span.
-/// - APD: SMPTE ST 2065-2:2020 element a, at 2 nm, linear between samples, zero outside.
-/// - RP 180: SMPTE RP 180-1999 Table 1, at 10 nm, linear between samples, zero outside.
+/// Status M (ISO 5-3:1995), APD (ST 2065-2:2020) and RP 180 tables (docs/CONSTANTS.md).
 struct StandardsTables: Sendable, Equatable {
     static let statusMFile = "iso5-3-1995-status-m.csv"
     static let statusMSlopesFile = "iso5-3-1995-status-m.slopes.json"
@@ -15,25 +8,21 @@ struct StandardsTables: Sendable, Equatable {
     static let rp180File = "rp180-1999-table1.csv"
     static let files = [statusMFile, statusMSlopesFile, academyPrintingDensityFile, rp180File]
     static let environmentVariable = "EMULSION_STANDARDS_DIR"
-    /// The default folder, beside the reference data (`~/Documents/Emulsion Research/standards` by default).
     static let siblingFolderName = "standards"
-    /// ISO 5-3 Table 4 normalizes each channel's log10 spectral product to this at its peak.
+    /// ISO 5-3 Table 4 log10 spectral product at each channel's peak.
     static let statusMLogPeak = 5.0
 
     let statusM: SpectralResponsivities
     let academyPrintingDensity: SpectralResponsivities
     let rp180: SpectralResponsivities
-    /// The manifest entries of the files read, in `files` order.
     let provenance: [StandardsManifest.Entry]
 
-    /// The standards tables directory when no flag is given; it may not exist.
     static var defaultDirectory: URL {
         directory(
             flag: nil, environment: ProcessInfo.processInfo.environment[environmentVariable],
             referenceData: DigitizedStock.referenceDataDirectory)
     }
 
-    /// `flag` if given, else a non-empty `environment`, else `siblingFolderName` beside the resolved `referenceData`.
     static func directory(flag: URL?, environment: String?, referenceData: URL) -> URL {
         URL.resolve(
             flag: flag, environment: environment,

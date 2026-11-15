@@ -3,10 +3,12 @@
 #   Tools/review-renders.sh [base-ref] [output-folder]
 # "before" is base-ref (default origin/main, fetched first), built in a temporary worktree; "after" is this
 # checkout as it is, uncommitted changes included. Each sample gives
-# <sample>.<neutral|default>.<before|after>.jpg in the output folder (default
-# ~/Documents/Emulsion Review/renders/<base>-vs-<head>), so Quick Look can flip between a pair.
+# <sample>.<neutral|default|digicam|digicam-strong>.<before|after>.jpg in the output folder (default
+# ~/Documents/Emulsion Review/renders/<base>-vs-<head>), so Quick Look can flip between a pair (a base
+# without the digicam process renders only the film looks).
 # Samples: EMULSION_REVIEW_SAMPLES, else ~/Documents/Emulsion Research/samples/proraw-misc;
-# only *_CC0.dng files are rendered. Nothing here goes into git.
+# only *_CC0.dng files are rendered, unless EMULSION_REVIEW_INCLUDE_LOCAL=1, which also renders the
+# other DNGs into local-only/ (the owner's review only; never share them). Nothing here goes into git.
 set -eu
 root=$(CDPATH= cd -- "$(dirname -- "$0")/.." && pwd)
 base=${1:-origin/main}

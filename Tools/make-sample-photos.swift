@@ -1,5 +1,4 @@
-// Generates the synthetic sample photos bundled with EmulsionKit, so the app has something
-// to develop on an empty library. Generated, not photographed: no license questions.
+// Generates EmulsionKit's bundled sample photos: synthetic, so no licence questions.
 // Usage: swift Tools/make-sample-photos.swift
 import CoreImage
 import CoreImage.CIFilterBuiltins
@@ -10,6 +9,7 @@ let output = root.appendingPathComponent("Packages/EmulsionKit/Sources/EmulsionK
 let frame = CGRect(x: 0, y: 0, width: 1800, height: 1200)
 let context = CIContext()
 let sRGB = CGColorSpace(name: CGColorSpace.sRGB)!
+let jpegQuality = 0.85
 
 func color(_ r: Double, _ g: Double, _ b: Double, _ a: Double = 1) -> CIColor { CIColor(red: r, green: g, blue: b, alpha: a) }
 func solid(_ c: CIColor, _ rect: CGRect = frame) -> CIImage { CIImage(color: c).cropped(to: rect) }
@@ -25,7 +25,7 @@ func glow(at center: CGPoint, core: Double, falloff: Double, _ inner: CIColor, _
 func save(_ image: CIImage, _ name: String) throws {
     try context.writeJPEGRepresentation(
         of: image.cropped(to: frame), to: output.appendingPathComponent(name), colorSpace: sRGB,
-        options: [CIImageRepresentationOption(rawValue: kCGImageDestinationLossyCompressionQuality as String): 0.85])
+        options: [CIImageRepresentationOption(rawValue: kCGImageDestinationLossyCompressionQuality as String): jpegQuality])
 }
 
 try FileManager.default.createDirectory(at: output, withIntermediateDirectories: true)

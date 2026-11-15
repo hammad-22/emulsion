@@ -2,8 +2,6 @@ import EmulsionKit
 import EmulsionUI
 import SwiftUI
 
-/// Select at the top; at the bottom, within reach of a thumb, Import, or while selecting,
-/// Delete.
 struct LibraryToolbar: ToolbarContent {
     @Binding var selection: LibrarySelection
     let onImportError: (any Error) -> Void

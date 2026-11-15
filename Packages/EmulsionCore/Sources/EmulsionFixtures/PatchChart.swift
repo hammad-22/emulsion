@@ -1,5 +1,4 @@
-/// A grid of flat patches, `cell` pixels square, row-major from the top-left. Cells are large
-/// enough that demosaic and denoise edges leave each centre untouched.
+/// Flat patches, row-major from the top-left, large enough for demosaic edges to miss the centres.
 public struct PatchChart: Sendable {
     private static let minimumCell = 32
 
@@ -19,14 +18,12 @@ public struct PatchChart: Sendable {
     public var width: Int { columns * cell }
     public var height: Int { rows * cell }
 
-    /// The patch under pixel (x, y), y = 0 the top row; black outside the patches.
     public func value(x: Int, y: Int) -> SIMD3<Double> {
         let index = (y / cell) * columns + x / cell
         return index < patches.count ? patches[index] : .zero
     }
 
-    /// The central quarter (half width, half height) of patch `index` in top-left pixel
-    /// coordinates, for an image drawn at `scale` times the chart size.
+    /// The central quarter of patch `index`, top-left pixel coordinates, at `scale` × the chart.
     public func centre(of index: Int, scale: Double = 1) -> (x: Range<Int>, y: Range<Int>) {
         let size = Double(cell) * scale
         let left = Double(index % columns) * size
@@ -36,8 +33,7 @@ public struct PatchChart: Sendable {
         return (lower(left)..<upper(left), lower(top)..<upper(top))
     }
 
-    /// Mean of each patch's central quarter in `pixels` (bottom row first, as `Fixtures.linear`
-    /// returns them) of an image `width` × `height` drawn from this chart at any scale.
+    /// Mean of each patch's central quarter in `pixels` (bottom row first, any scale).
     public func means(of pixels: [SIMD3<Double>], width: Int, height: Int) -> [SIMD3<Double>] {
         let scale = Double(width) / Double(self.width)
         return patches.indices.map { index in

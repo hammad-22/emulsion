@@ -2,12 +2,10 @@ import EmulsionKit
 import SwiftUI
 
 #if DEBUG
-    /// Viewfinder frame time and rate, for profiling on device. Launch with
-    /// `--viewfinder-timing` to show it.
     struct ViewfinderTimingOverlay: View {
         let model: CameraModel
 
-        static var isEnabled: Bool { ProcessInfo.processInfo.arguments.contains("--viewfinder-timing") }
+        static var isEnabled: Bool { LaunchArgument.isPresent(LaunchArgument.viewfinderTiming) }
 
         var body: some View {
             let timing = model.viewfinderTiming

@@ -1,13 +1,11 @@
 import CryptoKit
 import Foundation
 
-/// One digitized datasheet chart, read from its CSV: a shared x column and one curve per remaining column.
-/// An empty cell means the chart doesn't draw that curve at that x.
+/// One traced chart from its CSV; an empty cell means the curve isn't drawn at that x.
 struct DigitizedChart: Sendable, Equatable {
     enum Kind: String, CaseIterable, Sendable {
         case characteristic, spectralSensitivity, spectralDyeDensity
 
-        /// The column layouts this tool reads; the first column is x.
         var acceptedHeaders: [[String]] {
             switch self {
             case .characteristic: [["log_exposure_lux_s", "red", "green", "blue"]]
@@ -23,11 +21,9 @@ struct DigitizedChart: Sendable, Equatable {
     }
 
     let kind: Kind
-    /// What the manifest says about this chart: source page, conditions, traced extents, uncertainty.
     let entry: StockManifest.Chart
     let file: String
     let curves: [DigitizedCurve]
-    /// SHA-256 (hex) of the CSV bytes, so a fit can name exactly what it used.
     let sha256: String
 
     init(kind: Kind, entry: StockManifest.Chart, file: String, data: Data) throws(FitError) {
@@ -37,7 +33,6 @@ struct DigitizedChart: Sendable, Equatable {
         try self.init(kind: kind, entry: entry, file: file, text: text, sha256: Self.sha256(of: data))
     }
 
-    /// - Parameter sha256: the digest of the file's bytes, already computed by the caller.
     init(kind: Kind, entry: StockManifest.Chart, file: String, text: String, sha256: String) throws(FitError) {
         self.kind = kind
         self.entry = entry
@@ -50,7 +45,6 @@ struct DigitizedChart: Sendable, Equatable {
 
     func curve(named name: String) -> DigitizedCurve? { curves.first { $0.name == name } }
 
-    /// The x values where every named curve has a sample, with those samples column by column.
     func aligned(_ names: [String]) -> (x: [Double], columns: [[Double]])? {
         let picked = names.compactMap(curve(named:))
         guard picked.count == names.count, let first = picked.first else { return nil }

@@ -9,10 +9,8 @@ struct PhotoEditor: View {
     @State private var selection: [AdjustmentGroup: String] = [:]
     @Environment(\.scenePhase) private var scenePhase
 
-    // Fits the same labels and controls as the iPhone panel, with room to resize.
     private let minimumPanelWidth: CGFloat = 340
     private let maximumPanelWidth: CGFloat = 400
-    // Keep a useful photo area when the window or split divider is resized.
     private let minimumPhotoSize: CGFloat = 320
 
     init(photo: PhotoRecord, store: PhotoStore) {
@@ -40,6 +38,7 @@ struct PhotoEditor: View {
             LooksButton(session: session).disabled(showsOriginal)
             Toggle("Compare", systemImage: "square.split.2x1", isOn: $showsOriginal)
             Button("Reset Edits", systemImage: "arrow.counterclockwise") { session.reset() }
+                .disabled(!session.isEdited)
         }
         .task { await session.editorAppeared() }
         .onDisappear { session.close() }

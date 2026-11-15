@@ -1,10 +1,8 @@
 import Foundation
 import simd
 
-/// The scene and synthetic files used to measure RAW develop (MOV-79): a half-stop neutral
-/// wedge around mid-gray followed by chromatic patches, two of them outside sRGB.
+/// The RAW develop chart (MOV-79): a half-stop neutral wedge, then chromatic patches (docs).
 public enum RAWDevelopChart {
-    /// Linear Display P3 → linear sRGB (both D65).
     static let linearSRGBFromP3 =
         SyntheticDNG.xyzFromLinearSRGB.inverse
         * simd_double3x3(rows: [
@@ -14,22 +12,18 @@ public enum RAWDevelopChart {
         ])
 
     public static let midGray = 0.18
-    /// With the default camera the top three patches clip green at the sensor, and +3.5 also clips blue.
+    /// With the default camera the top three patches clip green at the sensor.
     public static let wedgeStops = Array(stride(from: -4.0, through: 3.5, by: 0.5))
-    /// Display P3 colours with a negative linear sRGB component: P3 red at 0.9 (G −0.038,
-    /// B −0.018 in sRGB) and a saturated green (R −0.118).
+    /// P3 red at 0.9 and a saturated green: negative in linear sRGB.
     public static let outOfSRGBP3: [SIMD3<Double>] = [[0.9, 0, 0], [0.05, 0.8, 0.1]]
-    /// Linear sRGB: the six chromatic `SceneFixtures.patchesP3`, then `outOfSRGBP3`.
     public static let chromaticScene: [SIMD3<Double>] =
         SceneFixtures.patchesP3.prefix(6).map { linearSRGBFromP3 * SIMD3<Double>($0) }
         + outOfSRGBP3.map { linearSRGBFromP3 * $0 }
     static let neutralScene = wedgeStops.map { SIMD3(repeating: midGray * pow(2, $0)) }
-    /// Linear sRGB scene: the neutral wedge, then the chromatic patches.
     public static let scene = neutralScene + chromaticScene
     public static let neutralIndices = neutralScene.indices
     public static let chromaticIndices = neutralScene.count..<scene.count
     public static let outOfSRGBIndices = (scene.count - outOfSRGBP3.count)..<scene.count
-    /// Display P3 colours outside sRGB survive this camera's sensor.
     public static let camera = SyntheticDNG.wideGamutCameraFromXYZ
 
     public static func chart(cell: Int = 48) -> PatchChart { PatchChart(scene, cell: cell) }
@@ -38,10 +32,7 @@ public enum RAWDevelopChart {
         scene.map { SyntheticDNG.camera(linearSRGB: $0, cameraFromXYZ: cameraFromXYZ) }
     }
 
-    /// Camera values of `scene` (linear sRGB reflectances) lit by a light of chromaticity `light`
-    /// instead of D65, at the same luminance: each D65 value scaled per channel by the ratio of
-    /// the two lights in camera space (von Kries in camera space). Exact for neutral patches; for
-    /// chromatic ones a simple model, not a spectral simulation.
+    /// Camera values under `light` instead of D65: von Kries in camera space, exact for neutrals.
     public static func cameraValues(_ scene: [SIMD3<Double>], light: SIMD2<Double>) -> [SIMD3<Double>] {
         let lightRatio =
             SyntheticDNG.camera(chromaticity: light, cameraFromXYZ: camera)
@@ -49,10 +40,7 @@ public enum RAWDevelopChart {
         return cameraValues(scene).map { $0 * lightRatio }
     }
 
-    /// A DNG of `chart` (scene values in linear sRGB) as `camera` records it lit by a light of
-    /// chromaticity `light`, whose AsShotNeutral is the camera neutral of `taggedLight`: the light
-    /// the camera believed it saw. At the D65 defaults the stored neutral is `SyntheticDNG.daylightNeutral`
-    /// to the six decimals the file keeps, so the file is the one the MOV-79 and MOV-134 measurements used.
+    /// A DNG of `chart` lit by `light`, its AsShotNeutral set for `taggedLight`.
     public static func dng(
         _ mosaic: SyntheticDNG.Mosaic, chart: PatchChart, light: SIMD2<Double> = SyntheticDNG.d65Chromaticity,
         taggedLight: SIMD2<Double> = SyntheticDNG.d65Chromaticity, baselineStops: Double = 0, profile: SyntheticDNG.Profile? = nil

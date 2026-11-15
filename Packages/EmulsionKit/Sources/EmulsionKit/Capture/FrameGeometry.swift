@@ -1,11 +1,8 @@
 import CoreGraphics
 import ImageIO
 
-/// Converts between the upright frame the viewfinder shows and the camera sensor's native
-/// landscape orientation, given the clockwise rotation (0, 90, 180, 270) between them.
+/// Upright viewfinder frame ↔ sensor-native orientation, for a clockwise rotation in degrees.
 enum FrameGeometry {
-    /// A point of interest for `AVCaptureDevice` (sensor-native, (0,0) top-left, (1,1)
-    /// bottom-right per `focusPointOfInterest`) from a normalized point in the upright frame.
     static func devicePoint(forFramePoint point: CGPoint, rotationAngle: Double) -> CGPoint {
         switch quarterTurns(rotationAngle) {
         case 1: CGPoint(x: point.y, y: 1 - point.x)
@@ -15,8 +12,6 @@ enum FrameGeometry {
         }
     }
 
-    /// The orientation that displays a sensor-native image upright after rotating it
-    /// clockwise by `rotationAngle`.
     static func orientation(forRotationAngle rotationAngle: Double) -> CGImagePropertyOrientation {
         switch quarterTurns(rotationAngle) {
         case 1: .right

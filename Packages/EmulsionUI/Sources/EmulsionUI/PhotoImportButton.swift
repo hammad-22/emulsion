@@ -3,8 +3,7 @@ import EmulsionKit
 import PhotosUI
 import SwiftUI
 
-/// Picks photos from the system library and adds their original files to the store.
-/// Reports the first failure through `onError`; the rest of the batch still imports.
+/// Imports the picked photos' originals; reports the first failure while the rest still import.
 public struct PhotoImportButton: View {
     @Environment(PhotoStore.self) private var store
     @State private var selection: [PhotosPickerItem] = []
@@ -12,14 +11,12 @@ public struct PhotoImportButton: View {
     private let fillsWidth: Bool
     private let onError: (any Error) -> Void
 
-    /// `fillsWidth` stretches the label, for a button stacked with others of equal width.
     public init(fillsWidth: Bool = false, onError: @escaping (any Error) -> Void) {
         self.fillsWidth = fillsWidth
         self.onError = onError
     }
 
     public var body: some View {
-        // A plain button presenting the picker, so button and label styles apply as usual.
         Button {
             isPicking = true
         } label: {
@@ -30,7 +27,7 @@ public struct PhotoImportButton: View {
         .onChange(of: selection) { _, items in
             guard !items.isEmpty else { return }
             selection = []
-            // Keep the batch alive when its first photo replaces the empty-state view.
+            // Unstructured, so the batch survives its first photo replacing the empty state.
             Task { await importPhotos(items) }
         }
     }

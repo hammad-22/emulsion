@@ -3,10 +3,7 @@ import EmulsionKit
 import EmulsionUI
 import SwiftUI
 
-/// The phone editor: the photo with one ruler's panel below it, or beside it in landscape,
-/// revealed by Adjust.
 struct CompactEditorLayout<Photo: View>: View {
-    /// The height available, which caps the stacked panel.
     let height: CGFloat
     let showsAdjustments: Bool
     let isEditable: Bool
@@ -18,32 +15,28 @@ struct CompactEditorLayout<Photo: View>: View {
 
     @Environment(\.horizontalSizeClass) private var horizontalSizeClass
     @Environment(\.verticalSizeClass) private var verticalSizeClass
-    /// Gives the ruler useful travel beside the photo in landscape.
     private let sidePanelWidth: CGFloat = 360
-    /// Stacked, the photo keeps at least half the height; at accessibility text sizes the
-    /// panel scrolls instead of shrinking the photo further.
     private let maximumPanelFraction: CGFloat = 0.5
+
+    @State private var panelHeight: CGFloat = 0
 
     var body: some View {
         layout {
             photo().padding(isWide ? FilmLabLayout.inset : 0)
             controls
                 .disabled(!isEditable)
-                .frame(
-                    maxWidth: isWide ? (showsAdjustments ? sidePanelWidth : 0) : .infinity,
-                    maxHeight: showsAdjustments ? (isWide ? .infinity : height * maximumPanelFraction) : 0
-                )
-                .fixedSize(horizontal: false, vertical: !isWide)
+                .frame(maxWidth: isWide ? (showsAdjustments ? sidePanelWidth : 0) : .infinity)
                 .layoutPriority(1)
         }
     }
 
     private var controls: some View {
-        ViewThatFits(in: .vertical) {
-            panel
-            ScrollView { panel }
+        ScrollView {
+            panel.onGeometryChange(for: CGFloat.self, of: \.size.height) { panelHeight = $0 }
         }
-        .frame(height: showsAdjustments ? nil : 0)
+        .scrollBounceBehavior(.basedOnSize)
+        .defaultScrollAnchor(.center, for: .alignment)
+        .frame(height: controlsHeight)
         .clipped()
         .opacity(showsAdjustments ? 1 : 0)
         .allowsHitTesting(showsAdjustments)
@@ -53,6 +46,11 @@ struct CompactEditorLayout<Photo: View>: View {
     private var panel: some View {
         AdjustmentPanel(adjustments: $adjustments, group: $group, selection: $selection, whiteBalanceAsShot: whiteBalanceAsShot)
             .padding(.horizontal, FilmLabLayout.inset)
+    }
+
+    private var controlsHeight: CGFloat? {
+        guard showsAdjustments else { return 0 }
+        return isWide ? nil : min(panelHeight, height * maximumPanelFraction)
     }
 
     private var isWide: Bool { horizontalSizeClass == .regular || verticalSizeClass == .compact }

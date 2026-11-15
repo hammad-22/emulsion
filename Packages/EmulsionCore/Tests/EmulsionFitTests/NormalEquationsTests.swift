@@ -23,7 +23,6 @@ struct NormalEquationsTests {
     }
 
     @Test func singularMatrixHasNoSolution() {
-        // Third row = first + second.
         let singular: [Double] = [1, 2, 3, 2, 5, 7, 3, 7, 10]
         #expect(NormalEquations.solve(singular, [1, 1, 1]) == nil)
         #expect(NormalEquations.inverse(singular, order: 3) == nil)

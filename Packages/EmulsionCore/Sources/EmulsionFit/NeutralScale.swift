@@ -1,13 +1,10 @@
-/// The negative's neutral scale read through its dye set. At every characteristic-chart sample the Status M density
-/// above each channel's lowest traced density fixes three dye amounts (Newton, from the previous sample's amounts);
-/// those amounts then give the printing densities above minimum density.
+/// The neutral scale read through the dye set (docs/CONSTANTS.md, "NeutralScale").
 struct NeutralScale: Sendable, Equatable {
     struct Sample: Codable, Sendable, Equatable {
-        /// log10 lux-seconds, the characteristic chart's x.
+        /// log10 lux-seconds.
         let logExposure: Double
-        /// Red, green, blue: chart density minus that channel's lowest traced density.
+        /// Red, green, blue, above each channel's lowest traced density.
         let statusM: [Double]
-        /// Cyan, magenta, yellow.
         let dyeAmounts: [Double]
         let academyPrintingDensity: [Double]
         let rp180PrintingDensity: [Double]
@@ -15,9 +12,6 @@ struct NeutralScale: Sendable, Equatable {
 
     let samples: [Sample]
 
-    /// - Parameters:
-    ///   - logExposure: ascending samples where every channel is traced.
-    ///   - densities: red, green and blue Status M densities at those samples.
     static func solve(logExposure: [Double], densities: [[Double]], dyeSet: NegativeDyeSet, standards: StandardsTables)
         throws(DyeSetError) -> NeutralScale
     {
@@ -39,7 +33,6 @@ struct NeutralScale: Sendable, Equatable {
         return NeutralScale(samples: samples)
     }
 
-    /// One channel (or dye) of one quantity along the scale, as a curve for `NegativeFit.straightLineGamma`.
     func curve(_ name: String, channel: Int, _ value: (Sample) -> [Double]) -> DigitizedCurve {
         DigitizedCurve(name: name, x: samples.map(\.logExposure), y: samples.map { value($0)[channel] })
     }

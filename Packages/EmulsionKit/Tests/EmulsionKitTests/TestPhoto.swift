@@ -16,6 +16,17 @@ enum TestPhoto {
             .jpegRepresentation(of: SceneFixtures.patches(), colorSpace: space)!
     }()
 
+    /// A JPEG with fine detail (stripes over a gradient), where JPEG compression shows.
+    static let detailedSize = (width: 640, height: 480)
+    static let detailedJPEG: Data = {
+        let space = CGColorSpace(name: CGColorSpace.sRGB)!
+        let image = Fixtures.image(width: detailedSize.width, height: detailedSize.height, space: space) { x, y in
+            let stripe: Float = (x / 2 + y / 3).isMultiple(of: 2) ? 0.15 : 0
+            return SIMD3(Float(x) / 640 * 0.7 + stripe, Float(y) / 480 * 0.7 + stripe, 0.4 + stripe)
+        }
+        return CIContext(options: [.useSoftwareRenderer: true]).jpegRepresentation(of: image, colorSpace: space)!
+    }()
+
     /// A synthetic DNG (384 × 144) whose profile brightens through a gain table, as 48 MP ProRAW
     /// does, so its develop measures an exposure anchor (about 2 stops).
     static let anchoredRAW = RAWDevelopChart.dng(
@@ -70,6 +81,17 @@ enum TestPixels {
     static func rgba(_ image: CGImage) -> [UInt8] {
         guard let data = image.dataProvider?.data as Data? else { return [] }
         return (0..<image.height).flatMap { row in data[(row * image.bytesPerRow)..<(row * image.bytesPerRow + image.width * 4)] }
+    }
+
+    /// `image` drawn into RGBA8 Display P3, so images decoded in different layouts compare byte for byte.
+    static func redrawn(_ image: CGImage) throws -> CGImage {
+        let space = CGColorSpace(name: CGColorSpace.displayP3)!
+        let context = try #require(
+            CGContext(
+                data: nil, width: image.width, height: image.height, bitsPerComponent: 8, bytesPerRow: 0, space: space,
+                bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue))
+        context.draw(image, in: CGRect(x: 0, y: 0, width: image.width, height: image.height))
+        return try #require(context.makeImage())
     }
 
     /// Max and mean absolute difference over the colour channels, in 8-bit codes.

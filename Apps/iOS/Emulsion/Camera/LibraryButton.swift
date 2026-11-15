@@ -2,7 +2,6 @@ import EmulsionKit
 import EmulsionUI
 import SwiftUI
 
-/// The newest photo, opening the library; the library zooms out of it.
 struct LibraryButton: View {
     let photo: PhotoRecord?
     let transition: Namespace.ID
@@ -10,7 +9,7 @@ struct LibraryButton: View {
 
     static let transitionID = "library"
     static let size: CGFloat = 56
-    private let corner: CGFloat = 12
+    private static let corner: CGFloat = 12
 
     @Environment(PhotoStore.self) private var store
 
@@ -23,11 +22,11 @@ struct LibraryButton: View {
                     Image(systemName: "photo.on.rectangle")
                         .font(.title3)
                         .frame(maxWidth: .infinity, maxHeight: .infinity)
-                        .glassEffect(.regular, in: .rect(cornerRadius: corner))
+                        .glassEffect(.regular, in: .rect(cornerRadius: Self.corner))
                 }
             }
             .frame(width: Self.size, height: Self.size)
-            .clipShape(.rect(cornerRadius: corner))
+            .clipShape(.rect(cornerRadius: Self.corner))
         }
         .buttonStyle(.plain)
         .matchedTransitionSource(id: Self.transitionID, in: transition)

@@ -1,18 +1,15 @@
 import XCTest
 
-/// The camera as the app opens on it, in the Simulator's stand-in camera (the sample
-/// photos as a live viewfinder): switch lens, pick a recipe, tap to focus, take a photo, find
-/// it in the library, delete it and come back. Screenshots are kept in the result bundle as PR proof.
 final class CameraUITests: XCTestCase {
     @MainActor
     func testCaptureAppearsInLibrary() throws {
         let app = XCUIApplication()
         app.launch()
 
-        let viewfinder = app.descendants(matching: .any)["viewfinder"]
+        let viewfinder = app.descendants(matching: .any)[AccessibilityID.viewfinder]
         XCTAssertTrue(viewfinder.waitForExistence(timeout: 10))
         let library = app.buttons["Library"]
-        let photos = app.buttons.matching(NSPredicate(format: "label BEGINSWITH 'Photo from'"))
+        let photos = app.photos
         let photosBefore = try countPhotos(app, library: library, photos: photos)
         XCTAssertTrue(viewfinder.waitForExistence(timeout: 5))
         sleep(1)
@@ -42,7 +39,7 @@ final class CameraUITests: XCTestCase {
         keepScreenshot(app, named: "Camera 2b Warm Light")
 
         viewfinder.coordinate(withNormalizedOffset: CGVector(dx: 0.3, dy: 0.4)).tap()
-        XCTAssertTrue(app.descendants(matching: .any)["focus-reticle"].waitForExistence(timeout: 1))
+        XCTAssertTrue(app.descendants(matching: .any)[AccessibilityID.focusReticle].waitForExistence(timeout: 1))
         keepScreenshot(app, named: "Camera 3 Focus")
 
         app.buttons["Take Photo"].tap()
@@ -56,7 +53,7 @@ final class CameraUITests: XCTestCase {
         sleep(1)
         keepScreenshot(app, named: "Camera 5 Library")
 
-        // Deletes the capture (newest first), leaving the library as it was for the next test.
+        // Newest first: deleting the capture leaves the library as it was for the next test.
         photos.firstMatch.press(forDuration: 1)
         app.buttons["Delete"].tap()
         app.buttons["Delete 1 Photo"].tap()
@@ -67,32 +64,28 @@ final class CameraUITests: XCTestCase {
         XCTAssertTrue(app.buttons["Take Photo"].isEnabled, "the camera runs again")
         XCTAssertEqual(recipe.value as? String, "Warm Light", "the recipe is kept")
 
-        // Back to Everyday, so the next run starts where this one did.
         if !app.buttons["Everyday"].exists { recipe.tap() }
         app.buttons["Everyday"].tap()
         XCTAssertEqual(recipe.value as? String, "Everyday")
     }
 
-    /// The system pauses the camera (another app takes it): the frozen viewfinder says why and
-    /// the shutter and lenses stop working, without an alert (MOV-133).
     @MainActor
     func testInterruptionPausesTheCamera() {
         let app = XCUIApplication()
-        app.launchArguments = ["-camera-scenario", "in-use"]
+        app.launchArguments = LaunchArgument.cameraScenarioArguments("in-use")
         app.launch()
 
-        XCTAssertTrue(app.descendants(matching: .any)["camera-paused"].waitForExistence(timeout: 10))
+        XCTAssertTrue(app.descendants(matching: .any)[AccessibilityID.cameraPaused].waitForExistence(timeout: 10))
         XCTAssertTrue(app.staticTexts["Camera in Use"].exists, "VoiceOver can read why")
         XCTAssertFalse(app.buttons["Take Photo"].isEnabled)
         XCTAssertFalse(app.alerts.firstMatch.exists)
         keepScreenshot(app, named: "Camera 6 Paused")
     }
 
-    /// A session that fails offers to try again, and trying again brings the viewfinder back.
     @MainActor
     func testFailedCameraCanBeRetried() {
         let app = XCUIApplication()
-        app.launchArguments = ["-camera-scenario", "failed"]
+        app.launchArguments = LaunchArgument.cameraScenarioArguments("failed")
         app.launch()
 
         let retry = app.buttons["Try Again"]
@@ -100,11 +93,10 @@ final class CameraUITests: XCTestCase {
         keepScreenshot(app, named: "Camera 7 Failed")
         retry.tap()
 
-        XCTAssertTrue(app.descendants(matching: .any)["viewfinder"].waitForExistence(timeout: 5))
+        XCTAssertTrue(app.descendants(matching: .any)[AccessibilityID.viewfinder].waitForExistence(timeout: 5))
         XCTAssertTrue(app.buttons["Take Photo"].isEnabled)
     }
 
-    /// Opens the library to count what's already there, then returns to the camera.
     @MainActor
     private func countPhotos(_ app: XCUIApplication, library: XCUIElement, photos: XCUIElementQuery) throws -> Int {
         XCTAssertTrue(library.waitForExistence(timeout: 5))

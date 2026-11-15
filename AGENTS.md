@@ -3,6 +3,7 @@
 A free, open-source film lab for iPhone (Mac later): RAW and log footage in, a simulated negative → print film process out. **The engine is the product**: fast, honest about what it models, and verified.
 
 - Background: `docs/ENGINE.md` (how it works), `docs/DECISIONS.md` (owner decisions), `docs/RESEARCH.md`, `docs/MARKET-RESEARCH.md`.
+- Constant sources: `docs/CONSTANTS.md` (non-film engine constants), `docs/DIGICAM.md` (the digicam process).
 - Film physics for E2 work: `docs/FILM-THEORY.md` (equations, sources, what the engine models vs approximates, gap list) and `docs/STOCK-DATA.md` (datasheet inventory). Read both before changing the film model.
 - Work: Linear team **Emulsion** (key `MOV`). GitHub: `hammad-22/emulsion` (open source, Apache-2.0).
 - This file is the single source of rules for every coding agent (Codex reads it directly; `CLAUDE.md` imports it). Folder-specific rules live in nested `AGENTS.md` files: `Packages/EmulsionCore/Kernels/`, `Packages/EmulsionCore/Tests/`, `Packages/EmulsionKit/`, `Packages/EmulsionUI/`, `Apps/iOS/`, `Apps/macOS/`. Read the nested file before editing in that folder.
@@ -12,8 +13,8 @@ iOS 26 / macOS 26 only, iPhone 17 Pro and iPhone Duo as targets. Swift 6.4 toolc
 
 ## Layout
 - `Packages/EmulsionCore/`: the engine package. Every look decision lives here.
-  - `Sources/EmulsionCore/`: film math (`FilmModel`), input transforms (`ColorSpaces`), develop (`Developer`; `RAWDecoder` keeps one RAW file's decoder alive for white balance changes), render graph and export (`Renderer`), stock files (`Resources/Stocks/*.json`, loaded through `FilmStock`; the default is `FilmLook.stock`), texture constants (`FilmLook`), kernel argument packing (`FilmModel+Kernel`).
-  - `Kernels/Emulsion.ci.metal`: GPU kernels; must match the Swift mirror. Compiled `.metallib`s are checked in under `Resources/Kernels/`.
+  - `Sources/EmulsionCore/`: film math (`FilmModel`), input transforms (`ColorSpaces`), develop (`Developer`; `RAWDecoder` keeps one RAW file's decoder alive for white balance changes), render graph and export (`Renderer`), stock files (`Resources/Stocks/*.json`, loaded through `FilmStock`; the default is `FilmLook.stock`), texture constants (`FilmLook`), kernel argument packing (`FilmModel+Kernel`). The non-film digicam process (`Adjustments.process`, docs/ENGINE.md "Non-film looks"): `Renderer+Digicam`, `DigicamModel` (Swift mirror), `DigicamLook` (constants).
+  - `Kernels/`: GPU kernels, `Emulsion.ci.metal` (film) and `Digicam.ci.metal` (digicam), linked into one metallib; must match the Swift mirrors. Compiled `.metallib`s are checked in under `Resources/Kernels/`.
   - `Sources/EmulsionFixtures/`: synthetic test images. `Tests/`: the test suite, with visual regression goldens in `Tests/EmulsionCoreTests/Goldens/` and frozen CC0 photos in `Scenes/`.
   - `Sources/EmulsionFit/` + `Sources/emulsion-fit/`: offline stock fitting (`emulsion-fit` CLI: manifest and reference-data loader and checks, bounded least squares, negative-curve fit). `Sources/EmulsionFit/Resources/StockData/<stock>/` holds the provenance manifests and the fitted stock files (`negative-fit.stock.json`; parameters and provenance only, not loaded by the engine until MOV-25). The traced curve CSVs are not in the repo (`docs/DECISIONS.md`, 12 Nov 2026): they are local reference data, pinned by SHA-256 in the manifests; never commit them. Not a library product, so no app can link it. The tracing tools are in `Tools/stock-digitizing/`.
 - `Packages/EmulsionKit/`: shared app logic for iOS and Mac (library, `RenderService`, camera capture, editor controls, settings, export, sample photos). No UI.
@@ -26,7 +27,7 @@ iOS 26 / macOS 26 only, iPhone 17 Pro and iPhone Duo as targets. Swift 6.4 toolc
 Run these yourself to verify every change. A change isn't done until they pass.
 ```bash
 export DEVELOPER_DIR=/Applications/Xcode.app/Contents/Developer
-sh Tools/build-kernels.sh                                    # after any .metal change
+sh Tools/build-kernels.sh                                    # after any .metal change (both sources, one metallib)
 (cd Packages/EmulsionCore && swift test)                     # must stay green
 (cd Packages/EmulsionKit && swift test)                      # app logic; also on iOS, see its AGENTS.md
 (cd Packages/EmulsionUI && swift test)                       # shared control interaction tests
@@ -61,7 +62,7 @@ Stock-data checks and `emulsion-fit` read the local reference data (traced curve
 - **Reproduce bugs with a failing test first, then fix.**
 - **Review agents always.** Have an independent agent check any non-trivial engine change, research claim or verdict. Back claims with proof (file:line, a reproduced number, a source URL) and say what's unverified.
 - **Reuse before writing.** Search for an existing helper before adding one. Duplicates between Swift and Metal are deliberate mirrors; any other duplicate is a bug.
-- **Leave it cleaner.** Fix stale comments and dead code in the files you touch.
+- **Leave it cleaner.** Fix stale comments and dead code in the files you touch. For layout (file size, comments, constants, enums), follow the organize skill (`.agents/skills/swift-organize/SKILL.md`).
 - **Prove it in the PR.** Every PR has a **Proof** section (template in `.github/pull_request_template.md`):
   - UI changes: before/after screenshots or a short screen recording from the iOS Simulator (`xcrun simctl io booted screenshot|recordVideo`), and from a device when it matters;
   - engine changes: before/after renders of a reference fixture, plus the measured numbers;

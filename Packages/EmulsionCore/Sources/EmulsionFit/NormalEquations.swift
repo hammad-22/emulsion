@@ -1,20 +1,14 @@
-/// Symmetric positive-definite systems (least-squares normal equations) by Cholesky factorization, A = L Lᵀ.
-/// Matrices are n×n arrays, row-major. Plain Swift on purpose: the systems have at most a dozen unknowns, and
-/// Accelerate's current LAPACK interface would need an unsafe compiler flag in this package. Fixed loop order,
-/// so results are bit-identical run to run.
+/// Cholesky solves; plain Swift (LAPACK needs an unsafe flag here), bit-identical run to run.
 enum NormalEquations {
-    /// A pivot (the squared diagonal of L) smaller than this fraction of A's largest diagonal entry means a column is,
-    /// to about 12 significant digits, a combination of the earlier ones: the matrix counts as singular.
+    /// Pivot ÷ largest diagonal below this: singular to about 12 significant digits.
     static let relativePivotTolerance = 1e-12
 
-    /// Solves A x = b, or nil when A is singular or not positive definite.
     static func solve(_ a: [Double], _ b: [Double]) -> [Double]? {
         guard let lower = factor(a, order: b.count) else { return nil }
         return solve(lower: lower, b)
     }
 
-    /// The x minimizing Σ_n w_n·(Σ_i x_i·columns[i][n] − rhs[n])², through the normal equations (Σ w·a_i·a_j) x =
-    /// Σ w·a_i·rhs; nil when they are singular. `weights` defaults to 1 per sample.
+    /// Weighted least squares through the normal equations; nil when they are singular.
     static func solveLeastSquares(columns: [[Double]], rhs: [Double], weights: [Double]? = nil) -> [Double]? {
         let weights = weights ?? [Double](repeating: 1, count: rhs.count)
         func weightedDot(_ a: [Double], _ b: [Double]) -> Double {
@@ -23,7 +17,6 @@ enum NormalEquations {
         return solve(columns.flatMap { a in columns.map { weightedDot(a, $0) } }, columns.map { weightedDot($0, rhs) })
     }
 
-    /// A⁻¹, or nil when A is singular or not positive definite.
     static func inverse(_ a: [Double], order: Int) -> [Double]? {
         guard let lower = factor(a, order: order) else { return nil }
         var inverse = [Double](repeating: 0, count: order * order)
@@ -44,7 +37,6 @@ enum NormalEquations {
         return inverse
     }
 
-    /// L, row-major, or nil when a pivot fails the tolerance (or the input isn't a finite square matrix).
     static func factor(_ a: [Double], order n: Int) -> [Double]? {
         guard n > 0, a.count == n * n, a.allSatisfy(\.isFinite) else { return nil }
         let largestDiagonal = (0..<n).map { a[$0 * n + $0] }.max() ?? 0

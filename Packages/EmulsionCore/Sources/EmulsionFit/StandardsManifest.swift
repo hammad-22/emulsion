@@ -1,7 +1,6 @@
 import Foundation
 
-/// The committed provenance of the standards tables (`Resources/standards-manifest.json`): per file, which standard,
-/// edition and table it transcribes, where from, and the SHA-256 the loader checks. The tables stay local (MOV-94).
+/// Committed provenance and digests of the local standards tables (MOV-94).
 struct StandardsManifest: Codable, Sendable, Equatable {
     static let supportedFormatVersion = 1
 

@@ -1,12 +1,7 @@
 import EmulsionKit
 import EmulsionUI
 import SwiftUI
-import UIKit
 
-/// The live camera picture, aspect-fit. Frames go straight into a layer, so 30 frames a
-/// second never pass through SwiftUI. Tap to focus and expose there. `accessory` is laid over
-/// the picture's bottom edge (the recipe strip), outside the picture's own accessibility element.
-/// While the system pauses the camera, the frozen picture is blurred and says why.
 struct ViewfinderView<Accessory: View>: View {
     let model: CameraModel
     @ViewBuilder let accessory: Accessory
@@ -21,23 +16,18 @@ struct ViewfinderView<Accessory: View>: View {
 
     var body: some View {
         ViewfinderLayerView(display: display)
-            .aspectRatio(aspectRatio ?? defaultAspectRatio, contentMode: .fit)
+            .aspectRatio(aspectRatio ?? uprightAspectRatioBeforeFirstFrame, contentMode: .fit)
             .onGeometryChange(for: CGSize.self, of: \.size) { size = $0 }
             .overlay { FocusReticle(point: model.focusPoint) }
             .overlay(alignment: .topLeading) { timingOverlay }
-            .keyframeAnimator(initialValue: 0.0, trigger: model.captureCount) { content, blink in
-                content.overlay { Color.black.opacity(blink).allowsHitTesting(false) }
-            } keyframes: { _ in
-                LinearKeyframe(0.8, duration: 0.04)
-                LinearKeyframe(0, duration: 0.18)
-            }
+            .modifier(ShutterBlink(captureCount: model.captureCount))
             .contentShape(.rect)
             .onTapGesture { focus(at: $0) }
             .accessibilityElement()
             .accessibilityLabel("Viewfinder")
             .accessibilityHint("Double-tap to focus and expose on the centre")
             .accessibilityAction { focus(at: CGPoint(x: size.width / 2, y: size.height / 2)) }
-            .accessibilityIdentifier("viewfinder")
+            .accessibilityIdentifier(AccessibilityID.viewfinder)
             // Outside the viewfinder's element, so VoiceOver reads why the camera paused.
             .overlay { paused }
             .overlay(alignment: .top) { coolingNote }
@@ -63,8 +53,7 @@ struct ViewfinderView<Accessory: View>: View {
         #endif
     }
 
-    /// Frames are upright, so portrait 3:4 until the first one says otherwise.
-    private var defaultAspectRatio: CGFloat { verticalSizeClass == .compact ? 4 / 3 : 3 / 4 }
+    private var uprightAspectRatioBeforeFirstFrame: CGFloat { verticalSizeClass == .compact ? 4 / 3 : 3 / 4 }
 
     private var pixels: CGFloat { min(max(size.width, size.height) * displayScale, maxPixels).rounded() }
 
@@ -84,38 +73,19 @@ struct ViewfinderView<Accessory: View>: View {
     }
 }
 
-/// Says why the viewfinder has slowed down under critical system pressure.
-private struct CoolingNote: View {
-    var body: some View {
-        Label("Preview slowed while iPhone cools", systemImage: "thermometer.medium")
-            .font(.caption.weight(.semibold))
-            .padding(.horizontal, FilmLabLayout.gap)
-            .padding(.vertical, FilmLabLayout.compact)
-            .glassEffect(.regular, in: .capsule)
-            .allowsHitTesting(false)
+private struct ShutterBlink: ViewModifier {
+    let captureCount: Int
+
+    private static let peakOpacity = 0.8
+    private static let closeDuration = 0.04
+    private static let openDuration = 0.18
+
+    func body(content: Content) -> some View {
+        content.keyframeAnimator(initialValue: 0.0, trigger: captureCount) { view, blink in
+            view.overlay { Color.black.opacity(blink).allowsHitTesting(false) }
+        } keyframes: { _ in
+            LinearKeyframe(Self.peakOpacity, duration: Self.closeDuration)
+            LinearKeyframe(0, duration: Self.openDuration)
+        }
     }
-}
-
-/// Owns the layer the frames are drawn into.
-@MainActor
-private final class ViewfinderDisplay {
-    let view = UIView()
-
-    init() {
-        view.backgroundColor = .black
-        view.layer.contentsGravity = .resizeAspect
-        // Taps belong to SwiftUI's gesture, which knows the picture's size.
-        view.isUserInteractionEnabled = false
-    }
-
-    func show(_ image: CGImage) {
-        view.layer.contents = image
-    }
-}
-
-private struct ViewfinderLayerView: UIViewRepresentable {
-    let display: ViewfinderDisplay
-
-    func makeUIView(context: Context) -> UIView { display.view }
-    func updateUIView(_ uiView: UIView, context: Context) {}
 }

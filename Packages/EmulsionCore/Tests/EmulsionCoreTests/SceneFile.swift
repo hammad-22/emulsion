@@ -5,15 +5,12 @@ import UniformTypeIdentifiers
 
 @testable import EmulsionCore
 
-/// Frozen scene-linear images for the visual regression suite: half-float RGBA TIFF (LZW, lossless)
-/// in the working space (extended linear sRGB), read back without colour matching. Not OpenEXR:
-/// ImageIO's EXR writer converts through ColorSync in float and moves half floats by a few ulps
-/// (0 became −4e-5 next to 11.5), so it cannot freeze a scene exactly.
+/// Half-float RGBA TIFF, not OpenEXR: ImageIO's EXR writer moves half floats (docs/CONSTANTS.md).
 enum SceneFile {
-    /// Half-float RGBA samples (IEEE 754 binary16 bit patterns), top row first.
     struct HalfImage: Equatable {
         let width: Int
         let height: Int
+        /// RGBA samples as IEEE 754 binary16 bit patterns, top row first.
         let bits: [UInt16]
     }
 
@@ -58,7 +55,6 @@ enum SceneFile {
         return HalfImage(width: image.width, height: image.height, bits: bits)
     }
 
-    /// The scene as a working-space image, values used as stored (no colour matching).
     static func image(_ half: HalfImage) -> CIImage {
         let data = half.bits.withUnsafeBytes { Data($0) }
         return CIImage(

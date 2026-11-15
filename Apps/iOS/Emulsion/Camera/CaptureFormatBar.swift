@@ -2,7 +2,6 @@ import EmulsionKit
 import EmulsionUI
 import SwiftUI
 
-/// What the shutter will write: the RAW format, and 12 or 48 MP where the lens offers both.
 struct CaptureFormatBar: View {
     let capabilities: CameraCapabilities?
 
@@ -23,7 +22,7 @@ struct CaptureFormatBar: View {
             }
         }
         .frame(minHeight: FilmLabLayout.minimumControlHeight)
-        .dynamicTypeSize(...DynamicTypeSize.accessibility1)
+        .dynamicTypeSize(...FilmLabLayout.largestCameraTextSize)
         .accessibilityShowsLargeContentViewer()
     }
 

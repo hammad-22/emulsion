@@ -35,7 +35,8 @@ public struct Negative: @unchecked Sendable {
 /// film curve: the camera's rendering can't be undone.
 public struct Developer {
     private let kernels: Kernels
-    /// The exposure anchor's own context, caching intermediates (see `ExposureAnchor.stops(of:context:)`).
+    /// The renderer's caching context, shared with its renders but viewfinder frames (MOV-147);
+    /// used here by `ExposureAnchor.stops(of:context:)`.
     private let context: CIContext
 
     init(kernels: Kernels, context: CIContext) {

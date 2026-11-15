@@ -1,0 +1,29 @@
+import EmulsionCore
+import EmulsionUI
+import SwiftUI
+
+struct RecipeChip: View {
+    let recipe: Recipe
+    let isSelected: Bool
+    let action: () -> Void
+
+    var body: some View {
+        Button(action: action) {
+            HStack(spacing: FilmLabLayout.hairline) {
+                if isSelected { Image(systemName: "checkmark").font(.caption.weight(.bold)) }
+                Text(recipe.name)
+                    .font(isSelected ? .subheadline.weight(.bold) : .subheadline.weight(.medium))
+                    .lineLimit(1)
+            }
+            .padding(.horizontal, 14)
+            .frame(minHeight: FilmLabLayout.minimumControlHeight)
+            .background(.white.opacity(isSelected ? FilmLabLayout.selectedFill : 0), in: .capsule)
+            .contentShape(.capsule)
+        }
+        .buttonStyle(.plain)
+        .glassEffect(.regular.interactive(), in: .capsule)
+        .accessibilityLabel(recipe.name)
+        .accessibilityAddTraits(isSelected ? .isSelected : [])
+        .accessibilityShowsLargeContentViewer { Text(recipe.name) }
+    }
+}

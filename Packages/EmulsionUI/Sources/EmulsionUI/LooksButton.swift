@@ -1,7 +1,6 @@
 import EmulsionKit
 import SwiftUI
 
-/// The same saved-look collection and application flow in both editors.
 public struct LooksButton: View {
     private let session: EditSession
     @State private var isPresented = false
