@@ -7,7 +7,7 @@ Judged on 2400 px whole-photo renders at grain 1.0: the measured, fine, full-col
 - The film Grain control now spans 0…2 (`FilmLook.maximumGrainAmount`) so the default has headroom; the digicam process's Noise keeps 0…1 and its default 0.75 (owner: its top end stays capped).
 - Curated film looks keep their relation to the default: their grain was scaled ÷0.35 (0.25 → 0.71, 0.15 → 0.43, 0.45 → 1.29).
 - No migration: saved edits and recipes keep their stored grain amount (a recipe saved at 0.35 still prints at 0.35, now with size ×1.75 and color 30%).
-- Recipes store size and color from format 2, with the film's backing (MOV-32); the digicam process still adds no fields of its own. Editor sliders for size and color are not built yet.
+- Recipes store size and color from format 2, with the film's backing (MOV-32); the digicam process still adds no fields of its own. Editor sliders for size and color are MOV-157.
 
 ## 14 November 2026: the digicam process reuses Grain and Halation (MOV-149)
 

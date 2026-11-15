@@ -6,7 +6,7 @@ import Testing
 struct AdjustmentGroupTests {
     @Test func everyEditableValueHasExactlyOneControl() {
         // Every Double the engine reads should have a slider; a new one added to Adjustments fails here until it gets one.
-        // Grain size and color are set by the default look and recipes only until their sliders exist (MOV-30 follow-up).
+        // Grain size and color are set by the default look and recipes only until their sliders exist (MOV-157).
         let withoutSlider: Set<String> = ["seed", "grainSize", "grainColor"]
         let editable = Mirror(reflecting: Adjustments()).children.filter { $0.value is Double && !withoutSlider.contains($0.label ?? "") }
         let controls = AdjustmentGroup.allCases.flatMap { $0.controls(whiteBalanceAsShot: nil) }
