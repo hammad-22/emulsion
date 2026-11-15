@@ -34,7 +34,8 @@ struct FullSizeRenderTests {
                 #expect(try renderer.export(renderer.render(developed, .neutral), format: .jpeg) == export, "\(name): export \(run)")
                 #expect(SceneFile.halfImage(rendering: try renderer.materialize(developed).image) == negative, "\(name): negative \(run)")
                 #expect(try Self.pixels(renderer.cgImage(renderer.render(developed, .neutral))) == display, "\(name): cgImage \(run)")
-                #expect(try renderer.export(renderer.render(developed, Adjustments()), format: .jpeg) == look, "\(name): default look \(run)")
+                #expect(
+                    try renderer.export(renderer.render(developed, Adjustments()), format: .jpeg) == look, "\(name): default look \(run)")
             }
         }
     }
