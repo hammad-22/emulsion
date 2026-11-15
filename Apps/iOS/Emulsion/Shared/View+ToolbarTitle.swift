@@ -1,9 +1,7 @@
 import SwiftUI
 
 extension View {
-    /// Shows a toolbar label's title beside its icon in a horizontal bar, and leaves the
-    /// system's icon-only default in a vertical bar (iOS 27.1 canvases), where a title would
-    /// crowd the column.
+    /// Shows a label's title in a horizontal toolbar; a vertical one keeps the icon-only default.
     @ViewBuilder
     func titleInHorizontalToolbar() -> some View {
         if #available(iOS 27.1, *) {

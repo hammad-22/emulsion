@@ -2,7 +2,6 @@ import EmulsionKit
 import EmulsionUI
 import SwiftUI
 
-/// Opens an edit session for the photo and closes it (saving the last change) on the way out.
 struct EditorScreen: View {
     let photoID: PhotoRecord.ID
 

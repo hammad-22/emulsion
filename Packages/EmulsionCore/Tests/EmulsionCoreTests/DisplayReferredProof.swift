@@ -5,14 +5,13 @@ import Testing
 
 @testable import EmulsionCore
 
-/// Before/after evidence for display-referred sources (JPEG/HEIC): writes PNG renders of the
-/// proof chart and prints a table of numbers. Opt-in: EMULSION_PROOF=<output directory>.
-@Suite(.enabled(if: ProcessInfo.processInfo.environment["EMULSION_PROOF"] != nil))
+/// Opt-in: EMULSION_PROOF=<output directory>.
+@Suite(.enabled(if: TestEnvironment.displayReferredProof.isSet))
 struct DisplayReferredProof {
     private var renderer: Renderer { EmulsionTestCase.sharedRenderer }
 
     @Test func writeRendersAndNumbers() throws {
-        let directory = URL(filePath: try #require(ProcessInfo.processInfo.environment["EMULSION_PROOF"]))
+        let directory = URL(filePath: try #require(TestEnvironment.displayReferredProof.value))
         try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
         let chart = DisplayFixtures.proofChart()
         let negative = try renderer.materialize(try renderer.developer.sceneFromDisplay(chart))

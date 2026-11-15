@@ -13,7 +13,7 @@ public actor RenderService {
     public static let shared = RenderService()
     private var renderer: Renderer?
     /// The same renderer once `prepareViewfinder` has run, for frames rendered off the actor.
-    /// `Renderer` is immutable apart from its `CIContext`, which is thread-safe.
+    /// `Renderer` is immutable apart from its `CIContext`s, which are thread-safe.
     private nonisolated let viewfinderRenderer = Mutex<Renderer?>(nil)
     /// One develop per photo and size, with the RAW white balance it was developed at: another
     /// white balance replaces it, so dragging the temperature doesn't fill the cache. A photo that
@@ -81,7 +81,7 @@ public actor RenderService {
         developCount += 1
         // Draft RAW decode may come back larger than asked; fit it exactly. Then render it
         // once into a half-float buffer, so slider moves don't redo the RAW develop or the
-        // JPEG inversion (Core Image doesn't cache intermediates for us).
+        // JPEG inversion, and the RAW decode never reaches the interactive context (MOV-147).
         let fitted = try renderer.materialize(renderer.resized(developed, longestEdge: maxDimension))
         previews[key] = (fitted, whiteBalance)
         markUsed(key)
@@ -151,7 +151,7 @@ public actor RenderService {
     ) async throws -> CGImage {
         let renderer = try await preparedViewfinderRenderer()
         let negative = renderer.developer.viewfinderNegative(from: Self.fitted(frame.uprightImage, maxDimension: maxDimension))
-        return try renderer.cgImage(renderer.render(negative, adjustments))
+        return try renderer.viewfinderImage(negative, adjustments)
     }
 
     /// Loads the renderer and samples the viewfinder's preview inverse, so the first frame
@@ -189,7 +189,7 @@ public actor RenderService {
         // makes that decoder again.
         if openDecoder?.url == url { openDecoder = nil }
         let full = try develop(url, maxDimension: nil, whiteBalance: adjustments.whiteBalance)
-        return try renderer.export(renderer.render(full, adjustments), format: format)
+        return try renderer.export(renderer.render(full, adjustments, intent: .export), format: format)
     }
 
     /// Reads and develops the file with its exposure anchor; the anchor is measured as shot, so

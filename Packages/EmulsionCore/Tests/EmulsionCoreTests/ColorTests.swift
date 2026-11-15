@@ -23,9 +23,7 @@ final class ColorTests: EmulsionTestCase {
     }
 
     func testNeonGradientDoesNotCollapse() throws {
-        // Scene-linear magenta→red neon ramp, pushed into the highlight shoulder. Every tone
-        // scale compresses highlights, so judge color steps against the *neutral* tone scale's
-        // own compression at the same brightness: colors must not merge faster than gray does.
+        // Colours must not merge faster than the neutral tone scale does at the same brightness.
         let values = (0..<64).map { x -> SIMD3<Float> in
             let t = Float(x) / 63
             return SIMD3(2.0, 0.05, 1.6 * (1 - t))

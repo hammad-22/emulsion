@@ -8,6 +8,7 @@ public struct AdjustmentPanel: View {
     @Binding private var selectedGroup: AdjustmentGroup
     @Binding private var selectedControls: [AdjustmentGroup: String]
     private let whiteBalanceAsShot: CameraWhiteBalance?
+    @Environment(\.dynamicTypeSize) private var dynamicTypeSize
 
     /// `whiteBalanceAsShot` is a RAW photo's as-shot white balance, which adds the White Balance
     /// group; nil for other photos.
@@ -64,32 +65,40 @@ public struct AdjustmentPanel: View {
                     .frame(minWidth: FilmLabLayout.minimumControlHeight, minHeight: FilmLabLayout.minimumControlHeight)
                     .contentShape(.rect)
             }
+            // What iOS draws here anyway; on macOS it keeps the larger label out of a push-button bezel.
+            .buttonStyle(.borderless)
             .disabled(adjustments[keyPath: selectedControl.keyPath] == Adjustments()[keyPath: selectedControl.keyPath])
         }
     }
 
+    /// A row that scrolls sideways; a column at accessibility sizes, so no name is cut off.
+    @ViewBuilder
     private func controlPicker(_ group: AdjustmentGroup, _ controls: [AdjustmentControl], _ selectedControl: AdjustmentControl)
         -> some View
     {
-        ScrollView(.horizontal) {
-            HStack(spacing: FilmLabLayout.compact) {
-                ForEach(controls) { control in
-                    Button {
-                        selectedControls[group] = control.id
-                    } label: {
-                        Text(control.title)
-                            .font(.caption.weight(.medium))
-                            .padding(.horizontal, FilmLabLayout.gap)
-                            .frame(minHeight: FilmLabLayout.minimumControlHeight)
-                            .background(control.id == selectedControl.id ? Color.primary.opacity(0.12) : Color.clear, in: .capsule)
-                            .contentShape(.capsule)
-                    }
-                    .buttonStyle(.plain)
-                    .accessibilityLabel(control.accessibilityLabel)
-                    .accessibilityAddTraits(control.id == selectedControl.id ? .isSelected : [])
-                }
+        let buttons = ForEach(controls) { control in
+            Button {
+                selectedControls[group] = control.id
+            } label: {
+                Text(control.title(for: adjustments.process))
+                    .font(.caption.weight(.medium))
+                    .padding(.horizontal, FilmLabLayout.gap)
+                    .frame(minHeight: FilmLabLayout.minimumControlHeight)
+                    .background(control.id == selectedControl.id ? Color.primary.opacity(0.12) : Color.clear, in: .capsule)
+                    .contentShape(.capsule)
             }
+            .buttonStyle(.plain)
+            .accessibilityLabel(control.accessibilityLabel(for: adjustments.process))
+            .accessibilityAddTraits(control.id == selectedControl.id ? .isSelected : [])
         }
-        .scrollIndicators(.hidden)
+        if dynamicTypeSize.isAccessibilitySize {
+            VStack(alignment: .leading, spacing: FilmLabLayout.hairline) { buttons }
+                .frame(maxWidth: .infinity, alignment: .leading)
+        } else {
+            ScrollView(.horizontal) {
+                HStack(spacing: FilmLabLayout.compact) { buttons }
+            }
+            .scrollIndicators(.hidden)
+        }
     }
 }

@@ -1,7 +1,6 @@
 import Foundation
 import Metal
 
-/// The machine a report was made on.
 enum Host {
     static var model: String {
         var size = 0

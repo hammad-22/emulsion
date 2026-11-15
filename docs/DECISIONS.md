@@ -1,5 +1,9 @@
 # Decisions
 
+## 14 November 2026: the digicam process reuses Grain and Halation (MOV-149)
+
+The digicam process (Digicam 2004) stores its sensor noise in `Adjustments.grain` (shown as "Noise") and its in-camera processing in `Adjustments.halation` (shown as "Processing"), so recipe files keep format version 1; only the engine model (`emulsion-digicam-v1`) tells the processes apart. Renaming these fields later needs a recipe format bump. The look is owner-directed to be stronger and more washed out than the period measurements in places; `DigicamLook` and `docs/ENGINE.md` say where.
+
 ## 12 November 2026: traced datasheet curves stay local (owner)
 
 12 Nov 2026: publish fitted stock parameters and tools; keep traced datasheet curves local until MOV-94 counsel review; then reconsider publishing them with attribution.

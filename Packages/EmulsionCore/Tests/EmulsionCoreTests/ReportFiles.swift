@@ -1,7 +1,5 @@
 import Foundation
 
-/// The visual regression report directory: `report.md`, `report.json`, `update-summary.md` and,
-/// under `images/`, per-case actual / golden / diff images named like the goldens.
 struct ReportFiles {
     let directory: URL
     var imagesDirectory: URL { directory.appending(path: "images") }
@@ -9,8 +7,7 @@ struct ReportFiles {
     private static let reportNames = ["report.md", "report.json", "update-summary.md"]
     private static let imageSuffixes = [".actual.png", ".golden.png", ".diff.png"]
 
-    /// Creates the directory and removes the files a previous run wrote. Nothing else is touched:
-    /// the directory may be one the user named.
+    /// Removes only the files a previous run wrote: the directory may be one the user named.
     func prepare() throws {
         let files = FileManager.default
         try files.createDirectory(at: directory, withIntermediateDirectories: true)
@@ -33,8 +30,6 @@ struct ReportFiles {
         try write(markdown(report), to: "report.md")
     }
 
-    /// `<case>.actual.png`, `<case>.golden.png` (if any) and `<case>.diff.png`, a ΔE00 heat map of
-    /// `deltaE` (per pixel, present when the sizes match).
     func writeImages(_ name: String, actual: RegressionImage, golden: RegressionImage?, deltaE: [Double]?) throws {
         try save(actual, "\(name).actual.png")
         guard let golden else { return }
@@ -62,7 +57,6 @@ struct ReportFiles {
         return (header + Self.table(report.cases)).joined(separator: "\n") + "\n"
     }
 
-    /// Printed and saved after an update: ΔE00 from the old golden to the new render.
     func updateSummary(_ outcomes: [VisualRegression.Outcome], title: String) -> String {
         let header = [
             "### Golden update: \(title)", "",

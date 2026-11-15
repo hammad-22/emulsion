@@ -69,7 +69,6 @@ struct LeastSquaresTests {
         #expect(abs(slopeError - expected) < 1e-6 * expected)
     }
 
-    /// A parameter held on its bound is fixed: its standard errors and degrees of freedom match the model without it.
     @Test func boundParameterCountsAsFixedForStandardErrors() throws {
         let noise = [0.03, -0.02, 0.01, -0.04, 0.02, 0.0, -0.01, 0.03, -0.02, 0.01]
         let x = noise.indices.map(Double.init)

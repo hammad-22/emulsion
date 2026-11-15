@@ -2,8 +2,6 @@ import EmulsionKit
 import EmulsionUI
 import SwiftUI
 
-/// The app opens on the camera: a live RAW viewfinder, with the library one tap away.
-/// The camera runs only while this screen is in front and the app is active.
 struct CameraScreen: View {
     @Environment(PhotoStore.self) private var store
     @Environment(AppSettings.self) private var settings
@@ -19,13 +17,10 @@ struct CameraScreen: View {
                 CameraContent(model: model, showsLibrary: $showsLibrary, transition: libraryTransition)
             }
         }
-        // Library errors show on whichever screen is in front: an alert presented from here
-        // while the library covers the camera would dismiss the cover instead.
+        // Presenting from here while the library covers the camera would dismiss the cover.
         .background {
             if !showsLibrary { Color.clear.libraryErrorAlert(store) }
         }
-        // A neutral dark surround keeps the picture central, as in the editor. Set on this
-        // screen only, so the library above it keeps the system appearance.
         .environment(\.colorScheme, .dark)
         .tint(.white)
         .task {
@@ -48,7 +43,6 @@ struct CameraScreen: View {
 
     private var isLive: Bool { model != nil && scenePhase == .active && !showsLibrary }
 
-    /// The Simulator has no camera, so it shows the sample photos as a live viewfinder.
     private static func makeSource() -> any CameraSource {
         #if targetEnvironment(simulator)
             #if DEBUG

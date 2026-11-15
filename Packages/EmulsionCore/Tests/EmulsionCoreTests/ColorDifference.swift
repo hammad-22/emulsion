@@ -3,44 +3,37 @@ import simd
 
 @testable import EmulsionCore
 
-/// CIEDE2000 colour difference on Display P3 encoded output, for the visual regression suite.
-/// Checked against colour-science and Sharma, Wu & Dalal (2005) in `References/delta-e.json`.
+/// CIEDE2000 on Display P3 output (Sharma, Wu & Dalal 2005; docs/CONSTANTS.md).
 enum ColorDifference {
     private static let displayP3 = InputColorSpace.displayP3
-    /// The display's D65 white as XYZ (Y = 1).
     private static let white = ColorMath.xyz(displayP3.primaries.white)
-    /// Linear Display P3 → XYZ (normalised primary matrix).
     private static let p3ToXYZ: simd_double3x3 = {
         let p = displayP3.primaries
         return ColorMath.rgbToXYZ(p.r, p.g, p.b, white: p.white)
     }()
 
-    /// Display P3 encoded (sRGB transfer) → CIELAB. The Lab white is the display's own D65 and no
-    /// chromatic adaptation is applied: both images compared share that white.
+    /// No chromatic adaptation: both images compared share the display's D65 white.
     static func lab(fromDisplayP3 encoded: SIMD3<Double>) -> SIMD3<Double> {
         let xyz = xyz(fromDisplayP3: encoded) / white
         let f = SIMD3(labCompand(xyz.x), labCompand(xyz.y), labCompand(xyz.z))
         return SIMD3(116 * f.y - 16, 500 * (f.x - f.y), 200 * (f.y - f.z))
     }
 
-    /// Display P3 encoded (sRGB transfer) → XYZ, white Y = 1.
     static func xyz(fromDisplayP3 encoded: SIMD3<Double>) -> SIMD3<Double> {
         p3ToXYZ * SIMD3(decode(encoded.x), decode(encoded.y), decode(encoded.z))
     }
 
-    /// CIEDE2000 between two Display P3 encoded colours.
     static func deltaE2000(displayP3 a: SIMD3<Double>, _ b: SIMD3<Double>) -> Double {
         deltaE2000(lab(fromDisplayP3: a), lab(fromDisplayP3: b))
     }
 
     private static func decode(_ v: Double) -> Double { ColorMath.decode(v, curve: displayP3.curve) }
 
-    /// CIE 1976 lightness companding: ε = 216/24389, κ = 24389/27.
+    /// Sourced: CIE 1976, ε = 216/24389, κ = 24389/27.
     private static func labCompand(_ t: Double) -> Double {
         t > 216.0 / 24389 ? cbrt(t) : (24389.0 / 27 * t + 16) / 116
     }
 
-    /// CIEDE2000 with kL = kC = kH = 1, following Sharma, Wu & Dalal (2005).
     static func deltaE2000(_ lab1: SIMD3<Double>, _ lab2: SIMD3<Double>) -> Double {
         let chromaMean = (hypot(lab1.y, lab1.z) + hypot(lab2.y, lab2.z)) / 2
         let chromaMean7 = pow(chromaMean, 7)
@@ -94,12 +87,10 @@ enum ColorDifference {
 
     private static func radians(_ degrees: Double) -> Double { degrees * .pi / 180 }
 
-    /// Summary statistics of per-pixel differences.
     struct Summary: Codable, Equatable, Sendable {
         let mean: Double
-        /// Nearest-rank 95th percentile: sorted[⌈0.95·n⌉ − 1].
+        /// Nearest-rank percentiles, computed in integers.
         let p95: Double
-        /// Nearest-rank 99.9th percentile: what is left after ignoring the worst pixel in a thousand.
         let p999: Double
         let max: Double
         let count: Int
@@ -117,7 +108,6 @@ enum ColorDifference {
             max = sorted[sorted.count - 1]
         }
 
-        /// ⌈perMille · count / 1000⌉ in integers, so no rounding error can move the rank.
         private static func nearestRank(perMille: Int, count: Int) -> Int { (perMille * count + 999) / 1000 }
     }
 }

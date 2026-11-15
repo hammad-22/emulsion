@@ -1,7 +1,6 @@
 import EmulsionUI
 import SwiftUI
 
-/// Keep the whole photograph and its controls in a usable rectangle, without cropping.
 @available(iOS 27.1, *)
 struct UnobscuredContent<Content: View>: View {
     var avoidsDivision = false

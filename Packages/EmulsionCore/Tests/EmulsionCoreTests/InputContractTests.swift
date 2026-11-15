@@ -3,8 +3,7 @@ import Testing
 
 @testable import EmulsionCore
 
-/// Every input declares what its light means, and the developed negative carries it through
-/// the pipeline (docs/ENGINE.md, "Input contracts").
+/// See docs/ENGINE.md, "Input contracts".
 struct InputContractTests {
     private static let expected: [InputColorSpace: InputContract] = [
         .appleLog: .sceneReferred,
@@ -49,8 +48,6 @@ struct InputContractTests {
         #expect(resized.contract == .displayReferred)
     }
 
-    /// The viewfinder's preview estimate is never what an input or a develop declares: files
-    /// are developed (and exported) under their own contract.
     @Test func noInputOrDevelopProducesAPreviewEstimate() throws {
         #expect(InputColorSpace.allCases.allSatisfy { $0.contract != .previewEstimate })
         let picture = try renderer.render(Negative(image: SceneFixtures.patches(cell: 16), contract: .sceneReferred), .neutral)
@@ -59,7 +56,6 @@ struct InputContractTests {
         }
     }
 
-    /// A preview estimate is printed absolutely, exactly like scene light.
     @Test func previewEstimatePrintsLikeSceneLight() throws {
         let scene = SceneFixtures.patches(cell: 4)
         let preview = Fixtures.linear(try renderer.render(Negative(image: scene, contract: .previewEstimate), .neutral))

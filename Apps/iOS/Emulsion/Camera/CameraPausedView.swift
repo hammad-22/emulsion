@@ -1,8 +1,6 @@
 import EmulsionKit
 import SwiftUI
 
-/// Over the frozen viewfinder while the system has paused the camera: why, and that it comes
-/// back by itself. Blurred, like the system Camera's own pause, rather than an alert.
 struct CameraPausedView: View {
     let interruption: CameraInterruption
 
@@ -14,7 +12,7 @@ struct CameraPausedView: View {
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
         .background(.ultraThinMaterial)
-        .accessibilityIdentifier("camera-paused")
+        .accessibilityIdentifier(AccessibilityID.cameraPaused)
     }
 
     private var symbol: String {

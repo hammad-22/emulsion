@@ -19,9 +19,9 @@ struct EmulsionApp: App {
 
     @ViewBuilder private var content: some View {
         #if DEBUG
-            if ProcessInfo.processInfo.arguments.contains("--component-gallery") {
+            if LaunchArgument.isPresent(LaunchArgument.componentGallery) {
                 ComponentGallery()
-            } else if ProcessInfo.processInfo.arguments.contains("--library") {
+            } else if LaunchArgument.isPresent(LaunchArgument.library) {
                 LibraryScreen().libraryErrorAlert(store)
             } else {
                 CameraScreen()

@@ -1,32 +1,17 @@
 import XCTest
 
-/// End-to-end walk through the app from an empty library: add the sample photos, select
-/// two, cancel and confirm deleting the selection, edit the remaining photo, compare with
-/// the original, reset, rotate, save to Photos and delete.
-/// Screenshots are kept in the result bundle as PR proof. Run on a fresh install
-/// with an isolated test bundle identifier so the owner's library stays untouched.
 final class LibraryToEditorUITests: XCTestCase {
     @MainActor
-    func testEmptyLibraryExplanationContrast() throws {
-        let app = XCUIApplication()
-        app.launch()
-        guard app.buttons["Try Sample Photos"].waitForExistence(timeout: 5) else {
-            throw XCTSkip("Needs an empty library; uninstall the isolated proof app first.")
-        }
-        let explanation = "Import a photo, or try a sample, to develop it as a film negative and print."
-        // This regression targets the explanation; full-screen contrast findings remain in MOV-59/MOV-135.
-        try app.performAccessibilityAudit(for: .contrast) { issue in
-            issue.element?.label != explanation
-        }
+    func testEmptyLibraryContrast() throws {
+        let app = try XCUIApplication.launchEmptyLibrary()
+        // The sample prints fade in as they render; the audit reads pixels.
+        sleep(3)
+        try app.audit(.contrast)
     }
 
     @MainActor
     func testEmptyLibraryTextScalingAndLabels() throws {
-        let app = XCUIApplication()
-        app.launch()
-        guard app.buttons["Try Sample Photos"].waitForExistence(timeout: 5) else {
-            throw XCTSkip("Needs an empty library; uninstall the isolated proof app first.")
-        }
+        let app = try XCUIApplication.launchEmptyLibrary()
         try app.performAccessibilityAudit(for: [.textClipped, .dynamicType, .sufficientElementDescription, .trait, .hitRegion])
         app.swipeUp()
         app.swipeUp()
@@ -38,12 +23,12 @@ final class LibraryToEditorUITests: XCTestCase {
     func testLibraryEditorLooksLabelsTraitsAndHitRegions() throws {
         let app = try launchSampleLibrary()
         defer { removeSamples(app) }
-        let photo = app.buttons.matching(NSPredicate(format: "label BEGINSWITH 'Photo from'")).firstMatch
+        let photo = app.photos.firstMatch
         keepScreenshot(app, named: "Library accessibility")
         try app.performAccessibilityAudit(for: [.sufficientElementDescription, .trait, .hitRegion])
         photo.tap()
         app.buttons["Adjust"].tap()
-        let ruler = app.otherElements["adjustment-ruler"]
+        let ruler = app.otherElements[AccessibilityID.adjustmentRuler]
         XCTAssertTrue(ruler.waitForExistence(timeout: 5))
         XCTAssertEqual(ruler.label, "Exposure")
         XCTAssertEqual(ruler.value as? String, "0.0 EV")
@@ -59,7 +44,7 @@ final class LibraryToEditorUITests: XCTestCase {
     func testAppliedLookHasSelectedTrait() throws {
         let app = try launchSampleLibrary()
         defer { removeSamples(app) }
-        let photo = app.buttons.matching(NSPredicate(format: "label BEGINSWITH 'Photo from'")).firstMatch
+        let photo = app.photos.firstMatch
         photo.tap()
         app.buttons["Looks"].tap()
         let look = app.buttons.matching(NSPredicate(format: "label BEGINSWITH 'Warm Light'")).firstMatch
@@ -75,24 +60,22 @@ final class LibraryToEditorUITests: XCTestCase {
     func testAdjustmentGroupValueAndHitRegions() throws {
         let app = try launchSampleLibrary()
         defer { removeSamples(app) }
-        let photo = app.buttons.matching(NSPredicate(format: "label BEGINSWITH 'Photo from'")).firstMatch
+        let photo = app.photos.firstMatch
         photo.tap()
         app.buttons["Adjust"].tap()
-        XCTAssertTrue(app.otherElements["adjustment-ruler"].waitForExistence(timeout: 5))
+        XCTAssertTrue(app.otherElements[AccessibilityID.adjustmentRuler].waitForExistence(timeout: 5))
         let group = app.descendants(matching: .any).matching(identifier: "Adjustment group").firstMatch
         XCTAssertEqual(group.value as? String, "Light")
         try app.performAccessibilityAudit(for: .hitRegion)
         group.tap()
         app.buttons["Color"].tap()
         XCTAssertEqual(group.value as? String, "Color")
-        XCTAssertEqual(app.otherElements["adjustment-ruler"].label, "Warmth")
+        XCTAssertEqual(app.otherElements[AccessibilityID.adjustmentRuler].label, "Warmth")
     }
 
     @MainActor
     func testSamplesEditCompareAndSave() throws {
-        let app = XCUIApplication()
-        app.launchArguments = ["--library"]
-        app.launch()
+        let app = XCUIApplication.launchLibrary()
         XCTAssertTrue(app.navigationBars["Library"].waitForExistence(timeout: 5))
 
         let samples = app.buttons["Try Sample Photos"]
@@ -100,7 +83,7 @@ final class LibraryToEditorUITests: XCTestCase {
         keepScreenshot(app, named: "1 Empty library")
         samples.tap()
 
-        let firstPhoto = app.buttons.matching(NSPredicate(format: "label BEGINSWITH 'Photo from'")).firstMatch
+        let firstPhoto = app.photos.firstMatch
         XCTAssertTrue(firstPhoto.waitForExistence(timeout: 5))
         sleep(2)
         keepScreenshot(app, named: "2 Library with samples")
@@ -110,7 +93,7 @@ final class LibraryToEditorUITests: XCTestCase {
         XCTAssertTrue(app.navigationBars["1 Selected"].waitForExistence(timeout: 2))
         XCTAssertTrue(firstPhoto.isSelected)
         keepScreenshot(app, named: "2b Selecting")
-        let photos = app.buttons.matching(NSPredicate(format: "label BEGINSWITH 'Photo from'"))
+        let photos = app.photos
         photos.element(boundBy: 1).tap()
         XCTAssertTrue(app.navigationBars["2 Selected"].waitForExistence(timeout: 2))
         app.buttons["Delete"].tap()
@@ -128,7 +111,7 @@ final class LibraryToEditorUITests: XCTestCase {
         firstPhoto.tap()
 
         app.buttons["Adjust"].tap()
-        let exposure = app.otherElements["adjustment-ruler"]
+        let exposure = app.otherElements[AccessibilityID.adjustmentRuler]
         XCTAssertTrue(exposure.waitForExistence(timeout: 5))
         sleep(2)
         keepScreenshot(app, named: "3 Editor")
@@ -155,7 +138,7 @@ final class LibraryToEditorUITests: XCTestCase {
         XCTAssertEqual(exposure.value as? String, editedExposure, "Hiding controls preserves the edit")
         app.buttons["Adjustment group"].tap()
         app.buttons["Color"].tap()
-        let warmth = app.otherElements["adjustment-ruler"]
+        let warmth = app.otherElements[AccessibilityID.adjustmentRuler]
         XCTAssertEqual(warmth.label, "Warmth")
         dragRuler(warmth)
         let editedWarmth = warmth.value as? String
@@ -179,7 +162,8 @@ final class LibraryToEditorUITests: XCTestCase {
 
         allowPhotoLibraryAdds()
         app.buttons["Save to Photos"].tap()
-        app.tap()  // Lets the interruption monitor answer the permission alert.
+        // Lets the interruption monitor answer the permission alert.
+        app.tap()
         XCTAssertTrue(app.alerts["Saved to Photos"].waitForExistence(timeout: 20))
         keepScreenshot(app, named: "7 Saved")
         app.alerts["Saved to Photos"].buttons["OK"].tap()
@@ -190,30 +174,10 @@ final class LibraryToEditorUITests: XCTestCase {
     }
 
     @MainActor
-    private func launchSampleLibrary() throws -> XCUIApplication {
-        let app = XCUIApplication()
-        app.launch()
-        guard app.buttons["Try Sample Photos"].waitForExistence(timeout: 5) else {
-            throw XCTSkip("Needs an empty library; uninstall the isolated proof app first.")
-        }
-        app.buttons["Try Sample Photos"].tap()
-        XCTAssertTrue(app.buttons.matching(NSPredicate(format: "label BEGINSWITH 'Photo from'")).firstMatch.waitForExistence(timeout: 5))
-        return app
-    }
+    private func launchSampleLibrary() throws -> XCUIApplication { try XCUIApplication.launchSampleLibrary() }
 
     @MainActor
-    private func removeSamples(_ app: XCUIApplication) {
-        if app.navigationBars["Looks"].exists { app.buttons["Done"].tap() }
-        if !app.navigationBars["Library"].exists { app.buttons["BackButton"].tap() }
-        guard app.buttons["Select"].waitForExistence(timeout: 5) else { return }
-        app.buttons["Select"].tap()
-        let photos = app.buttons.matching(NSPredicate(format: "label BEGINSWITH 'Photo from'"))
-        let count = photos.count
-        for index in 0..<count { photos.element(boundBy: index).tap() }
-        app.buttons["Delete"].tap()
-        app.buttons["Delete \(count) Photos"].tap()
-        XCTAssertTrue(app.buttons["Try Sample Photos"].waitForExistence(timeout: 5))
-    }
+    private func removeSamples(_ app: XCUIApplication) { app.removeSamples() }
 
     @MainActor
     private func dragRuler(_ ruler: XCUIElement) {

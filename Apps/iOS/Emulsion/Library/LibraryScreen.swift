@@ -2,21 +2,19 @@ import EmulsionKit
 import EmulsionUI
 import SwiftUI
 
-/// The photo library: every imported photo with its film look, newest first.
-/// Opens over the camera, with a button back to it.
 struct LibraryScreen: View {
     @Environment(PhotoStore.self) private var store
     @Environment(\.isPresented) private var isPresented
     @Environment(\.dismiss) private var dismiss
+    @Environment(\.horizontalSizeClass) private var horizontalSizeClass
+    @Environment(\.verticalSizeClass) private var verticalSizeClass
     @State private var path: [PhotoRecord.ID] = []
     @State private var selection = LibrarySelection()
     @State private var previewID: PhotoRecord.ID?
-    @Environment(\.horizontalSizeClass) private var horizontalSizeClass
-    @Environment(\.verticalSizeClass) private var verticalSizeClass
     @State private var importError: String?
     @Namespace private var editorTransition
     /// An even column count for the grid beside the preview (HIG, iPhone Duo inner display).
-    private let expandedColumnCount = 4
+    private static let expandedColumnCount = 4
 
     var body: some View {
         NavigationStack(path: $path) {
@@ -76,7 +74,7 @@ struct LibraryScreen: View {
     private var expandedLibrary: some View {
         ArrangementView {
             PhotoGrid(
-                selection: $selection, transition: editorTransition, columnCount: expandedColumnCount,
+                selection: $selection, transition: editorTransition, columnCount: Self.expandedColumnCount,
                 previewID: shownPreviewID, edit: openEditor
             ) {
                 previewID = $0
@@ -91,7 +89,6 @@ struct LibraryScreen: View {
 
     private func openEditor(_ id: PhotoRecord.ID) { path.append(id) }
 
-    /// The photo picked for preview while it still exists, otherwise the newest.
     private var shownPreviewID: PhotoRecord.ID? {
         if let previewID, store.photo(previewID) != nil { return previewID }
         return store.photos.first?.id
