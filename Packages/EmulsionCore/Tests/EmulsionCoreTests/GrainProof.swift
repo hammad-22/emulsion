@@ -14,9 +14,10 @@ struct GrainProof {
     private var renderer: Renderer { EmulsionTestCase.sharedRenderer }
     private static let (width, height, side) = (4032, 3024, 1024)
 
+    /// The measured model: white noise at the pixel (size 1) with the layers' full color.
     private static func adjustments(grain: Double, seed: Double = 3) -> Adjustments {
         var a = Adjustments.neutral
-        (a.grain, a.seed) = (grain, seed)
+        (a.grain, a.grainSize, a.grainColor, a.seed) = (grain, 1, 1, seed)
         return a
     }
 
@@ -99,7 +100,7 @@ struct GrainProof {
         for stops in stride(from: -6.0, through: 6, by: 1) {
             let logE = SIMD3(repeating: stops * log10(2.0))
             let table = Grain.sigmaD48(logExposure: logE)
-            let pixel = Grain.densitySigma(logExposure: logE, amount: 1, longEdge: Double(w))
+            let pixel = Grain.densitySigma(logExposure: logE, amount: 1, size: 1, longEdge: Double(w))
             let measured = pixel * noiseSD
             let key = String(format: "%.0f", stops)
             let traced = trace.map { $0[key].map { String(format: "%.5f", $0) } ?? "" }

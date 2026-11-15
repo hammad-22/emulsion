@@ -51,7 +51,7 @@ extension RegressionCase {
         pointVariants.map { RegressionCase(name: "\(scene.name).\($0.name)", scene: scene.image, adjustments: $0.adjustments) }
     }
 
-    /// The suite's default look: `Adjustments()` (grain and halation 0.35) with a fixed seed.
+    /// The suite's default look: `Adjustments()` (grain 1 at size 1.5 and color 0.3, halation 0.35) with a fixed seed.
     static let defaultLook = adjust(Adjustments()) { $0.seed = 7 }
 
     private static let spatialCases: [RegressionCase] = {

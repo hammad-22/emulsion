@@ -147,22 +147,6 @@ extension Kernels {
         return try run(halationMix, extent, returned + [weights])
     }
 
-    /// `image` blurred by a Gaussian of `sigma` pixels: below `Halation.exactBlurPixels` with the exact
-    /// separable kernel `gaussianPass`, above with Core Image's.
-    private func gaussianBlur(_ image: CIImage, sigma: Double) throws -> CIImage {
-        guard sigma < Halation.exactBlurPixels else { return image.applyingGaussianBlur(sigma: sigma) }
-        let radius = (4 * sigma).rounded(.up)
-        func pass(_ input: CIImage, _ step: CIVector) throws -> CIImage {
-            guard
-                let output = gaussianPass.apply(
-                    extent: input.extent, roiCallback: { _, rect in rect.insetBy(dx: -radius * step.x, dy: -radius * step.y) },
-                    arguments: [input, step, sigma])
-            else { throw EmulsionError.renderFailed }
-            return output
-        }
-        return try pass(pass(image, CIVector(x: 1, y: 0)), CIVector(x: 0, y: 1))
-    }
-
     /// `image` reflected at its edges, repeating without end, and its halvings: element i is halved
     /// i times, up to the largest of `levels`. When no level is 0 and the origin is even, the image
     /// is mirrored after the first halving, so no full-resolution mirror is kept (review B6). An odd

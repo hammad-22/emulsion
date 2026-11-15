@@ -3,7 +3,7 @@ import Foundation
 /// An artistic adjustment snapshot for one of the built-in render processes. A photo owns its grain
 /// seed and its RAW white balance, which describes the light it was shot under.
 public struct Recipe: Codable, Equatable, Identifiable, Sendable {
-    /// The format written. Format 2 added the required `backing` (MOV-32).
+    /// The format written. Format 2 added the required `backing` (MOV-32), `grainSize` and `grainColor` (MOV-30).
     public static let formatVersion = 2
     /// Formats read: format 1 (no backing) prints with rem-jet.
     static let readableFormatVersions: ClosedRange<Int> = 1...formatVersion
@@ -73,9 +73,11 @@ public struct Recipe: Codable, Equatable, Identifiable, Sendable {
         let settings = try container.nestedContainer(keyedBy: Field.self, forKey: .adjustments)
         var adjustments = Adjustments()
         adjustments.process = process
-        for field in Self.numericFields { adjustments[keyPath: field.path] = try settings.decode(Double.self, forKey: field.key) }
-        // Format 1 has no backing (a `backing` key there is unknown and ignored, as format 1
-        // readers ignore it) and prints with rem-jet; format 2 requires it (docs/RECIPES.md).
+        for field in Self.numericFields where version > 1 || !Self.formatTwoFields.contains(field.key) {
+            adjustments[keyPath: field.path] = try settings.decode(Double.self, forKey: field.key)
+        }
+        // Format 1 has no backing or grain size and color (such keys there are unknown and ignored,
+        // as format 1 readers ignore them): it prints with their defaults; format 2 requires them.
         adjustments.backing = version == 1 ? .remJet : try settings.decode(AntihalationBacking.self, forKey: .backing)
         try self.init(
             id: container.decode(UUID.self, forKey: .id), name: container.decode(String.self, forKey: .name),
@@ -96,13 +98,15 @@ public struct Recipe: Codable, Equatable, Identifiable, Sendable {
 
     /// The keys of the `adjustments` object: the numeric adjustments and the backing.
     private enum Field: String, CodingKey {
-        case exposure, warmth, tint, color, highlights, shadows, grain, halation, backing
+        case exposure, warmth, tint, color, highlights, shadows, grain, halation, grainSize, grainColor, backing
     }
+
+    private static let formatTwoFields: Set<Field> = [.grainSize, .grainColor]
 
     private static var numericFields: [(key: Field, path: WritableKeyPath<Adjustments, Double>)] {
         [
             (.exposure, \.exposure), (.warmth, \.warmth), (.tint, \.tint), (.color, \.color), (.highlights, \.highlights),
-            (.shadows, \.shadows), (.grain, \.grain), (.halation, \.halation),
+            (.shadows, \.shadows), (.grain, \.grain), (.halation, \.halation), (.grainSize, \.grainSize), (.grainColor, \.grainColor),
         ]
     }
 }

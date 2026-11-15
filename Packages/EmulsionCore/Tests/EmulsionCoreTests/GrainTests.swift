@@ -12,9 +12,10 @@ struct GrainTests {
     private var renderer: Renderer { EmulsionTestCase.sharedRenderer }
     private static let fieldSide = 1024
 
+    /// The measured model: white noise at the pixel (size 1) with the layers' full color.
     private static func adjustments(grain: Double, seed: Double = 3) -> Adjustments {
         var a = Adjustments.neutral
-        (a.grain, a.seed) = (grain, seed)
+        (a.grain, a.grainSize, a.grainColor, a.seed) = (grain, 1, 1, seed)
         return a
     }
 
@@ -232,7 +233,7 @@ struct GrainTests {
     /// correlated; measured r(R,G) 0.10, r(G,B) 0.17 at 1600 px).
     @Test func blueLayerIsGrainiestAndDisplayGrainHasChroma() throws {
         let field = try noise(seed: 3)
-        let sigma = Grain.densitySigma(logExposure: .zero, amount: 1, longEdge: 1600)
+        let sigma = Grain.densitySigma(logExposure: .zero, amount: 1, size: 1, longEdge: 1600)
         let measured = sigma * SIMD3((0..<3).map { GrainMeasurement.standardDeviation(Self.channel(field, $0)) })
         for c in 0..<2 {
             let expected = sigma.z / sigma[c]

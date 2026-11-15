@@ -75,13 +75,14 @@ float3 fitP3(float3 rgb) {
 // filmSystemRelative adds ends and then baseLights = the calibrated printer lights alone.
 // Halation and grain (filmSystem, filmSystemRelative): the scene sampler is followed by `glow`
 // (halationMix: rgb = the glow G per layer R, G, B, before the exposure control) and `noise`
-// (grainNoise: rgb = unit-variance noise per layer). After the film arguments (for
+// (grainNoise, unit-variance noise per layer, blurred into clumps for grain size > 1). After the film arguments (for
 // filmSystemRelative, after ends and baseLights) come k = returned light per layer (red, green,
 // blue) and i0..i2 = rows of the inverse sensitivity (both packed by Halation.swift), then
 // g0..g7 = one grain table knot each (packed by Grain.swift): (σ red, σ green, σ blue, log10
 // exposure vs mid-gray), σ = density standard deviation per pixel (datasheet σ at 48 µm × amount
-// × Selwyn scale), knots ascending. filmSystemPlain and filmSystemRelativePlain (halation and
-// grain off) take the same arguments without glow, noise, k, i0..i2 and g0..g7.
+// × size × Selwyn scale), knots ascending, then grainColor (the grain's color part, 0…1).
+// filmSystemPlain and filmSystemRelativePlain (halation and grain off) take the same arguments
+// without glow, noise, k, i0..i2, g0..g7 and grainColor.
 float logistic(float x) { return 1.0/(1.0+exp(-x)); }
 
 // Layer exposure (rgb = red, green, blue layer) of linear P3 light p, unclamped.
@@ -121,6 +122,8 @@ float3 densitySigma(float3 logE, GrainTable t) {
     for(int i=0;i<7;i++) s+=(t.g[i+1].xyz-t.g[i].xyz)*clamp((logE-t.g[i].w)/(t.g[i+1].w-t.g[i].w),0.0,1.0);
     return s;
 }
+// Grain density per layer (Grain.density): σ·noise with its color part scaled by `color` (artistic).
+float3 grainDensity(float3 logE, GrainTable t, float3 noise, float color) { return saturated(densitySigma(logE,t)*noise,color); }
 
 // Layer log exposure → displayed print (display-linear P3); grain = density added to the negative
 // layers (R, G, B) before printing.
@@ -157,16 +160,16 @@ float3 filmPrint(float3 q, float3 logE, float3 m0, float3 m1, float3 m2, float4 
 extern "C" float4 filmSystem(coreimage::sample_t sample, coreimage::sample_t glow, coreimage::sample_t noise,
                              float4 m0, float4 m1, float4 m2, float4 neg, float4 negOff, float4 prt, float4 misc, float4 lights,
                              float4 d0, float4 d1, float4 d2, float4 k, float4 i0, float4 i1, float4 i2,
-                             float4 g0, float4 g1, float4 g2, float4 g3, float4 g4, float4 g5, float4 g6, float4 g7) {
+                             float4 g0, float4 g1, float4 g2, float4 g3, float4 g4, float4 g5, float4 g6, float4 g7, float grainColor) {
     float a=sample.a;
     float3 p=toP3(sample.rgb/max(a,1e-6));
     GrainTable t={{g0,g1,g2,g3,g4,g5,g6,g7}};
     LayerExposure x=exposeLayers(p,glow.rgb,k.xyz,i0.xyz,i1.xyz,i2.xyz,m0.xyz,m1.xyz,m2.xyz,negOff,misc);
-    float3 o=filmPrint(x.q,x.logE,m0.xyz,m1.xyz,m2.xyz,neg,negOff,prt,misc,lights.xyz,d0.xyz,d1.xyz,d2.xyz,densitySigma(x.logE,t)*noise.rgb);
+    float3 o=filmPrint(x.q,x.logE,m0.xyz,m1.xyz,m2.xyz,neg,negOff,prt,misc,lights.xyz,d0.xyz,d1.xyz,d2.xyz,grainDensity(x.logE,t,noise.rgb,grainColor));
     return float4(fitP3(fromP3(o))*a,a);
 }
 // filmSystem with halation and grain off: no glow or noise sampler, no k, i0..i2 or grain table,
-// so a look-only render pays for neither. Bit-identical to filmSystem with k = 0 and zero noise.
+// so a look-only render pays for neither. Equal to filmSystem with k = 0 and zero noise up to float rounding.
 extern "C" float4 filmSystemPlain(coreimage::sample_t sample, float4 m0, float4 m1, float4 m2, float4 neg, float4 negOff,
                                   float4 prt, float4 misc, float4 lights, float4 d0, float4 d1, float4 d2) {
     float a=sample.a;
@@ -257,12 +260,12 @@ extern "C" float4 filmSystemRelative(coreimage::sample_t sample, coreimage::samp
                                      float4 m0, float4 m1, float4 m2,
                                      float4 neg, float4 negOff, float4 prt, float4 misc, float4 lights,
                                      float4 d0, float4 d1, float4 d2, float4 ends, float4 baseLights, float4 k, float4 i0, float4 i1, float4 i2,
-                                     float4 g0, float4 g1, float4 g2, float4 g3, float4 g4, float4 g5, float4 g6, float4 g7) {
+                                     float4 g0, float4 g1, float4 g2, float4 g3, float4 g4, float4 g5, float4 g6, float4 g7, float grainColor) {
     float a=sample.a;
     float3 s0=toP3(sample.rgb/max(a,1e-6));
     GrainTable t={{g0,g1,g2,g3,g4,g5,g6,g7}};
     LayerExposure x=exposeLayers(s0,glow.rgb,k.xyz,i0.xyz,i1.xyz,i2.xyz,m0.xyz,m1.xyz,m2.xyz,negOff,misc);
-    float3 e=filmPrint(x.q,x.logE,m0.xyz,m1.xyz,m2.xyz,neg,negOff,prt,misc,lights.xyz,d0.xyz,d1.xyz,d2.xyz,densitySigma(x.logE,t)*noise.rgb);
+    float3 e=filmPrint(x.q,x.logE,m0.xyz,m1.xyz,m2.xyz,neg,negOff,prt,misc,lights.xyz,d0.xyz,d1.xyz,d2.xyz,grainDensity(x.logE,t,noise.rgb,grainColor));
     return float4(fitP3(fromP3(printedRelative(e,s0,m0.xyz,m1.xyz,m2.xyz,neg,negOff,prt,misc,d0.xyz,d1.xyz,d2.xyz,ends,baseLights.xyz)))*a,a);
 }
 // filmSystemRelative with halation and grain off (as filmSystemPlain).

@@ -44,13 +44,11 @@ enum VisualRegression {
     static let photoLocalToneThresholds = Thresholds(
         mean: thresholds.mean, p95: thresholds.p95, max: thresholds.max, allowsIsolatedOutliers: true,
         minimumStructuralSimilarity: 0.999)
-    /// Real photographs: the ΔE00 limits plus structure (MOV-146). Grain v2 (MOV-30) is white
-    /// per-pixel density noise, so a grain change now shows in ΔE00 rather than SSIM: removing the
-    /// default look's grain (0.35) from a frozen photo moves it by mean 0.21–0.22, p95 0.46–0.47,
-    /// max 1.02–1.20, and a new seed by mean 0.29–0.31, p95 0.64–0.66, max 1.59–1.76, past the mean
-    /// and max limits (the no-grain case on the Pixel 8 Pro only just: max 1.016); SSIM stays at
-    /// 0.99976–0.99993, so the structural floor alone would catch only the iPhone 12 Pro reseed
-    /// (`grainChangesFailThePhotoThresholds`). The floor stays for structure: blur of σ 0.3 px gives
+    /// Real photographs: the ΔE00 limits plus structure (MOV-146). Removing the default look's grain
+    /// (MOV-30: amount 1, size 1.5, color 0.3) from a frozen photo moves it by mean 0.33–0.34, p95
+    /// 0.66–0.68, max 1.34–1.59, SSIM 0.99775–0.99866; a new seed by mean 0.46–0.47, p95 0.93–0.96,
+    /// max 2.13–2.40, SSIM 0.99556–0.99734. Each fails both the per-pixel ΔE00 limit and the
+    /// structural floor (`grainChangesFailThePhotoThresholds`). Blur of σ 0.3 px gives SSIM
     /// 0.994–0.997, and rendered twice SSIM is 1. The local-tone cases above take 0.999 instead: CI's
     /// isolated outliers (16 pixels moved ≈ 4 ΔE00, simulated) cost them up to 0.00034, and they
     /// have no grain.

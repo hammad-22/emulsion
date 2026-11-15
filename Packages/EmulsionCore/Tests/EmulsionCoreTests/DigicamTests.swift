@@ -304,9 +304,11 @@ struct DigicamTests {
             """
         let recipe = try Recipe.decode(Data(saved.utf8))
         #expect(recipe.adjustments.process == .film)
-        // Re-encoded as format 2, which adds the backing such a recipe prints with (MOV-32).
+        // Re-encoded as format 2, which adds the backing and grain size and color it prints with (MOV-32, MOV-30).
         let upgraded = saved.replacingOccurrences(of: "\"formatVersion\" : 1", with: "\"formatVersion\" : 2")
             .replacingOccurrences(of: "\"adjustments\" : {\n", with: "\"adjustments\" : {\n    \"backing\" : \"remJet\",\n")
+            .replacingOccurrences(
+                of: "\"grain\" : 0.35,\n", with: "\"grain\" : 0.35,\n    \"grainColor\" : 0.3,\n    \"grainSize\" : 1.5,\n")
         #expect(String(decoding: try recipe.encoded(), as: UTF8.self) == upgraded)
         #expect(throws: EmulsionError.recipeModelUnsupported) {
             try Recipe.decode(Data(saved.replacingOccurrences(of: "emulsion-default-v1", with: "emulsion-future-v1").utf8))

@@ -159,11 +159,11 @@ enum GrainMeasurement {
 
     /// Display σ per channel (codes) that the Swift mirror predicts for a flat neutral patch `stops`
     /// from mid-gray: Monte Carlo over negative density offsets N(0, σ²) per layer, σ from `Grain`,
-    /// through `FilmModel.render`, clamped to 0…1 (the kernel's gamut fit clamps lightness).
+    /// through `FilmModel.render`, clamped to 0…1 (the kernel's gamut fit clamps lightness). Size 1, full color.
     static func predictedDisplaySD(stops: Double, amount: Double, longEdge: Double, samples: Int = 200_000) -> SIMD3<Double> {
         let model = FilmLook.stock
         let scene = SIMD3(repeating: 0.18 * pow(2, stops))
-        let sigma = Grain.densitySigma(logExposure: model.layerLogExposure(scene), amount: amount, longEdge: longEdge)
+        let sigma = Grain.densitySigma(logExposure: model.layerLogExposure(scene), amount: amount, size: 1, longEdge: longEdge)
         var random = GaussianSequence(seed: 0x5EED_0030)
         let prints = (0..<samples).map { _ in
             simd_clamp(model.render(scene, grain: sigma * SIMD3(random.next(), random.next(), random.next())), .zero, .one)

@@ -31,7 +31,7 @@ struct HalationTests {
     static func layerExposure(_ scene: CIImage, _ a: Adjustments) -> [SIMD3<Double>] {
         let model = FilmLook.stock
         return Fixtures.encodedFloats(scene, space: SceneFixtures.linearP3).map {
-            simd_max(model.sensitivity * model.saturated($0 * pow(2, a.exposure), a.printSaturation), .zero)
+            simd_max(model.sensitivity * FilmModel.saturated($0 * pow(2, a.exposure), a.printSaturation), .zero)
         }
     }
 
@@ -105,7 +105,10 @@ struct HalationTests {
         let bright = CIImage(color: CIColor(red: 16, green: 8, blue: 4)).cropped(to: scene.extent)
         let black = CIImage(color: .black).cropped(to: scene.extent)
         let withGlow = try renderer.filmPrint(negative, glow: bright, noise: black, a)
-        #expect(EmulsionTestCase.codes(withGlow.cropped(to: scene.extent)) == clean)
+        let worst =
+            zip(EmulsionTestCase.codes(withGlow.cropped(to: scene.extent)), clean).map { simd_reduce_max(simd_abs($0 - $1)) }.max() ?? 0
+        // The full kernel rounds differently from the plain one: measured ≤ 2.0e-4 codes, below half-float precision.
+        #expect(worst < 1e-3, "\(worst) codes")
     }
 
     // MARK: Exposure order (MOV-102)
@@ -372,7 +375,7 @@ struct HalationDisc {
     /// Layer exposure of the disc at `saturation` (the Color control).
     func discExposure(saturation: Double = 1) -> SIMD3<Double> {
         let model = FilmLook.stock
-        return simd_max(model.sensitivity * model.saturated(SIMD3<Double>(light), saturation), .zero)
+        return simd_max(model.sensitivity * FilmModel.saturated(SIMD3<Double>(light), saturation), .zero)
     }
     /// Layer exposure of the neutral background: the sensitivity rows sum to 1.
     var backgroundExposure: Double { Double(Self.background) }

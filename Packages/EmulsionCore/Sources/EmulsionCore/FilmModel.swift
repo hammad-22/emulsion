@@ -109,7 +109,7 @@ public struct FilmModel: Sendable, Equatable {
         _ scene: SIMD3<Double>, lights: SIMD3<Double> = .zero, saturation: Double = 1, glow: SIMD3<Double> = .zero,
         layerReturn k: SIMD3<Double> = .zero, grain: SIMD3<Double>
     ) -> SIMD3<Double> {
-        let light = saturated(scene, saturation)
+        let light = Self.saturated(scene, saturation)
         let exposure = simd_max(sensitivity * light, .zero)
         let halated = Halation.exposureWithHalation(exposure, glow: simd_max(glow, .zero), layerReturn: k)
         // The light the layers see, with the halation's change of exposure (for chroma retention).
@@ -126,7 +126,7 @@ public struct FilmModel: Sendable, Equatable {
     /// Display P3 luminance weights (the Color control saturates about this luminance).
     static let p3Luminance = SIMD3<Double>(0.2289746, 0.6917385, 0.0792869)
 
-    func saturated(_ scene: SIMD3<Double>, _ saturation: Double) -> SIMD3<Double> {
+    static func saturated(_ scene: SIMD3<Double>, _ saturation: Double) -> SIMD3<Double> {
         let y = dot(scene, Self.p3Luminance)
         return SIMD3(repeating: y) + (scene - SIMD3(repeating: y)) * saturation
     }

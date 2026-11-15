@@ -172,7 +172,7 @@ struct DisplayReferredTests {
 
     /// Halation and grain enter the edited print only: the GPU's relative print with both on (the
     /// glow and noise read back from their kernels) matches `renderRelative` given the same glow and
-    /// the grain density σ(log E′)·n, at an exposure and Color edit. Measured: ≤ 0.0011 codes.
+    /// the grain density (`Grain.density`, default size and color), at an exposure and Color edit. Measured: ≤ 0.0011 codes.
     @Test func gpuRelativePrintWithHalationAndGrainMatchesTheSwiftMirror() throws {
         let colors = randomColors(count: 200, lowest: 0.35, span: 0.3)
         let negative = try developed(Fixtures.row(colors, space: DisplayFixtures.displayP3), materialized: false)
@@ -182,7 +182,7 @@ struct DisplayReferredTests {
         let extent = negative.image.extent
         let glows = Fixtures.linear(
             try EmulsionTestCase.kernels.halationGlow(of: negative.image, model: FilmLook.stock, saturation: a.printSaturation))
-        let noise = Fixtures.linear(try EmulsionTestCase.kernels.grainNoise(extent, seed: a.seed))
+        let noise = Fixtures.linear(try EmulsionTestCase.kernels.grainNoise(extent, seed: a.seed, size: a.grainSize))
         let estimates = Fixtures.encodedFloats(negative.image, space: SceneFixtures.linearP3)
         let k = Halation.layerReturn(amount: a.halation, backing: a.backing)
         let gain = pow(2, a.exposure)
@@ -191,11 +191,13 @@ struct DisplayReferredTests {
             let edited = estimates[i] * gain
             let glow = simd_max(glows[i], .zero) * gain
             let exposure = Halation.exposureWithHalation(
-                simd_max(model.sensitivity * model.saturated(edited, a.printSaturation), .zero), glow: glow, layerReturn: k)
-            let sigma = Grain.densitySigma(logExposure: FilmModel.logExposure(exposure), amount: a.grain, longEdge: Double(extent.width))
+                simd_max(model.sensitivity * FilmModel.saturated(edited, a.printSaturation), .zero), glow: glow, layerReturn: k)
+            let grain = Grain.density(
+                logExposure: FilmModel.logExposure(exposure), noise: noise[i], amount: a.grain, size: a.grainSize, color: a.grainColor,
+                longEdge: Double(extent.width))
             let reference = model.renderRelative(
                 estimate: estimates[i], edited: edited, lights: a.printerLights, saturation: a.printSaturation, glow: glow,
-                layerReturn: k, grain: sigma * noise[i])
+                layerReturn: k, grain: grain)
             let codes = SIMD3((0..<3).map { Fixtures.encode(min(1, max(0, reference[$0]))) * 255 })
             worst = max(worst, simd_reduce_max(simd_abs(gpu[i] - codes)))
         }

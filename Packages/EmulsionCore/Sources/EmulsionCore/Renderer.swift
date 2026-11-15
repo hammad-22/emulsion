@@ -62,7 +62,7 @@ public final class Renderer: @unchecked Sendable {
         // Halation and grain act inside the film kernels, on layer exposure and negative density
         // (see `Halation`, `Grain`); with both off the film kernels run without them.
         let glow = a.halation > 0 ? try kernels.halationGlow(of: scene, model: model, saturation: a.printSaturation) : nil
-        let noise = a.grain > 0 ? try kernels.grainNoise(extent, seed: a.seed) : nil
+        let noise = a.grain > 0 ? try kernels.grainNoise(extent, seed: a.seed, size: a.grainSize) : nil
         var image = try filmPrint(negative, glow: glow, noise: noise, a)
         if a.highlights != 0 || a.shadows != 0 {
             image = try kernels.applyLocalTone(image, shadows: a.shadows, highlights: a.highlights)
@@ -88,7 +88,7 @@ public final class Renderer: @unchecked Sendable {
         let black = CIImage(color: .black).cropped(to: extent)
         let texture =
             Halation.kernelArguments(for: model, amount: a.halation, backing: a.backing)
-            + Grain.kernelArguments(amount: a.grain, longEdge: max(extent.width, extent.height))
+            + Grain.kernelArguments(amount: a.grain, size: a.grainSize, color: a.grainColor, longEdge: max(extent.width, extent.height))
         return try kernels.run(
             relative ? kernels.filmSystemRelative : kernels.filmSystem, extent,
             [negative.image, glow ?? black, noise ?? black] + film + ends + texture)

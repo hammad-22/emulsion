@@ -42,9 +42,8 @@ struct VisualRegressionTests {
         #expect(!VisualRegression.thresholds.accepts(summary), "\(name) with \(edit) passes: \(summary)")
     }
 
-    /// Losing the grain or changing its seed on a photo fails the photo thresholds. With grain v2
-    /// (white, per-pixel density noise) the per-pixel ΔE00 limit catches it; SSIM alone mostly does
-    /// not (numbers on `VisualRegression.photoThresholds`).
+    /// Losing the grain or changing its seed on a photo fails the ΔE00 limits and the photo thresholds
+    /// (numbers on `VisualRegression.photoThresholds`).
     @Test(arguments: ["iphone12pro-proraw.default-look", "pixel8pro-dng.default-look"])
     func grainChangesFailThePhotoThresholds(name: String) throws {
         let regressionCase = try RegressionCase.named(name)

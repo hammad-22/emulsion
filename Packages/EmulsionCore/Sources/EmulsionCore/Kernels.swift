@@ -48,4 +48,20 @@ struct Kernels {
         guard let image = kernel.apply(extent: extent, arguments: arguments) else { throw EmulsionError.renderFailed }
         return image
     }
+
+    /// `image` blurred by a Gaussian of `sigma` pixels: below `Halation.exactBlurPixels` with the exact
+    /// separable kernel `gaussianPass`, above with Core Image's.
+    func gaussianBlur(_ image: CIImage, sigma: Double) throws -> CIImage {
+        guard sigma < Halation.exactBlurPixels else { return image.applyingGaussianBlur(sigma: sigma) }
+        let radius = (4 * sigma).rounded(.up)
+        func pass(_ input: CIImage, _ step: CIVector) throws -> CIImage {
+            guard
+                let output = gaussianPass.apply(
+                    extent: input.extent, roiCallback: { _, rect in rect.insetBy(dx: -radius * step.x, dy: -radius * step.y) },
+                    arguments: [input, step, sigma])
+            else { throw EmulsionError.renderFailed }
+            return output
+        }
+        return try pass(pass(image, CIVector(x: 1, y: 0)), CIVector(x: 0, y: 1))
+    }
 }

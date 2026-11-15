@@ -19,8 +19,11 @@ public struct Adjustments: Codable, Equatable, Sendable {
     public var highlights: Double = 0
     public var shadows: Double = 0
     /// Texture (0 … 1).
-    public var grain: Double = 0.35
+    public var grain: Double = FilmLook.grainAmount
     public var halation: Double = 0.35
+    /// Grain clump size (1…3, a frame that many times narrower) and its color part (0 mono … 1 measured).
+    public var grainSize: Double = FilmLook.grainSize
+    public var grainColor: Double = FilmLook.grainColor
     /// What stops halation at the back of the negative.
     public var backing: AntihalationBacking = .remJet
     public var process: RenderProcess = .film
@@ -44,6 +47,8 @@ public struct Adjustments: Codable, Equatable, Sendable {
         for k in [\Adjustments.warmth, \.tint, \.color, \.highlights, \.shadows] { a[keyPath: k] = min(1, max(-1, a[keyPath: k])) }
         a.grain = min(1, max(0, grain))
         a.halation = min(1, max(0, halation))
+        a.grainSize = min(3, max(1, grainSize))
+        a.grainColor = min(1, max(0, grainColor))
         a.whiteBalance = whiteBalance?.clamped()
         return a
     }
@@ -67,6 +72,8 @@ extension Adjustments {
         try decode(.shadows, into: &shadows)
         try decode(.grain, into: &grain)
         try decode(.halation, into: &halation)
+        try decode(.grainSize, into: &grainSize)
+        try decode(.grainColor, into: &grainColor)
         try decode(.backing, into: &backing)
         try decode(.seed, into: &seed)
         try decode(.whiteBalance, into: &whiteBalance)
