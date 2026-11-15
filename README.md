@@ -22,6 +22,6 @@ Read [AGENTS.md](AGENTS.md) for the engineering rules (they apply to humans and 
 
 ## License
 
-Apache License 2.0. See [LICENSE](LICENSE) and [NOTICE](NOTICE).
+GNU Affero General Public License v3.0 only (AGPL-3.0-only). See [LICENSE](LICENSE) and [NOTICE](NOTICE). You may use, study, change and share Emulsion; if you distribute it or a modified version, you must share your source under the same licence. For other licensing terms, contact the copyright holder.
 
 Film stock names are trademarks of their owners; Emulsion is not affiliated with or endorsed by them.
