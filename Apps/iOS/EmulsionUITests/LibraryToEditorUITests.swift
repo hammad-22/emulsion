@@ -175,11 +175,20 @@ final class LibraryToEditorUITests: XCTestCase {
 
     @MainActor
     func testLooksContrastAndTextClipping() throws {
-        let app = try launchSampleLibrary()
+        try auditLooksReadability()
+    }
+
+    @MainActor
+    func testLooksContrastAndTextClippingAtLargestTextSize() throws {
+        try auditLooksReadability(XCUIApplication.Presentation.largestText)
+    }
+
+    @MainActor
+    private func auditLooksReadability(_ presentation: [String] = []) throws {
+        XCUIDevice.shared.orientation = .portrait
+        let app = try XCUIApplication.launchSampleLibrary(presentation)
         defer { removeSamples(app) }
-        let photo = app.photos.firstMatch
-        XCTAssertTrue(photo.waitForExistence(timeout: 10))
-        photo.tap()
+        app.openFirstPhoto()
         app.buttons["Looks"].tap()
         XCTAssertTrue(app.navigationBars["Looks"].waitForExistence(timeout: 5))
         keepScreenshot(app, named: "Looks initial readability")
@@ -193,10 +202,10 @@ final class LibraryToEditorUITests: XCTestCase {
 
     @MainActor
     func testLooksSaveApplyAndDelete() throws {
+        XCUIDevice.shared.orientation = .portrait
         let app = try launchSampleLibrary()
         defer { removeSamples(app) }
-        let photo = app.photos.firstMatch
-        photo.tap()
+        app.openFirstPhoto()
         app.buttons["Looks"].tap()
         let warm = app.buttons.matching(NSPredicate(format: "label BEGINSWITH 'Warm Light'")).firstMatch
         XCTAssertTrue(warm.waitForExistence(timeout: 5))
