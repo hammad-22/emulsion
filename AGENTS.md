@@ -21,7 +21,7 @@ iOS 26 / macOS 26 only, iPhone 17 Pro and iPhone Duo as targets. Swift 6.4 toolc
 - `Packages/EmulsionUI/`: shared SwiftUI components (rendered photo, sliders, photo import).
 - `Apps/iOS/`: the iOS app (`Emulsion.xcodeproj`, sources in `Emulsion/`, UI walkthrough in `EmulsionUITests/`). Opens on the camera; the library and editor are behind it.
 - `Apps/macOS/`: minimal native Mac shell on the same packages (`Emulsion.xcodeproj`); library, edit and compare.
-- `Tools/`: `build-kernels.sh` rebuilds the metallibs; `make-sample-photos.swift` regenerates the bundled sample photos; `color-references/` generates the colour-science test references (offline Python, never shipped); `review-renders.sh` renders full-resolution before/after look reviews from local CC0 samples.
+- `Tools/`: `build-kernels.sh` rebuilds the metallibs; `make-sample-photos.swift` regenerates the bundled sample photos; `color-references/` generates the colour-science test references and `halation-kernel/` derives the halation profile and its Gaussian fit (offline Python, never shipped); `review-renders.sh` renders full-resolution before/after look reviews from local CC0 samples.
 
 ## Commands
 Run these yourself to verify every change. A change isn't done until they pass.
@@ -34,6 +34,7 @@ sh Tools/build-kernels.sh                                    # after any .metal 
 .venv/bin/python -I Tools/color-references/generate_input_references.py    # after changing input reference samples
 .venv/bin/python -I Tools/color-references/generate_delta_e_references.py  # after changing ΔE / chart references
 .venv/bin/python -I Tools/color-references/generate_ssim_references.py      # after changing SSIM references (all three: pip install -r Tools/color-references/requirements.txt)
+.venv/bin/python -I Tools/halation-kernel/halation_kernel.py              # after changing the halation derivation; writes the tool's JSON and Tests/.../References/halation-kernel.json (pip install -r Tools/halation-kernel/requirements.txt)
 (cd Packages/EmulsionCore && EMULSION_PERF=1 swift test --filter PerformanceProbe)  # Mac timings
 (cd Packages/EmulsionCore && EMULSION_UPDATE_GOLDENS=1 swift test --filter VisualRegression)  # accept an intended look change (Tests/AGENTS.md)
 Tools/review-renders.sh [base-ref]                           # full-resolution before/after of the local CC0 samples for look reviews

@@ -1,7 +1,7 @@
 # Metal / Core Image kernels
 
 - Two sources of Core Image color kernels (`extern "C"`, `coreimage::sample_t`), linked into one metallib per platform by `Tools/build-kernels.sh` (`metal-link`, since `metallib -cikernel` takes one input):
-  - `Emulsion.ci.metal`, the film process. Swift mirrors: `FilmModel.swift`, `FilmModel+Display.swift` and `ColorSpaces.swift`; loaded by `Kernels`.
+  - `Emulsion.ci.metal`, the film process. Swift mirrors: `FilmModel.swift`, `FilmModel+Display.swift`, `ColorSpaces.swift`, `Halation.swift` and `Grain.swift`; loaded by `Kernels`.
   - `Digicam.ci.metal`, the digicam process. Swift mirror: `DigicamModel.swift`; constants arrive as arguments from `DigicamLook`; loaded by `DigicamKernels`. Its `digicamLuma709`, `digicamHash` and value-noise lattice copy `lumaSRGB`, the grain `hash` and `valueNoise` from the film file so its open PRs merge cleanly; share a header later.
   - Function names are global across both files: prefix digicam ones with `digicam`. Change a kernel and its mirror together, using the same names for constants.
 - Rebuild with `sh Tools/build-kernels.sh` and commit all three metallibs (macOS, iOS, simulator) together with the source. The deployment target in the script must match `Package.swift`.
