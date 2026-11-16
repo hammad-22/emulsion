@@ -79,7 +79,7 @@ Fujifilm ended motion-picture film production around 2013 and no longer hosts th
 
 ## Licenses and trademarks
 
-- **Kodak documents** are © Eastman Kodak Company with no license grant. Each sheet lists trademarks, e.g. "Kodak, Keykode, Vision, and Wratten and the Kodak logo are trademarks" (H-1-5207) and "Kodak, Estar, Vision, and Wratten…" (H-1-2383); the Ektachrome sheet adds EKTACHROME. **Do not commit the PDFs.** Digitized curve values are factual measurements, but whether we may publish them in an Apache-2.0 repo is a legal question (MOV-87, MOV-94). Product names stay out of the app (MOV-92).
+- **Kodak documents** are © Eastman Kodak Company with no license grant. Each sheet lists trademarks, e.g. "Kodak, Keykode, Vision, and Wratten and the Kodak logo are trademarks" (H-1-5207) and "Kodak, Estar, Vision, and Wratten…" (H-1-2383); the Ektachrome sheet adds EKTACHROME. **Do not commit the PDFs.** Digitized curve values are factual measurements, but whether we may publish them in this public AGPL-3.0-only repo is a legal question (MOV-87, MOV-94). Product names stay out of the app (MOV-92).
 - **Fujifilm documents** are © Fujifilm; ETERNA, REALA and FUJICOLOR are Fujifilm marks. Our only copies are third-party mirrors, so their availability can change. Same rules as Kodak.
 - **SMPTE documents** are © SMPTE and offered free at pub.smpte.org. Using the RP 180 and APD responsivity tables as data inside the engine needs a license check before we ship the tables (MOV-94). **[Unverified: SMPTE's terms for redistributing the CSVs]**
 - **ISO 5-3** is paywalled; we hold no copy of its tables.

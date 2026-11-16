@@ -129,4 +129,4 @@ The product strategy is **Easy now, Pro later, same engine.** Every engine contr
 | --- | --- | --- | --- |
 | O1 | Free disk space on the dev Mac (Trash 23 GB) | P0 | ≥ 30 GB free |
 | O2 | Initial commit + GitHub repo (private) | P0 | User approval |
-| O3 | Third-party notices + license audit (no GPL code) | P1 | |
+| O3 | Third-party notices + license audit (no third-party copyleft code or data) | P1 | |
