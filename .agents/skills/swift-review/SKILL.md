@@ -48,7 +48,7 @@ Review the PR's diff (`gh pr diff <n>`, or `git diff main...HEAD`). Read `AGENTS
    - Bugs come with a regression test.
 8. **Hygiene**
    - Minimal comments, which explain why and give the source behind numbers; no stale or narrating comments, no dead code.
-   - No GPL code or data; no film brand names in UI strings.
+   - No third-party copyleft code or data (GPL, AGPL, LGPL, CC BY-SA); no film brand names in UI strings.
    - `swift format lint` is clean.
    - The PR has a Proof section and no tool-attribution footer.
 
