@@ -93,10 +93,7 @@ final class AccessibilityUITests: XCTestCase {
 
     @MainActor
     private func openAdjustments(_ app: XCUIApplication) throws -> XCUIElement {
-        app.photos.firstMatch.tap()
-        let editPhoto = app.buttons["Edit Photo"]
-        if editPhoto.waitForExistence(timeout: 2) { editPhoto.tap() }
-        XCTAssertTrue(app.buttons["Looks"].waitForExistence(timeout: 5))
+        app.openFirstPhoto()
         if app.buttons["Adjust"].exists { app.buttons["Adjust"].tap() }
         let ruler = app.otherElements.matching(identifier: AccessibilityID.adjustmentRuler).firstMatch
         XCTAssertTrue(ruler.waitForExistence(timeout: 5))

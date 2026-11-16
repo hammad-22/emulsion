@@ -11,7 +11,7 @@ public struct LooksButton: View {
         Button("Looks", systemImage: "camera.filters") { isPresented = true }
             .sheet(isPresented: $isPresented) {
                 LooksPicker(session: session)
-                    .presentationDetents([.medium, .large])
+                    .presentationDetents([.large])
                     .presentationDragIndicator(.visible)
             }
     }

@@ -174,6 +174,84 @@ final class LibraryToEditorUITests: XCTestCase {
     }
 
     @MainActor
+    func testLooksContrastAndTextClipping() throws {
+        try auditLooksReadability()
+    }
+
+    @MainActor
+    func testLooksContrastAndTextClippingAtLargestTextSize() throws {
+        try auditLooksReadability(XCUIApplication.Presentation.largestText)
+    }
+
+    @MainActor
+    private func auditLooksReadability(_ presentation: [String] = []) throws {
+        XCUIDevice.shared.orientation = .portrait
+        let app = try XCUIApplication.launchSampleLibrary(presentation)
+        defer { removeSamples(app) }
+        app.openFirstPhoto()
+        app.buttons["Looks"].tap()
+        XCTAssertTrue(app.navigationBars["Looks"].waitForExistence(timeout: 5))
+        keepScreenshot(app, named: "Looks initial readability")
+        try app.performAccessibilityAudit(for: [.contrast, .textClipped])
+        for page in 1...5 {
+            app.collectionViews["looks-collection"].swipeUp()
+            keepScreenshot(app, named: "Looks text layout \(page)")
+            try app.performAccessibilityAudit(for: [.contrast, .textClipped])
+        }
+    }
+
+    @MainActor
+    func testLooksSaveApplyAndDelete() throws {
+        try saveApplyAndDeleteLook()
+    }
+
+    @MainActor
+    func testLooksSaveApplyAndDeleteAtLargestTextSize() throws {
+        try saveApplyAndDeleteLook(XCUIApplication.Presentation.largestText)
+    }
+
+    @MainActor
+    private func saveApplyAndDeleteLook(_ presentation: [String] = []) throws {
+        XCUIDevice.shared.orientation = .portrait
+        let app = try XCUIApplication.launchSampleLibrary(presentation)
+        defer { removeSamples(app) }
+        app.openFirstPhoto()
+        app.buttons["Looks"].tap()
+        let warm = app.buttons.matching(NSPredicate(format: "label BEGINSWITH 'Warm Light'")).firstMatch
+        XCTAssertTrue(warm.waitForExistence(timeout: 5))
+        let collection = app.collectionViews["looks-collection"]
+        let warmTitle = app.staticTexts["Warm Light"]
+        for _ in 0..<5 where warmTitle.exists && !collection.frame.contains(warmTitle.frame) { collection.swipeUp() }
+        XCTAssertTrue(warmTitle.isHittable)
+        warmTitle.tap()
+        XCTAssertTrue(app.navigationBars["Looks"].waitForNonExistence(timeout: 5))
+        app.buttons["Looks"].tap()
+        XCTAssertTrue(app.navigationBars["Looks"].waitForExistence(timeout: 5))
+        XCTAssertTrue(warm.waitForExistence(timeout: 5))
+        XCTAssertTrue(warm.isSelected)
+        app.buttons["Save Look"].tap()
+        let save = app.alerts["Save Look"]
+        XCTAssertTrue(save.waitForExistence(timeout: 5))
+        save.textFields.firstMatch.tap()
+        save.textFields.firstMatch.typeText("Readability Test")
+        save.buttons["Save"].tap()
+        let saved = app.buttons.matching(NSPredicate(format: "label BEGINSWITH 'Readability Test'")).firstMatch
+        XCTAssertTrue(saved.waitForExistence(timeout: 5))
+        XCTAssertTrue(saved.isHittable, "Saving scrolls to the new look")
+        keepScreenshot(app, named: "Saved look")
+        app.staticTexts["Readability Test"].tap()
+        XCTAssertTrue(app.navigationBars["Looks"].waitForNonExistence(timeout: 5))
+        app.buttons["Looks"].tap()
+        for _ in 0..<5 where !saved.isHittable { app.collectionViews["looks-collection"].swipeUp() }
+        XCTAssertTrue(saved.isSelected)
+        app.buttons["Options for Readability Test"].tap()
+        XCTAssertTrue(app.buttons["Share Look"].waitForExistence(timeout: 5))
+        app.buttons["Delete Look"].tap()
+        app.buttons["Delete Look"].tap()
+        XCTAssertFalse(saved.exists)
+    }
+
+    @MainActor
     private func launchSampleLibrary() throws -> XCUIApplication { try XCUIApplication.launchSampleLibrary() }
 
     @MainActor
