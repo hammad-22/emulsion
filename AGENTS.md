@@ -63,11 +63,14 @@ Stock-data checks and `emulsion-fit` read the local reference data (traced curve
 - **Review agents always.** Have an independent agent check any non-trivial engine change, research claim or verdict. Back claims with proof (file:line, a reproduced number, a source URL) and say what's unverified.
 - **Reuse before writing.** Search for an existing helper before adding one. Duplicates between Swift and Metal are deliberate mirrors; any other duplicate is a bug.
 - **Leave it cleaner.** Fix stale comments and dead code in the files you touch. For layout (file size, comments, constants, enums), follow the organize skill (`.agents/skills/swift-organize/SKILL.md`).
-- **Prove it in the PR.** Every PR has a **Proof** section (template in `.github/pull_request_template.md`):
-  - UI changes: before/after screenshots or a short screen recording from the iOS Simulator (`xcrun simctl io booted screenshot|recordVideo`), and from a device when it matters;
-  - engine changes: before/after renders of a reference fixture, plus the measured numbers;
-  - docs-only changes: say "no visual change".
-  - for third-party-derived data, publish residual numbers, not plots of the source curves.
+- **Prove it in the PR: before and after, visually.** Every PR has a **Proof** section (template in `.github/pull_request_template.md`) that a reviewer can judge without checking out the branch:
+  - Start it with one or two lines under **What to look for**: what the reviewer should see change, and where.
+  - Show **before and after side by side**, same scene, same size, same settings except the change; "before" is the base branch.
+  - Pick the medium by the change: screenshots for anything static (layout, text, a color, a render); a short screen recording for anything with motion or interaction (animation, transition, gesture, scrolling, live slider drags, capture flow). When unsure, record.
+  - UI changes: iOS Simulator (`xcrun simctl io booted screenshot|recordVideo`) on iPhone 17 Pro and Duo, light and dark when it matters, and a device when it matters.
+  - Engine and look changes: before/after renders of a reference fixture at whole-photo size plus a 100% crop where the change shows, with the measured numbers.
+  - Only when nothing visible can change (docs, tests, refactors): say "No visual change" and why; for refactors, give the evidence (goldens unchanged).
+  - For third-party-derived data, publish residual numbers, not plots of the source curves. Proof uses only media we may publish (synthetic or CC0-derived); never the owner's or third-party photos.
   - Proof images and recordings go on a `proof/<issue>` branch (e.g. `proof/mov-54`), linked from the PR by a commit-pinned `raw.githubusercontent.com/.../<sha>/...` URL. Never commit them to `main` or a feature branch (MOV-131).
 - **CI test crashes:** inspect the `test-diagnostics-<run>-<attempt>` artifact for the test log and macOS crash reports (MOV-127). Keep the failing exit status; don't mask crashes with retries.
 - **Run the app in the Simulator** for any app change; don't stop at "it compiles". Use the iPhone 17 Pro and iPhone Duo simulators.

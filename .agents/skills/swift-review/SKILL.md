@@ -50,7 +50,7 @@ Review the PR's diff (`gh pr diff <n>`, or `git diff main...HEAD`). Read `AGENTS
    - Minimal comments, which explain why and give the source behind numbers; no stale or narrating comments, no dead code.
    - No third-party copyleft code or data (GPL, AGPL, LGPL, CC BY-SA); no film brand names in UI strings.
    - `swift format lint` is clean.
-   - The PR has a Proof section and no tool-attribution footer.
+   - The PR's Proof section shows before and after side by side (screenshots for static changes, a recording for motion or interaction), opens with "What to look for", or says "No visual change" with the reason; no tool-attribution footer.
 
 ## Output
 - **Findings, most important first.** Give each one:
