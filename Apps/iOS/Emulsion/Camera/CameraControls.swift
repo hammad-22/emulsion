@@ -24,13 +24,10 @@ struct CameraControls: View {
                 ScrollView { rail }.scrollIndicators(.hidden)
             }
         } else {
-            VStack(spacing: FilmLabLayout.space) {
-                lenses
-                HStack {
-                    library.frame(maxWidth: .infinity, alignment: .leading)
-                    shutter
-                    recipe.frame(maxWidth: .infinity, alignment: .trailing)
-                }
+            HStack {
+                library.frame(maxWidth: .infinity, alignment: .leading)
+                shutter
+                recipe.frame(maxWidth: .infinity, alignment: .trailing)
             }
         }
     }

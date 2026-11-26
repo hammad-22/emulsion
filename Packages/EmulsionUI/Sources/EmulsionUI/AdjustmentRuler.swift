@@ -8,7 +8,9 @@ struct AdjustmentRuler: View {
     @Binding var adjustments: Adjustments
     /// One of several rulers in the inspector: a smaller readout over the minimum touch height.
     var isCompact = false
+    var axis: Axis = .horizontal
     @State private var drag = RulerDrag()
+    @GestureState private var isScrubbingVertically = false
 
     private let tickSpacing: CGFloat = 10
     /// Every fifth tick is major: taller and a level brighter, like a printed scale.
@@ -25,17 +27,11 @@ struct AdjustmentRuler: View {
 
     var body: some View {
         VStack(spacing: FilmLabLayout.compact) {
-            ViewThatFits(in: .horizontal) {
-                HStack(alignment: .firstTextBaseline) {
-                    title.fixedSize()
-                    Spacer(minLength: FilmLabLayout.compact)
-                    readout.fixedSize()
-                }
-                VStack(alignment: .leading, spacing: FilmLabLayout.compact) {
-                    title
-                    readout
-                }
-                .frame(maxWidth: .infinity, alignment: .leading)
+            if axis == .vertical {
+                title.multilineTextAlignment(.center)
+                readout
+            } else {
+                horizontalReadout
             }
             scale
         }
@@ -55,32 +51,69 @@ struct AdjustmentRuler: View {
         .onChange(of: control.id) { drag.end() }
     }
 
+    private var horizontalReadout: some View {
+        ViewThatFits(in: .horizontal) {
+            HStack(alignment: .firstTextBaseline) {
+                title.fixedSize()
+                Spacer(minLength: FilmLabLayout.compact)
+                readout.fixedSize()
+            }
+            VStack(alignment: .leading, spacing: FilmLabLayout.compact) {
+                title
+                readout
+            }
+            .frame(maxWidth: .infinity, alignment: .leading)
+        }
+    }
+
     private var title: some View { Text(control.title(for: adjustments.process)).font(.subheadline.weight(.medium)) }
 
     private var readout: some View {
         Text(control.formatted(value)).font((isCompact ? Font.body : .title2).weight(.medium)).monospacedDigit()
     }
 
-    private var scale: some View {
-        ticks
-            .frame(maxWidth: .infinity, maxHeight: .infinity)
+    @ViewBuilder private var scale: some View {
+        if axis == .vertical {
+            scaleSurface
+                .gesture(
+                    DragGesture()
+                        .updating($isScrubbingVertically) { _, active, _ in active = true }
+                        .onChanged { scrub($0.translation.height, across: $0.translation.width) }
+                )
+                .onChange(of: isScrubbingVertically) { _, active in
+                    if !active { drag.end() }
+                }
+                .frame(minHeight: FilmLabLayout.minimumControlHeight)
+        } else {
+            scaleSurface
+                .horizontalScrub {
+                    scrub($0.width, across: $0.height)
+                } onEnded: {
+                    drag.end()
+                }
+                .frame(height: scaleHeight)
+        }
+    }
+
+    private var scaleSurface: some View {
+        ticks.frame(maxWidth: .infinity, maxHeight: .infinity)
             .mask {
-                LinearGradient(colors: [.clear, .black, .black, .clear], startPoint: .leading, endPoint: .trailing)
+                LinearGradient(
+                    colors: [.clear, .black, .black, .clear],
+                    startPoint: axis == .vertical ? .top : .leading,
+                    endPoint: axis == .vertical ? .bottom : .trailing)
             }
             .contentShape(.rect)
-            .horizontalScrub { translation in
-                let next = drag.update(
-                    value: value, translation: translation.width, verticalTranslation: translation.height,
-                    pointsPerUnit: tickSpacing / control.increment, range: control.range,
-                    neutral: neutral, detent: control.increment * 0.3
-                )
-                set(next)
-            } onEnded: {
-                drag.end()
-            }
             .onTapGesture(count: 2) { set(neutral) }
-            .frame(height: scaleHeight)
             .clipped()
+    }
+
+    private func scrub(_ translation: CGFloat, across perpendicular: CGFloat) {
+        set(
+            drag.update(
+                value: value, translation: translation, verticalTranslation: perpendicular,
+                pointsPerUnit: tickSpacing / control.increment, range: control.range,
+                neutral: neutral, detent: control.increment * 0.3))
     }
 
     /// One drawing for the whole scale, so a drag redraws the visible ticks instead of
@@ -93,22 +126,29 @@ struct AdjustmentRuler: View {
         let tickSpacing = self.tickSpacing
         let (major, minor, tickWidth, indicatorSize) = (majorTickHeight, minorTickHeight, self.tickWidth, self.indicatorSize)
         return Canvas { context, size in
-            let halfSpan = Double(size.width) / 2 / tickSpacing
+            let isVertical = axis == .vertical
+            let length = isVertical ? size.height : size.width
+            let breadth = isVertical ? size.width : size.height
+            let halfSpan = Double(length) / 2 / tickSpacing
             let first = max(0, Int((position - halfSpan).rounded(.down)))
             let last = min(tickCount, Int((position + halfSpan).rounded(.up)))
             guard first <= last else { return }
             for tick in first...last {
                 let isMajor = tick.isMultiple(of: 5)
                 let height = isMajor ? major : minor
-                let x = size.width / 2 + (Double(tick) - position) * tickSpacing
-                let mark = CGRect(x: x - tickWidth / 2, y: (size.height - height) / 2, width: tickWidth, height: height)
-                context.fill(Path(mark), with: isMajor ? .style(.secondary) : .style(.tertiary))
+                let x = length / 2 + (Double(tick) - position) * tickSpacing
+                let mark = CGRect(x: x - tickWidth / 2, y: (breadth - height) / 2, width: tickWidth, height: height)
+                context.fill(Path(oriented(mark)), with: isMajor ? .style(.secondary) : .style(.tertiary))
             }
             let indicator = CGRect(
-                x: (size.width - indicatorSize.width) / 2, y: (size.height - indicatorSize.height) / 2,
+                x: (length - indicatorSize.width) / 2, y: (breadth - indicatorSize.height) / 2,
                 width: indicatorSize.width, height: indicatorSize.height)
-            context.fill(Path(roundedRect: indicator, cornerRadius: indicatorSize.width / 2), with: .style(.primary))
+            context.fill(Path(roundedRect: oriented(indicator), cornerRadius: indicatorSize.width / 2), with: .style(.primary))
         }
+    }
+
+    private func oriented(_ rect: CGRect) -> CGRect {
+        axis == .vertical ? CGRect(x: rect.minY, y: rect.minX, width: rect.height, height: rect.width) : rect
     }
 
     private func set(_ value: Double) {

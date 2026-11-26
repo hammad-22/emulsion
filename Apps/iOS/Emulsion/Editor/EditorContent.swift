@@ -15,6 +15,8 @@ struct EditorContent: View {
     @State private var adjustmentsPreference: Bool?
 
     private var showsOriginal: Bool { isComparing || isHolding }
+    private let verticalPanelWidth: CGFloat = 128
+    private let minimumVerticalPanelHeight: CGFloat = 250
 
     var body: some View {
         GeometryReader { geometry in
@@ -37,26 +39,63 @@ struct EditorContent: View {
 
     @ViewBuilder
     private func workspace(_ geometry: GeometryProxy, isExpanded: Bool, showsAdjustments: Bool) -> some View {
-        if #available(iOS 27.1, *), isExpanded {
-            ArrangementWorkspace(showsInspector: showsAdjustments) {
+        if #available(iOS 27.1, *) {
+            EditorAdjustmentAxis(hasDivision: !geometry.reservedRegions(kind: .division, options: .includeInactive).isEmpty) { vertical in
+                adaptiveWorkspace(
+                    isExpanded: isExpanded, showsAdjustments: showsAdjustments,
+                    usesVerticalPanel: vertical && geometry.size.height >= minimumVerticalPanelHeight)
+            }
+        } else {
+            compactLayout(height: geometry.size.height, showsAdjustments: showsAdjustments)
+        }
+    }
+
+    @available(iOS 27.1, *)
+    @ViewBuilder private func adaptiveWorkspace(isExpanded: Bool, showsAdjustments: Bool, usesVerticalPanel: Bool) -> some View {
+        if isExpanded {
+            ArrangementWorkspace(showsInspector: showsAdjustments, narrowInspectorWidth: usesVerticalPanel ? verticalPanelWidth : nil) {
                 photo.padding(FilmLabLayout.inset)
             } inspector: {
-                AdjustmentInspector(
-                    adjustments: $session.adjustments, group: $group, selection: $selection,
-                    whiteBalanceAsShot: session.asShotWhiteBalance
-                )
-                .disabled(showsOriginal)
+                if usesVerticalPanel {
+                    verticalPanel
+                } else {
+                    AdjustmentInspector(
+                        adjustments: $session.adjustments, group: $group, selection: $selection,
+                        whiteBalanceAsShot: session.asShotWhiteBalance
+                    )
+                    .disabled(showsOriginal)
+                }
             }
-        } else if #available(iOS 27.1, *) {
+        } else if usesVerticalPanel {
+            UnobscuredContent {
+                HStack(spacing: showsAdjustments ? FilmLabLayout.compact : 0) {
+                    photo
+                    verticalPanel
+                        .frame(width: showsAdjustments ? verticalPanelWidth : 0)
+                        .clipped()
+                        .opacity(showsAdjustments ? 1 : 0)
+                        .allowsHitTesting(showsAdjustments)
+                        .accessibilityHidden(!showsAdjustments)
+                }
+                .padding(.horizontal, FilmLabLayout.compact)
+            }
+        } else {
             // Always wrapped, so an occlusion appearing doesn't rebuild the photo.
             UnobscuredContent {
                 GeometryReader { unobscured in
                     compactLayout(height: unobscured.size.height, showsAdjustments: showsAdjustments)
                 }
             }
-        } else {
-            compactLayout(height: geometry.size.height, showsAdjustments: showsAdjustments)
         }
+    }
+
+    private var verticalPanel: some View {
+        VerticalAdjustmentPanel(
+            adjustments: $session.adjustments, group: $group, selection: $selection,
+            whiteBalanceAsShot: session.asShotWhiteBalance
+        )
+        .frame(maxWidth: verticalPanelWidth)
+        .disabled(showsOriginal)
     }
 
     private var photo: some View {
