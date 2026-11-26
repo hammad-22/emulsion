@@ -65,9 +65,11 @@ struct CameraContent: View {
                     .transition(reduceMotion ? .opacity : .move(edge: .bottom).combined(with: .opacity))
             }
             if !isWide, let capabilities = model.capabilities, capabilities.lenses.count > 1 {
-                LensPicker(capabilities: capabilities) { lens in Task { await model.select(lens) } }
-                    .disabled(!model.acceptsInput)
-                    .dynamicTypeSize(...FilmLabLayout.largestCameraTextSize)
+                LensPicker(capabilities: capabilities) { option in
+                    Task { await model.select(option.lens, zoomFactor: option.zoomFactor) }
+                }
+                .disabled(!model.acceptsInput)
+                .dynamicTypeSize(...FilmLabLayout.largestCameraTextSize)
             }
         }
         .padding(.bottom, FilmLabLayout.gap)

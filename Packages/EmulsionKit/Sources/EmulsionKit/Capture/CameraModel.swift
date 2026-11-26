@@ -25,7 +25,8 @@ public final class CameraModel {
     public private(set) var pressure = CameraPressure.nominal
     public private(set) var capabilities: CameraCapabilities?
     public private(set) var isCapturing = false
-    public var acceptsInput: Bool { status == .running && !isCapturing }
+    private var isSelectingLens = false
+    public var acceptsInput: Bool { status == .running && !isCapturing && !isSelectingLens }
     public private(set) var lastCapture: PhotoRecord?
     /// 0…1 of the upright frame, until the reticle fades.
     public private(set) var focusPoint: CGPoint?
@@ -115,10 +116,14 @@ public final class CameraModel {
         await source.stop()
     }
 
-    public func select(_ lens: CameraLens) async {
-        guard acceptsInput, lens != capabilities?.lens else { return }
+    public func select(_ lens: CameraLens, zoomFactor: Double = 1) async {
+        guard acceptsInput, let current = capabilities,
+            lens != current.lens || zoomFactor != current.zoomFactor
+        else { return }
+        isSelectingLens = true
+        defer { isSelectingLens = false }
         do {
-            capabilities = try await source.select(lens)
+            capabilities = try await source.select(lens, zoomFactor: zoomFactor)
         } catch {
             self.error = error
         }

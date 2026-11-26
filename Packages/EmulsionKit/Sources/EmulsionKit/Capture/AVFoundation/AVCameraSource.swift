@@ -15,7 +15,8 @@
         nonisolated let eventDelivery = SourceStream.events()
         var isConfigured = false
         var devices: [CameraLens: AVCaptureDevice] = [:]
-        var lensOptions: [LensOption] = []
+        private var verifiedNativeZoom: [CameraLens: [CGFloat]] = [:]
+        private var isCapturingPhoto = false
         var input: AVCaptureDeviceInput?
         var lens = CameraLens.wide
         var rawFormat = RAWFormat.proRAW
@@ -58,8 +59,10 @@
             if session.isRunning { session.stopRunning() }
         }
 
-        public func select(_ lens: CameraLens) throws(CameraError) -> CameraCapabilities {
-            try use(lens)
+        public func select(_ lens: CameraLens, zoomFactor: Double) throws(CameraError) -> CameraCapabilities {
+            guard !isCapturingPhoto, capabilities.lenses.contains(where: { $0.lens == lens && $0.zoomFactor == zoomFactor })
+            else { throw .unavailable }
+            try use(lens, zoomFactor: zoomFactor)
             return capabilities
         }
 
@@ -80,9 +83,18 @@
         }
 
         public func capture(_ resolution: AppSettings.Resolution) async throws(CameraError) -> CapturedPhoto {
-            guard session.isRunning, let rawPixelFormat else { throw .captureFailed }
+            guard !isCapturingPhoto, session.isRunning, let rawPixelFormat, let device = input?.device,
+                photoOutput.availableRawPhotoPixelFormatTypes.contains(rawPixelFormat)
+            else { throw .captureFailed }
+            let isZoomed = device.videoZoomFactor != 1
+            if rawFormat == .bayer {
+                guard !isZoomed, photoOutput.connection(with: .video)?.videoScaleAndCropFactor == 1
+                else { throw .captureFailed }
+            }
+            isCapturingPhoto = true
+            defer { isCapturingPhoto = false }
             let settings = AVCapturePhotoSettings(rawPixelFormatType: rawPixelFormat)
-            if let size = PhotoDimensions.choose(resolution, from: photoDimensions) {
+            if let size = PhotoDimensions.choose(isZoomed ? .standard : resolution, from: photoDimensions) {
                 settings.maxPhotoDimensions = CMVideoDimensions(width: size.width, height: size.height)
             }
             // Bayer RAW must prioritize speed; ProRAW may use quality (AVCapturePhotoOutput.h).
@@ -112,9 +124,15 @@
         }
 
         private var capabilities: CameraCapabilities {
-            CameraCapabilities(
-                lenses: lensOptions, lens: lens, rawFormat: rawFormat,
-                supportsFullResolution: PhotoDimensions.supportsFullResolution(photoDimensions))
+            let zoomFactor = Double(input?.device.videoZoomFactor ?? 1)
+            // Only advertise crops from lenses whose RAW output has been configured.
+            if let device = input?.device {
+                verifiedNativeZoom[lens] = rawFormat == .proRAW ? device.nativeZoomStops : []
+            }
+            return CameraCapabilities(
+                lenses: LensOption.options(for: devices, nativeZoom: verifiedNativeZoom),
+                lens: lens, zoomFactor: zoomFactor, rawFormat: rawFormat,
+                supportsFullResolution: zoomFactor == 1 && PhotoDimensions.supportsFullResolution(photoDimensions))
         }
 
         private static func preferredThumbnailCodec(_ available: [AVVideoCodecType]) -> AVVideoCodecType? {

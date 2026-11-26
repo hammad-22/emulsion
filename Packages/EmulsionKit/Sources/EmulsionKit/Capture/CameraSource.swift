@@ -7,7 +7,7 @@ public protocol CameraSource: Sendable {
     func events() -> AsyncStream<CameraEvent>
     func start(lens: CameraLens) async throws(CameraError) -> CameraCapabilities
     func stop() async
-    func select(_ lens: CameraLens) async throws(CameraError) -> CameraCapabilities
+    func select(_ lens: CameraLens, zoomFactor: Double) async throws(CameraError) -> CameraCapabilities
     /// `framePoint` is 0…1 of the upright frame as displayed, top-left origin.
     func focusAndExpose(at framePoint: CGPoint) async
     func capture(_ resolution: AppSettings.Resolution) async throws(CameraError) -> CapturedPhoto

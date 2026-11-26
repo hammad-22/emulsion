@@ -21,7 +21,6 @@
                 if let lens = CameraLens(device.deviceType) { devices[lens] = device }
             }
             guard !devices.isEmpty else { throw .unavailable }
-            lensOptions = LensOption.options(for: devices)
 
             session.beginConfiguration()
             defer { session.commitConfiguration() }
@@ -39,15 +38,20 @@
             isConfigured = true
         }
 
-        func use(_ requested: CameraLens) throws(CameraError) {
+        func use(_ requested: CameraLens, zoomFactor: Double = 1) throws(CameraError) {
             let lens = devices[requested] == nil ? .wide : requested
             guard let device = devices[lens] else { throw .unavailable }
+            if input?.device == device {
+                try setZoom(zoomFactor, on: device)
+                return
+            }
             let newInput: AVCaptureDeviceInput
             do { newInput = try AVCaptureDeviceInput(device: device) } catch { throw .unavailable }
             let previous = input
             guard swapInput(from: previous, to: newInput) else { throw .unavailable }
             do {
                 try configureRAW(for: device)
+                try setZoom(zoomFactor, on: device)
             } catch {
                 rawPixelFormat = nil
                 restore(previous, replacing: newInput)
@@ -55,6 +59,16 @@
             }
             self.lens = lens
             follow(device)
+        }
+
+        private func setZoom(_ zoomFactor: Double, on device: AVCaptureDevice) throws(CameraError) {
+            let factor = CGFloat(zoomFactor)
+            do { try device.lockForConfiguration() } catch { throw .unavailable }
+            defer { device.unlockForConfiguration() }
+            // AVCapturePhotoOutput requires 1× for Bayer RAW.
+            guard factor == 1 || (rawFormat == .proRAW && device.nativeZoomStops.contains(factor)) else { throw .unavailable }
+            guard factor != device.videoZoomFactor else { return }
+            device.videoZoomFactor = factor
         }
 
         private func restore(_ previous: AVCaptureDeviceInput?, replacing failed: AVCaptureDeviceInput) {

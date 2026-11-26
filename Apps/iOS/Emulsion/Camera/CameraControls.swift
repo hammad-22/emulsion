@@ -48,8 +48,10 @@ struct CameraControls: View {
 
     @ViewBuilder private var lenses: some View {
         if let capabilities = model.capabilities, capabilities.lenses.count > 1 {
-            LensPicker(capabilities: capabilities) { lens in Task { await model.select(lens) } }
-                .disabled(!model.acceptsInput)
+            LensPicker(capabilities: capabilities) { option in
+                Task { await model.select(option.lens, zoomFactor: option.zoomFactor) }
+            }
+            .disabled(!model.acceptsInput)
         }
     }
 

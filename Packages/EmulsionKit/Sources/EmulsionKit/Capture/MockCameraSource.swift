@@ -18,6 +18,7 @@ public actor MockCameraSource: CameraSource {
     private nonisolated let stream = SourceStream.frames()
     private nonisolated let eventStream = SourceStream.events()
     private var lens = CameraLens.wide
+    private var zoomFactor = 1.0
     private var delivery: Task<Void, Never>?
     private var isInterrupted = false
     private var samples: [CGImage] = []
@@ -71,7 +72,10 @@ public actor MockCameraSource: CameraSource {
         if let startError { throw startError }
         guard !lenses.isEmpty else { throw .unavailable }
         if samples.isEmpty { samples = PhotoStore.sampleURLs.compactMap(Self.panningSample) }
-        self.lens = lenses.contains { $0.lens == lens } ? lens : lenses[0].lens
+        if self.lens != lens || !lenses.contains(where: { $0.lens == lens }) {
+            self.lens = lenses.contains { $0.lens == lens } ? lens : lenses[0].lens
+            zoomFactor = 1
+        }
         if delivery == nil { delivery = Task { await deliverFrames() } }
         return capabilities
     }
@@ -82,9 +86,10 @@ public actor MockCameraSource: CameraSource {
         isInterrupted = false
     }
 
-    public func select(_ lens: CameraLens) throws(CameraError) -> CameraCapabilities {
-        guard lenses.contains(where: { $0.lens == lens }) else { throw .unavailable }
+    public func select(_ lens: CameraLens, zoomFactor: Double) throws(CameraError) -> CameraCapabilities {
+        guard lenses.contains(where: { $0.lens == lens && $0.zoomFactor == zoomFactor }) else { throw .unavailable }
         self.lens = lens
+        self.zoomFactor = zoomFactor
         return capabilities
     }
 
@@ -106,10 +111,12 @@ public actor MockCameraSource: CameraSource {
     public func attachViewfinder(_ layer: ViewfinderLayer) {}
 
     private var capabilities: CameraCapabilities {
-        CameraCapabilities(lenses: lenses, lens: lens, rawFormat: .proRAW, supportsFullResolution: lens != .ultraWide)
+        CameraCapabilities(
+            lenses: lenses, lens: lens, zoomFactor: zoomFactor, rawFormat: .proRAW,
+            supportsFullResolution: lens != .ultraWide && zoomFactor == 1)
     }
 
-    private var sampleIndex: Int { lenses.firstIndex { $0.lens == lens } ?? 0 }
+    private var sampleIndex: Int { lenses.filter { $0.zoomFactor == 1 }.firstIndex { $0.lens == lens } ?? 0 }
 
     private var sampleURL: URL? {
         let urls = PhotoStore.sampleURLs

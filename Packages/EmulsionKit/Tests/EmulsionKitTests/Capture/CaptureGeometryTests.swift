@@ -64,6 +64,21 @@ struct RAWFormatTests {
 }
 
 struct LensOptionTests {
+    @Test func nativeStopsKeepPhysicalLensesAndUseTheirDisplayedMagnification() {
+        let ultraWide = LensOption(lens: .ultraWide, magnification: 13.0 / 24)
+        let wide = LensOption(lens: .wide, magnification: 1)
+        let telephoto = LensOption(lens: .telephoto, magnification: 100.0 / 24)
+        let duplicateWide = LensOption(lens: .ultraWide, magnification: 26.0 / 24, zoomFactor: 2)
+        let wideCrop = LensOption(lens: .wide, magnification: 2, zoomFactor: 2)
+        let telephotoCrop = LensOption(lens: .telephoto, magnification: 200.0 / 24, zoomFactor: 2)
+
+        let options = LensOption.merging(physical: [ultraWide, wide, telephoto], native: [duplicateWide, wideCrop, telephotoCrop])
+
+        #expect(options == [ultraWide, wide, wideCrop, telephoto, telephotoCrop])
+        #expect(options.map(\.displayedMagnification) == [0.5, 1, 2, 4, 8])
+        #expect(Set(options.map(\.id)).count == options.count)
+    }
+
     @Test func magnificationsReadLikeTheSystemCamera() {
         #expect(LensOption(lens: .ultraWide, magnification: 13.0 / 24).title(isSelected: false) == "0.5")
         #expect(LensOption(lens: .wide, magnification: 1).title(isSelected: true) == "1×")
