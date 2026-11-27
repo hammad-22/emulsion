@@ -30,6 +30,16 @@ public enum SceneFixtures {
             hypot(Float(x - size / 2), Float(y - size / 2)) < radius * Float(size) / 400 ? SIMD3(repeating: level) : SIMD3(repeating: 0.02)
         }
     }
+    /// A disc of `light` (linear Display P3) on a neutral background, centred in a square frame.
+    public static func disc(size: Int, radius: Float, light: SIMD3<Float>, background: Float = 0.02) -> CIImage {
+        Fixtures.image(width: size, height: size, space: linearP3) { x, y in
+            hypot(Float(x - size / 2), Float(y - size / 2)) < radius ? light : SIMD3(repeating: background)
+        }
+    }
+    /// A hard vertical edge: the left half `bright`, the right half `dark` (neutral scene light).
+    public static func edge(width: Int = 800, height: Int = 400, bright: Float = 16, dark: Float = 0.02) -> CIImage {
+        Fixtures.image(width: width, height: height, space: linear) { x, _ in SIMD3(repeating: x < width / 2 ? bright : dark) }
+    }
     /// Colored scene patches (linear Display P3 → working space), incl. saturated neon.
     public static let patchesP3: [SIMD3<Float>] = [
         [0.40, 0.20, 0.13], [0.12, 0.20, 0.45], [0.10, 0.25, 0.06],

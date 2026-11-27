@@ -7,6 +7,7 @@ struct Kernels {
     // Named exactly like the Metal functions in Emulsion.ci.metal.
     let filmSystem, filmSystemRelative, displayToScene, inputTransform, ycbcrInputTransform: CIColorKernel
     let halationSource, halationAdd, grain, lightnessGuide, localTone: CIColorKernel
+    let mirroredEdges: CIWarpKernel
 
     init(library data: Data) throws {
         func load(_ name: String) throws -> CIColorKernel { try CIColorKernel(functionName: name, fromMetalLibraryData: data) }
@@ -20,6 +21,7 @@ struct Kernels {
         grain = try load("grain")
         lightnessGuide = try load("lightnessGuide")
         localTone = try load("localTone")
+        mirroredEdges = try CIWarpKernel(functionName: "mirroredEdges", fromMetalLibraryData: data)
     }
 
     /// The metallib holding every process's kernels, for this platform.
