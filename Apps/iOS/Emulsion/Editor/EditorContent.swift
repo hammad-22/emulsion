@@ -1,4 +1,3 @@
-import EmulsionCore
 import EmulsionKit
 import EmulsionUI
 import SwiftUI
@@ -13,8 +12,6 @@ struct EditorContent: View {
     @State private var isComparing = false
     @State private var isHolding = false
     @State private var showsLookTray = false
-    @State private var candidate: Recipe?
-    @State private var isConfirmingLook = false
     /// Nil until the user taps Adjust; until then the canvas decides.
     @State private var adjustmentsPreference: Bool?
 
@@ -45,12 +42,6 @@ struct EditorContent: View {
         .navigationBarTitleDisplayMode(.inline)
         .onChange(of: isComparing) { _, isComparing in
             if isComparing { closeLookTray() }
-        }
-        .alert("Replace current adjustments?", isPresented: $isConfirmingLook, presenting: candidate) { recipe in
-            Button("Apply \(recipe.name)") { applyLook(recipe) }
-            Button("Cancel", role: .cancel) {}
-        } message: { _ in
-            Text("Applying a look replaces the adjustments on this photo.")
         }
         .task { await session.editorAppeared() }
     }
@@ -119,13 +110,18 @@ struct EditorContent: View {
 
     private func photoWithLookTray(isVertical: Bool) -> some View {
         ComparablePhoto(
-            url: session.url, adjustments: candidate?.applying(to: session.adjustments) ?? session.adjustments,
-            isComparing: isComparing, previewLookName: candidate?.name, isHolding: $isHolding
+            url: session.url, adjustments: session.adjustments, isComparing: isComparing, isHolding: $isHolding
         )
         .overlay(alignment: isVertical ? .trailing : .bottom) {
             if showsLookTray {
-                QuickLooksTray(session: session, isVertical: isVertical, candidate: $candidate, close: closeLookTray, apply: confirmLook)
-                    .padding(FilmLabLayout.compact)
+                ZStack(alignment: isVertical ? .trailing : .bottom) {
+                    Color.clear
+                        .contentShape(.rect)
+                        .onTapGesture(perform: closeLookTray)
+                        .accessibilityHidden(true)
+                    QuickLooksTray(session: session, isVertical: isVertical)
+                        .padding(FilmLabLayout.compact)
+                }
             }
         }
     }
@@ -144,21 +140,6 @@ struct EditorContent: View {
     }
 
     private func closeLookTray() {
-        candidate = nil
         showsLookTray = false
-    }
-
-    private func confirmLook() {
-        guard let candidate else { return }
-        if session.isEdited && !candidate.matches(session.adjustments) {
-            isConfirmingLook = true
-        } else {
-            applyLook(candidate)
-        }
-    }
-
-    private func applyLook(_ recipe: Recipe) {
-        session.apply(recipe)
-        closeLookTray()
     }
 }

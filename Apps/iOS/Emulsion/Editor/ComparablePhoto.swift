@@ -6,7 +6,6 @@ struct ComparablePhoto: View {
     let url: URL
     let adjustments: Adjustments
     let isComparing: Bool
-    var previewLookName: String? = nil
     @Binding var isHolding: Bool
 
     @GestureState private var isPressed = false
@@ -16,21 +15,12 @@ struct ComparablePhoto: View {
     private var showsOriginal: Bool { isComparing || isPressed }
 
     var body: some View {
-        RenderedPhoto(
-            url: url, adjustments: adjustments, showsOriginal: showsOriginal, retainsLatestRender: previewLookName == nil
-        )
-        .id(previewLookName != nil)
-        .accessibilityLabel(photoLabel)
-        .accessibilityAddTraits(.isImage)
-        .gesture(hold)
-        .onChange(of: isPressed) { _, isPressed in isHolding = isPressed }
-        .sensoryFeedback(.impact(weight: .light), trigger: isPressed) { _, isPressed in isPressed }
-    }
-
-    private var photoLabel: Text {
-        if showsOriginal { return Text("Original photo") }
-        if let previewLookName { return Text("Preview of \(previewLookName)") }
-        return Text("Edited photo")
+        RenderedPhoto(url: url, adjustments: adjustments, showsOriginal: showsOriginal)
+            .accessibilityLabel(showsOriginal ? "Original photo" : "Edited photo")
+            .accessibilityAddTraits(.isImage)
+            .gesture(hold)
+            .onChange(of: isPressed) { _, isPressed in isHolding = isPressed }
+            .sensoryFeedback(.impact(weight: .light), trigger: isPressed) { _, isPressed in isPressed }
     }
 
     private var hold: some Gesture {

@@ -109,13 +109,10 @@ public actor RenderService {
     /// A rendered preview, no larger than `maxPreviewDimension`. A thumbnail kept in memory or
     /// on disk returns without waiting for this actor. Throws `CancellationError` if the caller
     /// moved on while it waited its turn or its develop ran, so slider drags don't queue up stale renders.
-    @concurrent public nonisolated func image(
-        _ url: URL, _ adjustments: Adjustments, maxDimension: CGFloat, retainsLatestRender: Bool = true
-    ) async throws -> CGImage {
+    @concurrent public nonisolated func image(_ url: URL, _ adjustments: Adjustments, maxDimension: CGFloat) async throws -> CGImage {
         let thumbnail = ThumbnailCache.Key(url, adjustments, maxDimension: maxDimension)
         if let thumbnail, let cached = thumbnails.image(thumbnail) ?? thumbnails.storedImage(thumbnail) { return cached }
-        let (image, isNew) = try await render(
-            url, adjustments, maxDimension: maxDimension, thumbnail: thumbnail, retainsLatestRender: retainsLatestRender)
+        let (image, isNew) = try await render(url, adjustments, maxDimension: maxDimension, thumbnail: thumbnail)
         if let thumbnail, isNew { thumbnails.store(image, thumbnail) }
         return image
     }
@@ -128,7 +125,7 @@ public actor RenderService {
 
     /// The render, and whether it is new rather than a thumbnail another request kept meanwhile.
     private func render(
-        _ url: URL, _ adjustments: Adjustments, maxDimension: CGFloat, thumbnail: ThumbnailCache.Key?, retainsLatestRender: Bool
+        _ url: URL, _ adjustments: Adjustments, maxDimension: CGFloat, thumbnail: ThumbnailCache.Key?
     ) throws -> (CGImage, isNew: Bool) {
         if let thumbnail, let cached = thumbnails.image(thumbnail) { return (cached, false) }
         try Task.checkCancellation()
@@ -137,7 +134,7 @@ public actor RenderService {
         try Task.checkCancellation()
         let image = try renderer.cgImage(renderer.render(negative, adjustments))
         if let thumbnail { thumbnails.keep(image, thumbnail) }
-        if retainsLatestRender { latestRenders.keep(image, url, maxDimension: maxDimension) }
+        latestRenders.keep(image, url, maxDimension: maxDimension)
         return (image, true)
     }
 

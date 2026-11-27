@@ -6,10 +6,6 @@ import SwiftUI
 struct QuickLooksTray: View {
     let session: EditSession
     let isVertical: Bool
-    @Binding var candidate: Recipe?
-    let close: () -> Void
-    let apply: () -> Void
-
     @Environment(RecipeStore.self) private var store
     @ScaledMetric private var preferredSwatchWidth = 92.0
 
@@ -17,31 +13,10 @@ struct QuickLooksTray: View {
     private var verticalTrayWidth: CGFloat { swatchWidth + FilmLabLayout.compact }
 
     var body: some View {
-        VStack(alignment: .leading, spacing: FilmLabLayout.compact) {
-            HStack {
-                Text("Looks").font(.subheadline.weight(.semibold))
-                Spacer(minLength: FilmLabLayout.hairline)
-                Button(action: close) {
-                    Label("Close Looks", systemImage: "xmark")
-                        .labelStyle(.iconOnly)
-                        .frame(minWidth: FilmLabLayout.minimumControlHeight, minHeight: FilmLabLayout.minimumControlHeight)
-                        .contentShape(.rect)
-                }
-                .buttonStyle(.plain)
-            }
-            .padding(.leading, FilmLabLayout.compact)
-            swatches
-            if candidate != nil {
-                Button("Apply Look", action: apply)
-                    .buttonStyle(.glassProminent)
-                    .tint(.white)
-                    .foregroundStyle(.black)
-                    .frame(maxWidth: .infinity)
-            }
-        }
-        .frame(width: isVertical ? verticalTrayWidth : nil)
-        .padding(FilmLabLayout.compact)
-        .glassEffect(.regular, in: .rect(cornerRadius: FilmLabLayout.panelCorner))
+        swatches
+            .frame(width: isVertical ? verticalTrayWidth : nil)
+            .padding(FilmLabLayout.compact)
+            .glassEffect(.regular, in: .rect(cornerRadius: FilmLabLayout.panelCorner))
     }
 
     @ViewBuilder private var swatches: some View {
@@ -66,9 +41,9 @@ struct QuickLooksTray: View {
 
     @ViewBuilder private func options(_ recipes: [Recipe]) -> some View {
         ForEach(recipes) { recipe in
-            let isSelected = candidate.map { $0 == recipe } ?? recipe.matches(session.adjustments)
+            let isSelected = recipe.matches(session.adjustments)
             Button {
-                candidate = recipe
+                session.apply(recipe)
             } label: {
                 VStack(alignment: .leading, spacing: FilmLabLayout.hairline) {
                     LookSwatch(url: session.url, adjustments: recipe.applying(to: session.adjustments))
