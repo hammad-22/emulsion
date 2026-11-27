@@ -20,7 +20,7 @@ struct ExposureMenu: View {
                 isoMenu
             }
             if exposure.apertureStops.isEmpty {
-                Text("Aperture (apertureTitle(exposure.aperture))")
+                Text("Aperture \(apertureTitle(exposure.aperture))")
             } else {
                 apertureMenu
             }
@@ -49,7 +49,7 @@ struct ExposureMenu: View {
                 }
             }
         } label: {
-            Text(exposure.isManual ? "Shutter Speed · (shutterTitle(exposure.shutterSeconds))" : "Shutter Speed")
+            Text(exposure.isManual ? "Shutter Speed · \(shutterTitle(exposure.shutterSeconds))" : "Shutter Speed")
         }
     }
 
@@ -64,7 +64,7 @@ struct ExposureMenu: View {
                 }
             }
         } label: {
-            Text(exposure.isManual ? "ISO · (isoTitle(exposure.iso))" : "ISO")
+            Text(exposure.isManual ? "ISO · \(isoTitle(exposure.iso))" : "ISO")
         }
     }
 
@@ -79,7 +79,7 @@ struct ExposureMenu: View {
                 }
             }
         } label: {
-            Text("Aperture · (apertureTitle(exposure.aperture))")
+            Text("Aperture · \(apertureTitle(exposure.aperture))")
         }
     }
 
@@ -95,9 +95,9 @@ struct ExposureMenu: View {
     private func shutterTitle(_ seconds: Double) -> String {
         guard seconds > 0, seconds.isFinite else { return "—" }
         if seconds < 1 {
-            return "1/((1 / seconds).formatted(.number.grouping(.never).precision(.fractionLength(0))))"
+            return "1/\((1 / seconds).formatted(.number.grouping(.never).precision(.fractionLength(0))))"
         }
-        return "(seconds.formatted(.number.precision(.fractionLength(0...1)))) s"
+        return "\(seconds.formatted(.number.precision(.fractionLength(0...1)))) s"
     }
 
     private func isoTitle(_ iso: Float) -> String {
@@ -105,6 +105,6 @@ struct ExposureMenu: View {
     }
 
     private func apertureTitle(_ aperture: Float) -> String {
-        "ƒ/(aperture.formatted(.number.precision(.fractionLength(1...2))))"
+        "ƒ/\(aperture.formatted(.number.precision(.fractionLength(1...2))))"
     }
 }
