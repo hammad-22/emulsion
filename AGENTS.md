@@ -83,7 +83,11 @@ Stock-data checks and `emulsion-fit` read the local reference data (traced curve
   4. Investigate every finding and mark it ACCEPT or REFUTE, with proof (a reproduction, file:line or a test). Fix what's accepted, adding a regression test for each real bug.
   5. Open the PR as a **draft** (`gh pr create --draft`, or `gh stack submit --draft`) with the verdicts in a PR comment.
   6. Mark it ready (`gh pr ready`) once CI is green.
-- **Merging:** the parent session merges ready PRs once CI is green and the review verdicts are recorded. Stacks merge bottom-up.
+- **Risk level, and who approves the merge** (owner, 27 Nov 2026). Every PR description states **Risk: low, medium or high** with one line of why. When unsure, pick the higher level.
+  - **Low:** nothing a user can see or lose can change: docs and agent instructions, tests, comments, CI and tooling, refactors and file moves proven behavior-neutral (tests and goldens unchanged), and code only compiled into the Lab research build. The parent session merges these once CI is green and the review verdicts are recorded.
+  - **Medium:** anything a user sees or does that changes: UI, app logic, capture, export, new features and settings.
+  - **High:** anything that changes pixels or data: the film engine, kernels, color and RAW input, looks and their defaults, goldens; stored formats (library, recipes) and migrations; licensing; deleting data.
+  - **Medium and high need the owner's approval.** The parent marks the PR ready when CI is green, tells the owner what to look at (the Proof section), and merges only after the owner says yes for that PR. Stacks merge bottom-up.
 
 ## Sessions and project memory
 - **The project's memory lives in Linear**, not in any chat. Start every session by reading the *Emulsion V0 — State & handoff (read first)* document on the **Emulsion V0** initiative, then this file, then your issue.

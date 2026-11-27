@@ -1,6 +1,8 @@
 ## What and why
 <!-- One or two sentences. Link the Linear issue (e.g. MOV-95). -->
 
+**Risk:** <!-- low / medium / high, and one line of why (AGENTS.md, "Risk level"). Low merges after green CI and verdicts; medium and high wait for the owner's approval. -->
+
 ## Proof
 <!-- Required (AGENTS.md, "Prove it in the PR"). A reviewer should be able to judge the change from this section alone.
 Before and after, side by side: same scene, same size, same settings except the change. "Before" is the base branch.
