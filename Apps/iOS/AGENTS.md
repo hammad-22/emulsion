@@ -21,6 +21,7 @@
   xcodebuild test -project Apps/iOS/Emulsion.xcodeproj -scheme Emulsion -destination 'platform=iOS Simulator,name=iPhone 17 Pro,OS=26.2' -resultBundlePath /tmp/ui.xcresult
   xcrun xcresulttool export attachments --path /tmp/ui.xcresult --output-path /tmp/ui-shots
   ```
+  After a failed run, uninstall the isolated proof bundle before the next acceptance run. A zero exit status with skipped acceptance tests is not a pass.
   The walkthrough covers the phone layout only; it cannot select a Duo pose. Set Duo poses with T3 `agent-device fold closed|half-open|open` or Xcode Device Hub's Closed / Partially Open / Open buttons, on a simulator of your own with your own bundle ID. Capture the inner display with `xcrun simctl io <udid> screenshot --display primary-1`. Record which tool and pose each proof capture used, and say so when a pose could not be verified; never fake a pose with generic UI clicks or simctl taps.
   The bundled samples aren't RAW, so `WhiteBalanceUITests` is skipped unless the app's library has a RAW photo: launch the isolated proof app once with `--library`, copy a synthetic DNG (`RAWDevelopChart.dng`, named `<UUID>.dng`) into its `Library/Application Support/Emulsion/` folder, then run the test. Never use a real photo for this.
   Launch with `--viewfinder-timing` (debug builds) to show the viewfinder's frame time and rate.

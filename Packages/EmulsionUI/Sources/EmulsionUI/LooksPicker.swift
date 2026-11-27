@@ -65,25 +65,34 @@ struct LooksPicker: View {
     private var lookList: some View {
         List {
             Section {
+                sectionTitle("Emulsion")
                 ForEach(CuratedLooks.recipes) { recipe in row(recipe) }
-            } header: {
-                Text("Emulsion")
             } footer: {
                 Text(
                     "Artistic looks made with Emulsion's film and digicam processes. Applying a look replaces the adjustment values and keeps your original photo."
                 )
             }
-            Section("Your Looks") {
+            Section {
+                sectionTitle("Your Looks")
                 if store.recipes.isEmpty {
                     Text("Save your current edit as a look, or import one to make it yours.")
-                        .foregroundStyle(.secondary)
+                        .foregroundStyle(Color.primary)
                 }
                 ForEach(store.recipes) { recipe in row(recipe, canDelete: true) }
             }
             if let loadError = store.loadError {
-                Section { Text(loadError.localizedDescription).foregroundStyle(.secondary) }
+                Section { Text(loadError.localizedDescription).foregroundStyle(Color.primary) }
             }
         }
+        .scrollEdgeEffectStyle(.hard, for: .all)
+        .accessibilityIdentifier("looks-collection")
+    }
+
+    private func sectionTitle(_ title: LocalizedStringKey) -> some View {
+        Text(title)
+            .bold()
+            .foregroundStyle(Color.primary)
+            .accessibilityAddTraits(.isHeader)
     }
 
     @ToolbarContentBuilder private var toolbar: some ToolbarContent {

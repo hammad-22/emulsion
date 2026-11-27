@@ -41,6 +41,15 @@ extension XCUIApplication {
     }
 
     @MainActor
+    func openFirstPhoto() {
+        XCTAssertTrue(photos.firstMatch.waitForExistence(timeout: 10))
+        photos.firstMatch.tap()
+        let editPhoto = buttons["Edit Photo"]
+        if editPhoto.waitForExistence(timeout: 2) { editPhoto.tap() }
+        XCTAssertTrue(buttons["Looks"].waitForExistence(timeout: 5))
+    }
+
+    @MainActor
     func removeSamples() {
         if navigationBars["Looks"].exists { buttons["Done"].tap() }
         if !navigationBars["Library"].exists { buttons["BackButton"].tap() }
