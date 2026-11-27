@@ -19,12 +19,12 @@ struct ComparablePhoto: View {
         RenderedPhoto(
             url: url, adjustments: adjustments, showsOriginal: showsOriginal, retainsLatestRender: previewLookName == nil
         )
-            .id(previewLookName != nil)
-            .accessibilityLabel(photoLabel)
-            .accessibilityAddTraits(.isImage)
-            .gesture(hold)
-            .onChange(of: isPressed) { _, isPressed in isHolding = isPressed }
-            .sensoryFeedback(.impact(weight: .light), trigger: isPressed) { _, isPressed in isPressed }
+        .id(previewLookName != nil)
+        .accessibilityLabel(photoLabel)
+        .accessibilityAddTraits(.isImage)
+        .gesture(hold)
+        .onChange(of: isPressed) { _, isPressed in isHolding = isPressed }
+        .sensoryFeedback(.impact(weight: .light), trigger: isPressed) { _, isPressed in isPressed }
     }
 
     private var photoLabel: Text {

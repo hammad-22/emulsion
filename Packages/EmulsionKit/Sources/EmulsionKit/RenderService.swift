@@ -114,7 +114,8 @@ public actor RenderService {
     ) async throws -> CGImage {
         let thumbnail = ThumbnailCache.Key(url, adjustments, maxDimension: maxDimension)
         if let thumbnail, let cached = thumbnails.image(thumbnail) ?? thumbnails.storedImage(thumbnail) { return cached }
-        let (image, isNew) = try await render(url, adjustments, maxDimension: maxDimension, thumbnail: thumbnail, retainsLatestRender: retainsLatestRender)
+        let (image, isNew) = try await render(
+            url, adjustments, maxDimension: maxDimension, thumbnail: thumbnail, retainsLatestRender: retainsLatestRender)
         if let thumbnail, isNew { thumbnails.store(image, thumbnail) }
         return image
     }
