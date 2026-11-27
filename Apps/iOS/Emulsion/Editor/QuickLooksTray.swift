@@ -45,7 +45,7 @@ struct QuickLooksTray: View {
             Button {
                 session.apply(recipe)
             } label: {
-                VStack(alignment: .leading, spacing: FilmLabLayout.hairline) {
+                VStack(spacing: FilmLabLayout.hairline) {
                     LookSwatch(url: session.url, adjustments: recipe.applying(to: session.adjustments))
                         .frame(width: swatchWidth, height: swatchWidth)
                         .clipShape(.rect(cornerRadius: FilmLabLayout.gap))
@@ -60,7 +60,8 @@ struct QuickLooksTray: View {
                     Text(recipe.name)
                         .font(.caption)
                         .lineLimit(2)
-                        .frame(width: swatchWidth, alignment: .leading)
+                        .multilineTextAlignment(.center)
+                        .frame(width: swatchWidth)
                 }
             }
             .buttonStyle(.plain)
