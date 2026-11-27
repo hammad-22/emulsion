@@ -138,7 +138,10 @@ Keep it under 200 lines: specific, true, no duplicates. Delete rules that no lon
 - **Errors.** Use the typed `EmulsionError` (`LocalizedError`). No `try!`, and no force unwraps except provably constant values (e.g. built-in `CGColorSpace` names). Use `guard` for early exits.
 - **Naming.** Name things after the film process (negative, print, printer lights, density, exposure in stops), not the implementation. Name units: `stops`, `log10`, `linear`, `display`.
 - **Numbers.** Every magic number gets a name or a one-line source or reason. Shared constants live in `FilmLook`; don't repeat them.
-- **Files.** One main type per file, named after it. Split a file once it does two jobs.
+- **Files.** In the engine (`EmulsionCore`, kernels): one main type per file; a distinct role goes in `Type+Role.swift`. In the apps, `EmulsionUI` and `EmulsionKit`: one file per screen or reusable component, named after its main type. Small subviews, styles and helpers used only by it stay in that file as `private` types. A type gets its own file once something else uses it or the file passes about 300 lines. At our size file count made no measurable build-time difference (MOV-185); group for the reader.
+- **Folders.** By feature (`Camera/`, `Library/`); past about 8 files, subfolders named after what they hold (`Viewfinder/`, `Rendering/`), never `Views/`, `Models/` or `Helpers/`.
+- **Reuse across apps is why this is one repository** (owner, 26 Nov 2026). A view with no app-specific dependency starts life in `EmulsionUI`; the apps keep screens, navigation, toolbars and debug hooks.
+- **New code follows these rules now; existing files are regrouped only under MOV-185**, once the parent clears the folders. Don't move or merge existing files on your own.
 - **Comments: as few as possible.** Make the code explain itself through names and small functions. Comment only what code can't say: the physics or source behind a number, a non-obvious why, or a known limitation with its Linear issue. No narrating comments, no commented-out code. A comment that doesn't match the code is a bug.
 - **Formatting** is whatever `swift format` produces. Don't hand-format against it.
 

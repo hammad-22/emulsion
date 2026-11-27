@@ -31,13 +31,17 @@ Rules:
 - `// MARK: -` only in files that still have several sections after splitting. A file that needs many marks should be split instead.
 
 ## 2. Files: one job each
-- One main type per file, named after it. An extension that adds a distinct role goes in `Type+Role.swift` (`FilmModel+Kernel.swift`).
+- **Engine** (`EmulsionCore`, kernels): one main type per file, named after it.
+- **Apps, `EmulsionUI` and `EmulsionKit`:** one file per screen or reusable component, named after its main type. Small subviews, styles and helpers used only by it stay in that file as `private` types. A type gets its own file once something else uses it or the file passes about 300 lines. File count made no measurable build-time difference at our size (MOV-185), so group for the reader.
+- Everywhere, an extension that adds a distinct role goes in `Type+Role.swift` (`FilmModel+Kernel.swift`).
 - Aim for under about 300 lines for sources and 400 for tests. Over that, split by responsibility, not by line count:
   - protocol conformances into extensions (`extension PhotoStore: PhotoImporting`);
-  - nested helper types into their own files once they have their own logic;
-  - a view's subviews into their own `View` structs and files;
+  - a helper type into its own file once another file uses it;
+  - a long view into named private subviews in the same file;
   - a test suite by behaviour (`RenderServiceExportTests`, `RenderServicePreviewTests`), sharing fixtures in a `…TestSupport.swift`.
-- Group files in folders by feature (`Capture/`, `Library/`, `Editor/`, `Export/`), not by kind (`Models/`, `Helpers/`). SwiftPM picks up subfolders automatically; Xcode targets here use folder references, so check the app still builds.
+- Group files in folders by feature (`Capture/`, `Library/`, `Editor/`, `Export/`), not by kind (`Views/`, `Models/`, `Helpers/`). Past about 8 files, add subfolders named after what they hold (`Viewfinder/`, `Rendering/`). SwiftPM picks up subfolders automatically; the Xcode apps use buildable folders, so moves need no project-file edits (still check both apps build).
+- A view with no app-specific dependency belongs in `EmulsionUI`, so every app reuses one copy.
+- Move or merge files only when no open branch edits them. A merge keeps history for the main file (`git log --follow`); the absorbed small files keep theirs under the old path.
 - Order inside a type: stored properties, initialisers, the main API, then helpers; `private` things last or in a `private extension`.
 
 ## 3. Constants and enums
