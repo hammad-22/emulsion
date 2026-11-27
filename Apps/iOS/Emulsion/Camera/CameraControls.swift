@@ -34,7 +34,7 @@ struct CameraControls: View {
 
     private var rail: some View {
         VStack(spacing: FilmLabLayout.gap) {
-            CaptureFormatBar(capabilities: model.capabilities)
+            CaptureFormatBar(model: model)
             Spacer(minLength: 0)
             lenses
             shutter

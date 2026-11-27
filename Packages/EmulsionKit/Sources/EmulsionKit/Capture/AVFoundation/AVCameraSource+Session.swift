@@ -52,6 +52,7 @@
             do {
                 try configureRAW(for: device)
                 try setZoom(zoomFactor, on: device)
+                if device.exposureMode == .custom { configure(device) { try? restoreAutomaticExposure(on: $0) } }
             } catch {
                 rawPixelFormat = nil
                 restore(previous, replacing: newInput)

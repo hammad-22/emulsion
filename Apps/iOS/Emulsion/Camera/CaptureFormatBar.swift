@@ -3,14 +3,14 @@ import EmulsionUI
 import SwiftUI
 
 struct CaptureFormatBar: View {
-    let capabilities: CameraCapabilities?
+    let model: CameraModel
 
     @Environment(AppSettings.self) private var settings
 
     var body: some View {
         GlassEffectContainer {
             HStack {
-                if let capabilities {
+                if let capabilities = model.capabilities {
                     Text(capabilities.rawFormat.title)
                         .font(.caption.weight(.bold))
                         .padding(.horizontal, FilmLabLayout.gap)
@@ -18,6 +18,12 @@ struct CaptureFormatBar: View {
                         .glassEffect(.regular, in: .capsule)
                         .accessibilityLabel("Format: \(capabilities.rawFormat.title)")
                     resolution(capabilities)
+                    if let exposure = capabilities.exposure {
+                        ExposureMenu(exposure: exposure) { change in
+                            Task { await model.changeExposure(change) }
+                        }
+                        .disabled(!model.acceptsInput)
+                    }
                 }
             }
         }

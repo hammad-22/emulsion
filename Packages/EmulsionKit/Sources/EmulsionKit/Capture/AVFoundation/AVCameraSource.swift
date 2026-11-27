@@ -17,6 +17,7 @@
         var devices: [CameraLens: AVCaptureDevice] = [:]
         private var verifiedNativeZoom: [CameraLens: [CGFloat]] = [:]
         private var isCapturingPhoto = false
+        var isChangingExposure = false
         var input: AVCaptureDeviceInput?
         var lens = CameraLens.wide
         var rawFormat = RAWFormat.proRAW
@@ -60,21 +61,38 @@
         }
 
         public func select(_ lens: CameraLens, zoomFactor: Double) throws(CameraError) -> CameraCapabilities {
-            guard !isCapturingPhoto, capabilities.lenses.contains(where: { $0.lens == lens && $0.zoomFactor == zoomFactor })
+            guard !isCapturingPhoto, !isChangingExposure,
+                capabilities.lenses.contains(where: { $0.lens == lens && $0.zoomFactor == zoomFactor })
             else { throw .unavailable }
             try use(lens, zoomFactor: zoomFactor)
             return capabilities
         }
 
+        public func changeExposure(_ change: CameraExposure.Change) async throws(CameraError) -> CameraCapabilities {
+            guard session.isRunning, !isCapturingPhoto, !isChangingExposure, let device = input?.device,
+                exposure(on: device)?.accepts(change) == true
+            else { throw .exposureUnavailable }
+            isChangingExposure = true
+            defer {
+                isChangingExposure = false
+                if session.isRunning {
+                    respond(to: CameraPressure(device.systemPressureState.level), ofDevice: ObjectIdentifier(device))
+                }
+            }
+            try await applyExposure(change, to: device)
+            guard session.isRunning else { throw .exposureUnavailable }
+            return capabilities
+        }
+
         public func focusAndExpose(at framePoint: CGPoint) {
-            guard let device = input?.device else { return }
+            guard !isChangingExposure, let device = input?.device else { return }
             let point = FrameGeometry.devicePoint(forFramePoint: framePoint, rotationAngle: frameDelivery.rotationAngle)
             configure(device) {
                 if $0.isFocusPointOfInterestSupported, $0.isFocusModeSupported(.autoFocus) {
                     $0.focusPointOfInterest = point
                     $0.focusMode = .autoFocus
                 }
-                if $0.isExposurePointOfInterestSupported, $0.isExposureModeSupported(.autoExpose) {
+                if $0.exposureMode != .custom, $0.isExposurePointOfInterestSupported, $0.isExposureModeSupported(.autoExpose) {
                     $0.exposurePointOfInterest = point
                     $0.exposureMode = .autoExpose
                 }
@@ -83,7 +101,7 @@
         }
 
         public func capture(_ resolution: AppSettings.Resolution) async throws(CameraError) -> CapturedPhoto {
-            guard !isCapturingPhoto, session.isRunning, let rawPixelFormat, let device = input?.device,
+            guard !isCapturingPhoto, !isChangingExposure, session.isRunning, let rawPixelFormat, let device = input?.device,
                 photoOutput.availableRawPhotoPixelFormatTypes.contains(rawPixelFormat)
             else { throw .captureFailed }
             let isZoomed = device.videoZoomFactor != 1
@@ -97,8 +115,8 @@
             if let size = PhotoDimensions.choose(isZoomed ? .standard : resolution, from: photoDimensions) {
                 settings.maxPhotoDimensions = CMVideoDimensions(width: size.width, height: size.height)
             }
-            // Bayer RAW must prioritize speed; ProRAW may use quality (AVCapturePhotoOutput.h).
-            settings.photoQualityPrioritization = rawFormat == .bayer ? .speed : .quality
+            // Speed preserves custom exposure and is mandatory for Bayer RAW (AVCapturePhotoOutput.h).
+            settings.photoQualityPrioritization = rawFormat == .bayer || device.exposureMode == .custom ? .speed : .quality
             if let codec = Self.preferredThumbnailCodec(settings.availableRawEmbeddedThumbnailPhotoCodecTypes) {
                 settings.rawEmbeddedThumbnailPhotoFormat = [
                     AVVideoCodecKey: codec, AVVideoWidthKey: Self.thumbnailSize, AVVideoHeightKey: Self.thumbnailSize,
@@ -132,7 +150,8 @@
             return CameraCapabilities(
                 lenses: LensOption.options(for: devices, nativeZoom: verifiedNativeZoom),
                 lens: lens, zoomFactor: zoomFactor, rawFormat: rawFormat,
-                supportsFullResolution: zoomFactor == 1 && PhotoDimensions.supportsFullResolution(photoDimensions))
+                supportsFullResolution: zoomFactor == 1 && PhotoDimensions.supportsFullResolution(photoDimensions),
+                exposure: input.flatMap { exposure(on: $0.device) })
         }
 
         private static func preferredThumbnailCodec(_ available: [AVVideoCodecType]) -> AVVideoCodecType? {

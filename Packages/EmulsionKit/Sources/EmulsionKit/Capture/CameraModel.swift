@@ -26,7 +26,8 @@ public final class CameraModel {
     public private(set) var capabilities: CameraCapabilities?
     public private(set) var isCapturing = false
     private var isSelectingLens = false
-    public var acceptsInput: Bool { status == .running && !isCapturing && !isSelectingLens }
+    private var isChangingExposure = false
+    public var acceptsInput: Bool { status == .running && !isCapturing && !isSelectingLens && !isChangingExposure }
     public private(set) var lastCapture: PhotoRecord?
     /// 0…1 of the upright frame, until the reticle fades.
     public private(set) var focusPoint: CGPoint?
@@ -129,9 +130,21 @@ public final class CameraModel {
         }
     }
 
+    public func changeExposure(_ change: CameraExposure.Change) async {
+        guard acceptsInput, let exposure = capabilities?.exposure, exposure.accepts(change) else { return }
+        isChangingExposure = true
+        defer { isChangingExposure = false }
+        do {
+            let updated = try await source.changeExposure(change)
+            if lifecycle == .running { capabilities = updated }
+        } catch {
+            if lifecycle == .running { self.error = error }
+        }
+    }
+
     /// `point` is 0…1 of the upright frame, top-left origin.
     public func focus(at point: CGPoint) async {
-        guard status == .running else { return }
+        guard acceptsInput else { return }
         focusPoint = point
         focusReset?.cancel()
         focusReset = Task { [focusIndicatorDuration] in
