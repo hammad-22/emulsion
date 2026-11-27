@@ -1,3 +1,4 @@
+import EmulsionCore
 import EmulsionKit
 import EmulsionUI
 import SwiftUI
@@ -11,22 +12,30 @@ struct EditorContent: View {
     @State private var selection: [AdjustmentGroup: String] = [:]
     @State private var isComparing = false
     @State private var isHolding = false
+    @State private var showsLookTray = false
+    @State private var candidate: Recipe?
+    @State private var isConfirmingLook = false
     /// Nil until the user taps Adjust; until then the canvas decides.
     @State private var adjustmentsPreference: Bool?
 
     private var showsOriginal: Bool { isComparing || isHolding }
     private let verticalPanelWidth: CGFloat = 128
+    private let outerPanelWidth: CGFloat = 96
     private let minimumVerticalPanelHeight: CGFloat = 250
 
     var body: some View {
         GeometryReader { geometry in
             let isExpanded = geometry.isExpandedCanvas(horizontalSizeClass: horizontalSizeClass, verticalSizeClass: verticalSizeClass)
-            let showsAdjustments = adjustmentsPreference ?? isExpanded
+            let showsAdjustments = !showsLookTray && (adjustmentsPreference ?? isExpanded)
             workspace(geometry, isExpanded: isExpanded, showsAdjustments: showsAdjustments)
                 .toolbar {
-                    EditorToolbar(session: session, isComparing: $isComparing, showsAdjustments: showsAdjustments) {
-                        adjustmentsPreference = !showsAdjustments
-                    }
+                    EditorToolbar(
+                        session: session, isComparing: $isComparing, showsAdjustments: showsAdjustments,
+                        showsLookTray: showsLookTray, toggleLookTray: toggleLookTray,
+                        toggleAdjustments: {
+                            closeLookTray()
+                            adjustmentsPreference = !showsAdjustments
+                        })
                 }
         }
         .background(.black)
@@ -34,6 +43,15 @@ struct EditorContent: View {
         .tint(.white)
         .navigationTitle(showsOriginal ? Text("Original") : Text(""))
         .navigationBarTitleDisplayMode(.inline)
+        .onChange(of: isComparing) { _, isComparing in
+            if isComparing { closeLookTray() }
+        }
+        .alert("Replace current adjustments?", isPresented: $isConfirmingLook, presenting: candidate) { recipe in
+            Button("Apply \(recipe.name)") { applyLook(recipe) }
+            Button("Cancel", role: .cancel) {}
+        } message: { _ in
+            Text("Applying a look replaces the adjustments on this photo.")
+        }
         .task { await session.editorAppeared() }
     }
 
@@ -54,7 +72,8 @@ struct EditorContent: View {
     @ViewBuilder private func adaptiveWorkspace(isExpanded: Bool, showsAdjustments: Bool, usesVerticalPanel: Bool) -> some View {
         if isExpanded {
             ArrangementWorkspace(showsInspector: showsAdjustments, narrowInspectorWidth: usesVerticalPanel ? verticalPanelWidth : nil) {
-                photo.padding(FilmLabLayout.inset)
+                photoWithLookTray(isVertical: usesVerticalPanel)
+                    .padding(FilmLabLayout.inset)
             } inspector: {
                 if usesVerticalPanel {
                     verticalPanel
@@ -69,9 +88,9 @@ struct EditorContent: View {
         } else if usesVerticalPanel {
             UnobscuredContent {
                 HStack(spacing: showsAdjustments ? FilmLabLayout.compact : 0) {
-                    photo
+                    photoWithLookTray(isVertical: true)
                     verticalPanel
-                        .frame(width: showsAdjustments ? verticalPanelWidth : 0)
+                        .frame(width: showsAdjustments ? outerPanelWidth : 0)
                         .clipped()
                         .opacity(showsAdjustments ? 1 : 0)
                         .allowsHitTesting(showsAdjustments)
@@ -98,8 +117,17 @@ struct EditorContent: View {
         .disabled(showsOriginal)
     }
 
-    private var photo: some View {
-        ComparablePhoto(url: session.url, adjustments: session.adjustments, isComparing: isComparing, isHolding: $isHolding)
+    private func photoWithLookTray(isVertical: Bool) -> some View {
+        ComparablePhoto(
+            url: session.url, adjustments: candidate?.applying(to: session.adjustments) ?? session.adjustments,
+            isComparing: isComparing, previewLookName: candidate?.name, isHolding: $isHolding
+        )
+        .overlay(alignment: isVertical ? .trailing : .bottom) {
+            if showsLookTray {
+                QuickLooksTray(session: session, isVertical: isVertical, candidate: $candidate, close: closeLookTray, apply: confirmLook)
+                    .padding(FilmLabLayout.compact)
+            }
+        }
     }
 
     private func compactLayout(height: CGFloat, showsAdjustments: Bool) -> some View {
@@ -107,7 +135,30 @@ struct EditorContent: View {
             height: height, showsAdjustments: showsAdjustments, isEditable: !showsOriginal,
             whiteBalanceAsShot: session.asShotWhiteBalance, adjustments: $session.adjustments, group: $group, selection: $selection
         ) {
-            photo
+            photoWithLookTray(isVertical: verticalSizeClass == .compact)
         }
+    }
+
+    private func toggleLookTray() {
+        if showsLookTray { closeLookTray() } else { showsLookTray = true }
+    }
+
+    private func closeLookTray() {
+        candidate = nil
+        showsLookTray = false
+    }
+
+    private func confirmLook() {
+        guard let candidate else { return }
+        if session.isEdited && !candidate.matches(session.adjustments) {
+            isConfirmingLook = true
+        } else {
+            applyLook(candidate)
+        }
+    }
+
+    private func applyLook(_ recipe: Recipe) {
+        session.apply(recipe)
+        closeLookTray()
     }
 }

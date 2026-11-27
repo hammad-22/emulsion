@@ -81,6 +81,10 @@ extension RenderServiceTests {
         _ = try await service.image(url, .init(), maxDimension: 300)
         #expect(service.latestRender(url) === rendered, "thumbnails don't replace it")
 
+        let preview = try await service.image(url, .neutral, maxDimension: 900, retainsLatestRender: false)
+        #expect(preview !== rendered)
+        #expect(service.latestRender(url) === rendered, "an unapplied look does not replace the saved edit")
+
         await service.forget(url)
         #expect(service.latestRender(url) == nil)
     }

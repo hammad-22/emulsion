@@ -15,6 +15,7 @@ public struct RenderedPhoto: View {
     private let adjustments: Adjustments
     private let contentMode: ContentMode
     private let showsOriginal: Bool
+    private let retainsLatestRender: Bool
 
     @Environment(\.renderService) private var renderService
     @Environment(\.displayScale) private var displayScale
@@ -22,11 +23,14 @@ public struct RenderedPhoto: View {
     @State private var failed = false
     @State private var order = RenderOrder()
 
-    public init(url: URL, adjustments: Adjustments, contentMode: ContentMode = .fit, showsOriginal: Bool = false) {
+    public init(
+        url: URL, adjustments: Adjustments, contentMode: ContentMode = .fit, showsOriginal: Bool = false, retainsLatestRender: Bool = true
+    ) {
         self.url = url
         self.adjustments = adjustments
         self.contentMode = contentMode
         self.showsOriginal = showsOriginal
+        self.retainsLatestRender = retainsLatestRender
     }
 
     public var body: some View {
@@ -88,7 +92,8 @@ public struct RenderedPhoto: View {
             let rendered =
                 request.showsOriginal
                 ? try await renderService.original(request.url, maxDimension: request.pixels)
-                : try await renderService.image(request.url, request.adjustments, maxDimension: request.pixels)
+                : try await renderService.image(
+                    request.url, request.adjustments, maxDimension: request.pixels, retainsLatestRender: retainsLatestRender)
             guard order.shouldShow(ticket) else { return }
             image = rendered
             failed = false
