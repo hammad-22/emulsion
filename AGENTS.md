@@ -83,11 +83,14 @@ Stock-data checks and `emulsion-fit` read the local reference data (traced curve
   4. Investigate every finding and mark it ACCEPT or REFUTE, with proof (a reproduction, file:line or a test). Fix what's accepted, adding a regression test for each real bug.
   5. Open the PR as a **draft** (`gh pr create --draft`, or `gh stack submit --draft`) with the verdicts in a PR comment.
   6. Mark it ready (`gh pr ready`) once CI is green.
-- **Risk level, and who approves the merge** (owner, 27 Nov 2026). Every PR description states **Risk: low, medium or high** with one line of why. When unsure, pick the higher level.
-  - **Low:** nothing a user can see or lose can change: docs and agent instructions, tests, comments, CI and tooling, refactors and file moves proven behavior-neutral (tests and goldens unchanged), and code only compiled into the Lab research build. The parent session merges these once CI is green and the review verdicts are recorded.
-  - **Medium:** anything a user sees or does that changes: UI, app logic, capture, export, new features and settings.
-  - **High:** anything that changes pixels or data: the film engine, kernels, color and RAW input, looks and their defaults, goldens; stored formats (library, recipes) and migrations; licensing; deleting data.
-  - **Medium and high need the owner's approval.** The parent marks the PR ready when CI is green, tells the owner what to look at (the Proof section), and merges only after the owner says yes for that PR. Stacks merge bottom-up.
+- **Risk level, and who approves the merge** (owner, 27 Nov 2026; modeled on how AI review tools gate automatic approval). Every PR description states **Risk: low, medium, high or critical** with one line of why. The level comes from what the change does, not from its size.
+  - **Low:** docs and agent instructions, tests, comments, styling with no layout change, small behavior-neutral code changes (tests and goldens unchanged), and code compiled only into the Lab research build.
+  - **Medium:** ordinary app changes: screens, app logic, new features and settings.
+  - **High:** shared or foundational code: `RenderService`, capture, export, shared components used by more than one app, public API of the packages, dependencies, build settings.
+  - **Critical:** anything that changes pixels or data: film engine and kernels, color and RAW input, looks and their defaults, goldens; stored formats (library, recipes) and migrations; licensing; CI and secrets; deleting data.
+  - **Paths that are never low**, whatever the description says: `Packages/EmulsionCore/Kernels/`, `Resources/Kernels/`, `Resources/Stocks/`, `Tests/**/Goldens/`, `FilmModel*`, `Developer*`, `RAWDecoder*`, `LICENSE`, `NOTICE`, `.github/workflows/`, and any `Codable` stored type.
+  - **Only low merges without the owner.** The parent session merges a low PR when all of these hold: it is not a draft, CI is green on the latest commit, the review ran on that commit with no open finding, verdicts are recorded, and it carries no `do-not-merge` or `manual-review` label. The parent re-checks the stated level against the diff; a missing or doubtful level counts as medium.
+  - **Medium, high and critical need the owner's approval for that PR.** The parent marks it ready when the same conditions hold, points the owner at the Proof section, and merges only after their yes. Risk decides who approves; it never excuses a finding. Stacks merge bottom-up.
 
 ## Sessions and project memory
 - **The project's memory lives in Linear**, not in any chat. Start every session by reading the *Emulsion V0 — State & handoff (read first)* document on the **Emulsion V0** initiative, then this file, then your issue.
