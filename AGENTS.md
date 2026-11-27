@@ -71,6 +71,7 @@ Stock-data checks and `emulsion-fit` read the local reference data (traced curve
   - Engine and look changes: before/after renders of a reference fixture at whole-photo size plus a 100% crop where the change shows, with the measured numbers.
   - Only when nothing visible can change (docs, tests, refactors): say "No visual change" and why; for refactors, give the evidence (goldens unchanged).
   - For third-party-derived data, publish residual numbers, not plots of the source curves. Proof uses only media we may publish (synthetic or CC0-derived); never the owner's or third-party photos.
+  - **Embed, don't link:** images appear inline in the description (`<img src="…" width="360">` in a Before | After table), never as a text link the reviewer has to click. Recordings appear inline too: a GIF embedded the same way, with a link to the full video beside it if there is one.
   - Proof images and recordings go on a `proof/<issue>` branch (e.g. `proof/mov-54`), linked from the PR by a commit-pinned `raw.githubusercontent.com/.../<sha>/...` URL. Never commit them to `main` or a feature branch (MOV-131).
 - **CI test crashes:** inspect the `test-diagnostics-<run>-<attempt>` artifact for the test log and macOS crash reports (MOV-127). Keep the failing exit status; don't mask crashes with retries.
 - **Run the app in the Simulator** for any app change; don't stop at "it compiles". Use the iPhone 17 Pro and iPhone Duo simulators.
