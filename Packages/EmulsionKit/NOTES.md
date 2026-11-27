@@ -5,6 +5,8 @@ named after the type that points to it.
 
 ## AVCameraSource
 
+- Keep the physical lens buttons from AVFoundation discovery. Add in-sensor stops when the configured physical input reports native factors and ProRAW. Cache verified stops as lenses are visited, and recheck them when selected. Zoomed capture requests the standard resolution. Bayer capture requires 1×.
+
 - Follows Apple's AVCam sample: an actor whose executor is the capture session's serial queue, so
   every session call runs on that queue.
 - Physical cameras only, never a virtual one: Bayer RAW requires a zoom factor of 1

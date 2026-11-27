@@ -53,13 +53,26 @@ struct CameraContent: View {
             CameraUnavailableView(reason: .unavailable { Task { await model.start() } })
         case .idle, .starting, .running, .interrupted:
             ViewfinderView(model: model) {
-                if showingRecipes {
-                    recipeStrip
-                        .padding(.bottom, FilmLabLayout.gap)
-                        .transition(reduceMotion ? .opacity : .move(edge: .bottom).combined(with: .opacity))
-                }
+                viewfinderControls(showingRecipes: showingRecipes)
             }
         }
+    }
+
+    private func viewfinderControls(showingRecipes: Bool) -> some View {
+        VStack(spacing: FilmLabLayout.compact) {
+            if showingRecipes {
+                recipeStrip
+                    .transition(reduceMotion ? .opacity : .move(edge: .bottom).combined(with: .opacity))
+            }
+            if !isWide, let capabilities = model.capabilities, capabilities.lenses.count > 1 {
+                LensPicker(capabilities: capabilities) { option in
+                    Task { await model.select(option.lens, zoomFactor: option.zoomFactor) }
+                }
+                .disabled(!model.acceptsInput)
+                .dynamicTypeSize(...FilmLabLayout.largestCameraTextSize)
+            }
+        }
+        .padding(.bottom, FilmLabLayout.gap)
     }
 
     private var recipeStrip: some View {

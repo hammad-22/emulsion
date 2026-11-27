@@ -4,14 +4,14 @@ import SwiftUI
 
 struct LensPicker: View {
     let capabilities: CameraCapabilities
-    let select: (CameraLens) -> Void
+    let select: (LensOption) -> Void
 
     @ScaledMetric private var buttonSize = FilmLabLayout.minimumControlHeight
 
     var body: some View {
         HStack(spacing: FilmLabLayout.hairline) {
             ForEach(capabilities.lenses) { option in
-                lensButton(option, isSelected: option.lens == capabilities.lens)
+                lensButton(option, isSelected: option.lens == capabilities.lens && option.zoomFactor == capabilities.zoomFactor)
             }
         }
         .padding(FilmLabLayout.hairline)
@@ -20,7 +20,7 @@ struct LensPicker: View {
 
     private func lensButton(_ option: LensOption, isSelected: Bool) -> some View {
         Button {
-            select(option.lens)
+            select(option)
         } label: {
             Text(option.title(isSelected: isSelected))
                 .font(isSelected ? .footnote.weight(.bold) : .caption.weight(.semibold))

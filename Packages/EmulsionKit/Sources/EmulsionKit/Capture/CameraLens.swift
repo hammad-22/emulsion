@@ -13,15 +13,17 @@ public enum CameraLens: String, CaseIterable, Sendable, Identifiable {
     }
 }
 
-public struct LensOption: Sendable, Equatable, Identifiable {
+public struct LensOption: Sendable, Hashable, Identifiable {
     public let lens: CameraLens
     /// Relative to the wide lens: 0.5 for an ultra wide.
     public let magnification: Double
-    public var id: CameraLens { lens }
+    public let zoomFactor: Double
+    public var id: Self { self }
 
-    init(lens: CameraLens, magnification: Double) {
+    init(lens: CameraLens, magnification: Double, zoomFactor: Double = 1) {
         self.lens = lens
         self.magnification = magnification
+        self.zoomFactor = zoomFactor
     }
 
     public func title(isSelected: Bool) -> String {
@@ -35,8 +37,16 @@ public struct LensOption: Sendable, Equatable, Identifiable {
 
     private var formattedMagnification: String { displayedMagnification.formatted(.number.precision(.fractionLength(0...1))) }
 
+    static func merging(physical: [LensOption], native: [LensOption]) -> [LensOption] {
+        var shown = Set(physical.map(\.displayedMagnification))
+        let distinct = native.filter { shown.insert($0.displayedMagnification).inserted }
+        return (physical + distinct).sorted { $0.displayedMagnification < $1.displayedMagnification }
+    }
+
     /// Rounded like the system Camera's labels: tenths below 1×, halves above (4, not 4.2).
     var displayedMagnification: Double {
-        magnification < 1 ? (magnification * 10).rounded() / 10 : (magnification * 2).rounded() / 2
+        let base = magnification / zoomFactor
+        let rounded = base < 1 ? (base * 10).rounded() / 10 : (base * 2).rounded() / 2
+        return rounded * zoomFactor
     }
 }

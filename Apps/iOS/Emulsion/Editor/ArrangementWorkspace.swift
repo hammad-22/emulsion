@@ -4,6 +4,7 @@ import SwiftUI
 @available(iOS 27.1, *)
 struct ArrangementWorkspace<Photo: View, Inspector: View>: View {
     let showsInspector: Bool
+    var narrowInspectorWidth: CGFloat? = nil
     @ViewBuilder let photo: () -> Photo
     @ViewBuilder let inspector: () -> Inspector
 
@@ -20,7 +21,10 @@ struct ArrangementWorkspace<Photo: View, Inspector: View>: View {
                     .padding(FilmLabLayout.inset)
                     .frame(maxHeight: .infinity, alignment: .top)
             }
-            .splitArrangementLayoutSize(minWidth: inspectorMinimumWidth, idealWidth: inspectorIdealWidth)
+            .splitArrangementLayoutSize(
+                minWidth: narrowInspectorWidth.map { $0 + FilmLabLayout.inset * 2 } ?? inspectorMinimumWidth,
+                idealWidth: narrowInspectorWidth.map { $0 + FilmLabLayout.inset * 2 } ?? inspectorIdealWidth,
+                maxWidth: narrowInspectorWidth.map { $0 + FilmLabLayout.inset * 2 })
         }
         .arrangementViewStyle(.split.axes(splitAxes))
     }

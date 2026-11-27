@@ -6,6 +6,8 @@ struct EditorToolbar: ToolbarContent {
     let session: EditSession
     @Binding var isComparing: Bool
     let showsAdjustments: Bool
+    let showsLookTray: Bool
+    let toggleLookTray: () -> Void
     let toggleAdjustments: () -> Void
 
     @Environment(PhotoStore.self) private var store
@@ -16,7 +18,11 @@ struct EditorToolbar: ToolbarContent {
     @State private var isConfirmingDelete = false
 
     var body: some ToolbarContent {
-        ToolbarItem(placement: .bottomBar) { LooksButton(session: session).disabled(isComparing) }
+        ToolbarItemGroup(placement: .bottomBar) {
+            Button(showsLookTray ? "Hide Quick Looks" : "Quick Looks", systemImage: "film", action: toggleLookTray)
+                .disabled(isComparing)
+            LooksButton(session: session).disabled(isComparing || showsLookTray)
+        }
         ToolbarSpacer(.flexible, placement: .bottomBar)
         ToolbarItem(placement: .bottomBar) {
             adjustmentButton
@@ -25,7 +31,7 @@ struct EditorToolbar: ToolbarContent {
             Toggle("Compare", systemImage: "square.split.2x1", isOn: $isComparing)
                 .tint(.white)
             Button("Reset Edits", systemImage: "arrow.counterclockwise") { session.reset() }
-                .disabled(!session.isEdited)
+                .disabled(!session.isEdited || showsLookTray)
         }
         ToolbarSpacer(.fixed, placement: .topBarTrailing)
         ToolbarItem(placement: .topBarTrailing) {
@@ -35,7 +41,7 @@ struct EditorToolbar: ToolbarContent {
             .buttonStyle(.glassProminent)
             .tint(.white)
             .foregroundStyle(.black)
-            .disabled(isExporting)
+            .disabled(isExporting || showsLookTray)
             .alert(exportResult?.message ?? "", isPresented: Binding(isPresenting: $exportResult)) {}
             .sensoryFeedback(trigger: exportResult) { _, result in result?.feedback }
         }

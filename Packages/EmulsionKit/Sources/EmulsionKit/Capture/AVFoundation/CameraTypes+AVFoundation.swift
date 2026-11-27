@@ -47,15 +47,29 @@
 
     extension LensOption {
         /// From 35 mm equivalent focal lengths, else the field of view (AVCaptureDevice.h).
-        static func options(for devices: [CameraLens: AVCaptureDevice]) -> [LensOption] {
+        static func options(for devices: [CameraLens: AVCaptureDevice], nativeZoom: [CameraLens: [CGFloat]]) -> [LensOption] {
             guard let reference = devices[.wide] ?? devices.values.first else { return [] }
-            return CameraLens.allCases.compactMap { lens in
+            let physical: [LensOption] = CameraLens.allCases.compactMap { lens in
                 guard let device = devices[lens] else { return nil }
                 let focal = Double(device.nominalFocalLengthIn35mmFilm)
                 let referenceFocal = Double(reference.nominalFocalLengthIn35mmFilm)
                 if focal > 0, referenceFocal > 0 { return LensOption(lens: lens, magnification: focal / referenceFocal) }
                 let halfAngle = { (device: AVCaptureDevice) in Double(device.activeFormat.videoFieldOfView) * .pi / 360 }
                 return LensOption(lens: lens, magnification: tan(halfAngle(reference)) / tan(halfAngle(device)))
+            }
+            let native = physical.flatMap { base in
+                (nativeZoom[base.lens] ?? []).map { factor in
+                    LensOption(lens: base.lens, magnification: base.magnification * Double(factor), zoomFactor: Double(factor))
+                }
+            }
+            return LensOption.merging(physical: physical, native: native)
+        }
+    }
+
+    extension AVCaptureDevice {
+        var nativeZoomStops: [CGFloat] {
+            activeFormat.secondaryNativeResolutionZoomFactors.filter {
+                $0 > 1 && $0 >= minAvailableVideoZoomFactor && $0 <= maxAvailableVideoZoomFactor
             }
         }
     }

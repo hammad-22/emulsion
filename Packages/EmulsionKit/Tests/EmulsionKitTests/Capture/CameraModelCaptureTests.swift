@@ -18,6 +18,27 @@ struct CameraModelCaptureTests {
         #expect(model.capabilities?.supportsFullResolution == false)
     }
 
+    @Test func selectingAnInSensorStopUpdatesTheSameLensAndSurvivesRestart() async {
+        let library = TestLibrary()
+        let source = MockCameraSource(lenses: [
+            LensOption(lens: .wide, magnification: 1),
+            LensOption(lens: .wide, magnification: 2, zoomFactor: 2),
+        ])
+        let model = library.camera(source)
+        await model.start()
+        await model.select(.wide, zoomFactor: 2)
+        #expect(model.capabilities?.zoomFactor == 2)
+        #expect(model.capabilities?.supportsFullResolution == false)
+
+        await model.stop()
+        await model.start()
+        #expect(model.capabilities?.zoomFactor == 2)
+
+        await model.select(.wide)
+        #expect(model.capabilities?.zoomFactor == 1)
+        #expect(model.capabilities?.supportsFullResolution == true)
+    }
+
     @Test func focusForwardsThePointAndShowsTheReticleBriefly() async throws {
         let library = TestLibrary()
         let source = MockCameraSource()
