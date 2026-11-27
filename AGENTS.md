@@ -65,7 +65,7 @@ Stock-data checks and `emulsion-fit` read the local reference data (traced curve
 - **Leave it cleaner.** Fix stale comments and dead code in the files you touch. For layout (file size, comments, constants, enums), follow the organize skill (`.agents/skills/swift-organize/SKILL.md`).
 - **Prove it in the PR: before and after, visually.** Every PR has a **Proof** section (template in `.github/pull_request_template.md`) that a reviewer can judge without checking out the branch:
   - Start it with one or two lines under **What to look for**: what the reviewer should see change, and where.
-  - Show **before and after side by side**, same scene, same size, same settings except the change; "before" is the base branch.
+  - Show **before and after side by side** with the same feature or screen open, at the same step in the interaction. Keep the scene, size and settings matched except for the change. Use the base branch for "before". Give separate features separate comparisons.
   - Pick the medium by the change: screenshots for anything static (layout, text, a color, a render); a short screen recording for anything with motion or interaction (animation, transition, gesture, scrolling, live slider drags, capture flow). When unsure, record.
   - UI changes: iOS Simulator (`xcrun simctl io booted screenshot|recordVideo`) on iPhone 17 Pro and Duo, light and dark when it matters, and a device when it matters.
   - Engine and look changes: before/after renders of a reference fixture at whole-photo size plus a 100% crop where the change shows, with the measured numbers.
