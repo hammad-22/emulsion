@@ -19,6 +19,7 @@ public actor MockCameraSource: CameraSource {
     private nonisolated let eventStream = SourceStream.events()
     private var lens = CameraLens.wide
     private var zoomFactor = 1.0
+    private var manualExposure: (shutterSeconds: Double, iso: Float)?
     private var delivery: Task<Void, Never>?
     private var isInterrupted = false
     private var samples: [CGImage] = []
@@ -75,6 +76,7 @@ public actor MockCameraSource: CameraSource {
         if self.lens != lens || !lenses.contains(where: { $0.lens == lens }) {
             self.lens = lenses.contains { $0.lens == lens } ? lens : lenses[0].lens
             zoomFactor = 1
+            manualExposure = nil
         }
         if delivery == nil { delivery = Task { await deliverFrames() } }
         return capabilities
@@ -88,8 +90,21 @@ public actor MockCameraSource: CameraSource {
 
     public func select(_ lens: CameraLens, zoomFactor: Double) throws(CameraError) -> CameraCapabilities {
         guard lenses.contains(where: { $0.lens == lens && $0.zoomFactor == zoomFactor }) else { throw .unavailable }
+        if self.lens != lens { manualExposure = nil }
         self.lens = lens
         self.zoomFactor = zoomFactor
+        return capabilities
+    }
+
+    public func changeExposure(_ change: CameraExposure.Change) throws(CameraError) -> CameraCapabilities {
+        let exposure = simulatedExposure
+        guard exposure.accepts(change) else { throw .unavailable }
+        switch change {
+        case .automatic: manualExposure = nil
+        case .shutter(let seconds): manualExposure = (seconds, exposure.iso)
+        case .iso(let iso): manualExposure = (exposure.shutterSeconds, iso)
+        case .aperture: throw .unavailable
+        }
         return capabilities
     }
 
@@ -113,7 +128,23 @@ public actor MockCameraSource: CameraSource {
     private var capabilities: CameraCapabilities {
         CameraCapabilities(
             lenses: lenses, lens: lens, zoomFactor: zoomFactor, rawFormat: .proRAW,
-            supportsFullResolution: lens != .ultraWide && zoomFactor == 1)
+            supportsFullResolution: lens != .ultraWide && zoomFactor == 1, exposure: simulatedExposure)
+    }
+
+    private var simulatedExposure: CameraExposure {
+        // A deterministic fixed-aperture camera fixture.
+        let aperture: Float =
+            switch lens {
+            case .ultraWide: 2.2
+            case .wide: 1.8
+            case .telephoto: 2.8
+            }
+        return CameraExposure(
+            isManual: manualExposure != nil, shutterSeconds: manualExposure?.shutterSeconds ?? 1.0 / 60,
+            iso: manualExposure?.iso ?? 100, aperture: aperture,
+            shutterStops: CameraExposure.shutterStops(in: (1.0 / 4_000)...(1.0 / 3)),
+            isoStops: CameraExposure.isoStops(in: 50...1_600),
+            apertureStops: [])
     }
 
     private var sampleIndex: Int { lenses.filter { $0.zoomFactor == 1 }.firstIndex { $0.lens == lens } ?? 0 }

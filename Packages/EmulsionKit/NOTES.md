@@ -5,6 +5,14 @@ named after the type that points to it.
 
 ## AVCameraSource
 
+- Manual exposure is per physical lens session. The source checks the active format before accepting
+  a setting and waits for the exposure operation before allowing another camera control or shutter.
+  Unchanged exposure values use AVFoundation's Current constants. iOS 27 aperture stops are exposed
+  only for formats that report a variable aperture and support each recommended stop. Reset returns
+  the device to continuous auto exposure. Focus never overrides custom exposure.
+- Apple specifies speed prioritization for photo capture with locked ISO and duration, including
+  ProRAW. [AVCaptureDevice exposure API](https://developer.apple.com/documentation/avfoundation/avcapturedevice/setexposuremodecustom%28duration%3Aiso%3Acompletionhandler%3A%29).
+
 - Keep the physical lens buttons from AVFoundation discovery. Add in-sensor stops when the configured physical input reports native factors and ProRAW. Cache verified stops as lenses are visited, and recheck them when selected. Zoomed capture requests the standard resolution. Bayer capture requires 1×.
 
 - Follows Apple's AVCam sample: an actor whose executor is the capture session's serial queue, so

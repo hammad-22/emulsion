@@ -14,11 +14,11 @@
             }
         }
 
-        private func respond(to pressure: CameraPressure, ofDevice deviceID: ObjectIdentifier) {
+        func respond(to pressure: CameraPressure, ofDevice deviceID: ObjectIdentifier) {
             guard let device = input?.device, ObjectIdentifier(device) == deviceID else { return }
             eventDelivery.yield(.pressure(pressure))
             let rate = pressure.throttledFrameRate
-            guard rate != throttledRates[deviceID] else { return }
+            guard !isChangingExposure, rate != throttledRates[deviceID] else { return }
             if let rate,
                 !device.activeFormat.videoSupportedFrameRateRanges.contains(where: {
                     ($0.minFrameRate...$0.maxFrameRate).contains(Double(rate))
@@ -30,7 +30,9 @@
                 // `.invalid` restores the active format's default rate.
                 let duration = rate.map { CMTime(value: 1, timescale: $0) } ?? .invalid
                 $0.activeVideoMinFrameDuration = duration
-                $0.activeVideoMaxFrameDuration = duration
+                if $0.exposureMode != .custom || (duration.isValid && CMTimeCompare(duration, $0.exposureDuration) >= 0) {
+                    $0.activeVideoMaxFrameDuration = duration
+                }
             }
             throttledRates[deviceID] = rate
         }
@@ -73,13 +75,15 @@
         func followSubjectAreaChanges() async {
             let changes = NotificationCenter.default.notifications(named: AVCaptureDevice.subjectAreaDidChangeNotification)
             for await _ in changes.map({ _ in () }) {
-                guard let device = input?.device else { continue }
+                guard !isChangingExposure, let device = input?.device else { continue }
                 configure(device) {
                     if $0.isFocusPointOfInterestSupported, $0.isFocusModeSupported(.continuousAutoFocus) {
                         $0.focusPointOfInterest = Self.frameCenter
                         $0.focusMode = .continuousAutoFocus
                     }
-                    if $0.isExposurePointOfInterestSupported, $0.isExposureModeSupported(.continuousAutoExposure) {
+                    if $0.exposureMode != .custom, $0.isExposurePointOfInterestSupported,
+                        $0.isExposureModeSupported(.continuousAutoExposure)
+                    {
                         $0.exposurePointOfInterest = Self.frameCenter
                         $0.exposureMode = .continuousAutoExposure
                     }

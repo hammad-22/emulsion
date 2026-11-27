@@ -26,7 +26,7 @@ struct CameraContent: View {
                 }
             } else {
                 VStack(spacing: FilmLabLayout.gap) {
-                    CaptureFormatBar(capabilities: model.capabilities)
+                    CaptureFormatBar(model: model)
                     stage
                     controls(axis: .horizontal)
                 }
