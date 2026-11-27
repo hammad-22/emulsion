@@ -8,13 +8,14 @@ Static change (layout, text, color, a render): screenshots. Motion or interactio
 UI: iOS Simulator on iPhone 17 Pro and Duo; a device when it matters.
 Engine and looks: renders of a reference fixture at whole-photo size plus a 100% crop, with the measured numbers.
 Nothing visible can change (docs, tests, refactors): write "No visual change" and why, and delete the table.
-Images and recordings go on a proof/<issue> branch, linked by commit-pinned raw URLs, never in this PR. Only media we may publish (synthetic or CC0-derived). -->
+Embed, don't link: images must show inline, e.g. <img src="https://raw.githubusercontent.com/.../<sha>/after.png" width="360">; recordings as an embedded GIF (plus a link to the full video if any). A text link to an image is not proof.
+Images and recordings go on a proof/<issue> branch, embedded by commit-pinned raw URLs, never in this PR. Only media we may publish (synthetic or CC0-derived). -->
 
 **What to look for:** <!-- One or two lines: what the reviewer should see change, and where. -->
 
 | Before | After |
 | --- | --- |
-|  |  |
+| <img src="" width="360" alt="Before"> | <img src="" width="360" alt="After"> |
 
 <!-- Recordings: link or embed before and after here. Numbers: a small table. -->
 
